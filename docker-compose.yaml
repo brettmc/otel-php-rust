@@ -1,0 +1,7 @@
+services:
+  php:
+    build:
+      context: .
+    volumes:
+    - ./:/usr/src/myapp
+    user: php-rust
