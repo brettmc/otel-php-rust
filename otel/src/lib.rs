@@ -1,6 +1,6 @@
 use crate::{
-    tracer::{make_tracer_class},
-    tracer_provider::{make_tracer_provider_class},
+    trace::tracer::{make_tracer_class},
+    trace::tracer_provider::{make_tracer_provider_class},
     globals::{make_globals_class},
 };
 use phper::{modules::Module, php_get_module};
@@ -9,9 +9,11 @@ use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::TracerProvider;
 use opentelemetry_stdout::SpanExporter;
 
-pub mod tracer;
+pub mod trace{
+    pub mod tracer;
+    pub mod tracer_provider;
+}
 pub mod globals;
-pub mod tracer_provider;
 
 #[php_get_module]
 pub fn get_module() -> Module {

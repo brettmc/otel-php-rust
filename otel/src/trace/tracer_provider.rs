@@ -7,7 +7,7 @@ use std::{
 use std::mem::take;
 use opentelemetry::global::GlobalTracerProvider;
 use opentelemetry::trace::TracerProvider;
-use crate::tracer::TRACER_CLASS;
+use crate::trace::tracer::TRACER_CLASS;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
 

@@ -2,8 +2,8 @@ use phper::{
     classes::{ClassEntity, Visibility},
 };
 use opentelemetry::global;
-use crate::tracer::TRACER_CLASS;
-use crate::tracer_provider::TRACER_PROVIDER_CLASS;
+use crate::trace::tracer::TRACER_CLASS;
+use crate::trace::tracer_provider::TRACER_PROVIDER_CLASS;
 
 const GLOBALS_CLASS_NAME: &str = "OpenTelemetry\\Globals";
 
