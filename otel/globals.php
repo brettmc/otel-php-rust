@@ -2,6 +2,8 @@
 
 use OpenTelemetry\Globals;
 
-$tracer = Globals::getTracer();
+$provider = Globals::tracerProvider();
+var_dump($provider);
+$tracer = $provider->getTracer("my_tracer");
 var_dump($tracer);
 $tracer->test("foobar");

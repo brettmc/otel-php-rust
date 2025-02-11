@@ -1,5 +1,6 @@
 use crate::{
     tracer::{make_tracer_class},
+    tracer_provider::{make_tracer_provider_class},
     globals::{make_globals_class},
 };
 use phper::{modules::Module, php_get_module};
@@ -10,6 +11,7 @@ use opentelemetry_stdout::SpanExporter;
 
 pub mod tracer;
 pub mod globals;
+pub mod tracer_provider;
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -19,6 +21,7 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_AUTHORS"),
     );
 
+    module.add_class(make_tracer_provider_class());
     module.add_class(make_tracer_class());
     module.add_class(make_globals_class());
 
