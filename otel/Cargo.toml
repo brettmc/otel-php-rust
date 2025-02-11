@@ -1,0 +1,20 @@
+[package]
+name = "otel"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "otel"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+phper = "0.14.1"
+opentelemetry = "0.27.1"
+opentelemetry-stdout = "0.27.0"
+opentelemetry_sdk = "0.27.1"
+reqwest = { version = "0.12.5", features = ["blocking", "cookies"] }
+thiserror = "1.0.63"
+
+[dev-dependencies]
+phper-test = "0.14.1"
