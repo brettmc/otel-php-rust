@@ -11,7 +11,7 @@ use std::{
 use opentelemetry::trace::{
     SpanKind,
     Span,
-    // Status,
+    Status,
     Tracer,
 };
 use opentelemetry::global::{
@@ -55,12 +55,14 @@ pub fn make_tracer_class() -> ClassEntity<Option<BoxedTracer>> {
     });
 
     class
-        .add_method("test", Visibility::Public, |this, _arguments| -> phper::Result<()> {
+        .add_method("test", Visibility::Public, |this, arguments| -> phper::Result<()> {
             let tracer = this.as_state().as_ref().unwrap();
+            let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let mut span = tracer
-                .span_builder("test_span")
+                .span_builder(name)
                 .with_kind(SpanKind::Server)
                 .start(tracer);
+            span.set_status(Status::Ok);
             span.end();
             Ok(())
         })
