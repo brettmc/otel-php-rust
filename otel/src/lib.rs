@@ -9,10 +9,7 @@ use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::TracerProvider;
 use opentelemetry_stdout::SpanExporter;
 
-pub mod trace{
-    pub mod tracer;
-    pub mod tracer_provider;
-}
+pub mod trace;
 pub mod globals;
 
 #[php_get_module]
