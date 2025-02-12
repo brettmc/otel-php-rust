@@ -30,6 +30,7 @@ Span #0
 	Name        : updated
 	TraceId     : %s
 	SpanId      : %s
+	TraceFlags  : TraceFlags(1)
 	ParentSpanId: 0000000000000000
 	Kind        : Internal
 	Start time: %s
@@ -37,3 +38,5 @@ Span #0
 	Status: Ok
 	Attributes:
 		 ->  foo: String(Owned("bar"))
+		 ->  baz: String(Owned("bat"))
+		 ->  num: Integer(Owned(2))

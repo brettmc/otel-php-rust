@@ -99,7 +99,16 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
         });
 
     class
-        .add_method("getContext", Visibility::Public, |this, _arguments| {
+        .add_method("getContext", Visibility::Public, |this, _| {
+            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let span_context: SpanContext = span.span_context().clone();
+            let mut object = SPAN_CONTEXT_CLASS.init_object()?;
+            *object.as_mut_state() = Some(span_context);
+            Ok::<_, phper::Error>(object)
+        });
+
+    class
+        .add_method("getParentContext", Visibility::Public, |this, _| {
             let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
             let span_context: SpanContext = span.span_context().clone();
             let mut object = SPAN_CONTEXT_CLASS.init_object()?;

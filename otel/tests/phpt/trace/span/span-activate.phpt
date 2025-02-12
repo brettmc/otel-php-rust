@@ -5,11 +5,12 @@ otel
 --FILE--
 <?php
 use OpenTelemetry\Globals;
-use OpenTelemetry\API\Trace\StatusCode;
 $tracer = Globals::tracerProvider()->getTracer('my_tracer');
+
 $root = $tracer->spanBuilder('root')->startSpan();
 /*$scope =*/ $root->activate();
 $child = $tracer->spanBuilder('child')->startSpan();
+assert($child->getContext()->getTraceId() === $root->getContext()->getTraceId());
 $child->end();
 $root->end();
 ?>

@@ -8,6 +8,8 @@ RUN groupadd -g 1000 php-rust \
 RUN apt-get update \
   && apt-get install -y llvm-dev libclang-dev
 
+RUN ln -s /usr/src/myapp/target/release/libotel.so $(php-config --extension-dir)/otel.so
+
 USER php-rust
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

@@ -17,7 +17,9 @@ use phper::{
 use std::sync::OnceLock;
 use opentelemetry::{
     global,
+    KeyValue,
 };
+use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::{
     SdkTracerProvider,
@@ -56,7 +58,14 @@ pub fn get_module() -> Module {
 
     module.on_module_init(|| {
         global::set_text_map_propagator(TraceContextPropagator::new());
+        let resource = Resource::builder()
+            .with_service_name("my_service_name")
+            .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
+            .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
+            .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
+            .build();
         let provider = SdkTracerProvider::builder()
+            .with_resource(resource)
             .with_batch_exporter(SpanExporter::default())
             .build();
         let _ = TRACER_PROVIDER.set(provider);

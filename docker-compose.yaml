@@ -3,5 +3,5 @@ services:
     build:
       context: .
     volumes:
-    - ./:/usr/src/myapp
+    - ./otel/:/usr/src/myapp
     user: php-rust
