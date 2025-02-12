@@ -8,6 +8,7 @@ use std::mem::take;
 use opentelemetry::trace::{
     SpanBuilder,
 };
+use opentelemetry::InstrumentationScope;
 use opentelemetry::global;
 use opentelemetry::global::BoxedSpan;
 use crate::trace::span::SPAN_CLASS;
@@ -30,7 +31,12 @@ pub fn make_span_builder_class() -> ClassEntity<Option<SpanBuilder>> {
         .add_method("startSpan", Visibility::Public, |this, _| {
             let state = take(this.as_mut_state());
             //TODO keep a reference to the tracer in this instance and use that!!
-            let tracer = global::tracer("change-me");
+            let scope = InstrumentationScope::builder("change-me")
+                .with_version("0.1")
+                .with_schema_url(r"http://my.schema.url")
+                .build();
+
+            let tracer = global::tracer_with_scope(scope);
             let builder = state.as_ref().expect("SpanBuilder is not initialized");
             let span: BoxedSpan = builder.clone().start(&tracer);
             let mut object = SPAN_CLASS.init_object()?;

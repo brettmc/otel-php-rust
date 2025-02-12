@@ -5,6 +5,7 @@ use crate::{
         status_code::{make_status_code_class},
         tracer::{make_tracer_class},
         tracer_provider::{make_tracer_provider_class},
+        span_context::{make_span_context_class},
     },
     globals::{make_globals_class},
 };
@@ -17,6 +18,7 @@ use opentelemetry_stdout::SpanExporter;
 pub mod trace{
     pub mod span;
     pub mod span_builder;
+    pub mod span_context;
     pub mod status_code;
     pub mod tracer;
     pub mod tracer_provider;
@@ -35,6 +37,7 @@ pub fn get_module() -> Module {
     module.add_class(make_tracer_class());
     module.add_class(make_span_class());
     module.add_class(make_span_builder_class());
+    module.add_class(make_span_context_class());
     module.add_class(make_globals_class());
     module.add_class(make_status_code_class());
 

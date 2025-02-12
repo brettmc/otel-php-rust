@@ -5,17 +5,21 @@ Create a span with instrumentation scope
 use OpenTelemetry\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
-$tracer = Globals::tracerProvider()->getTracer("test", "0.1", "https://schema.url", ["a_string" => "foo", "a_bool" => true, "a_int" => 3]);
+$tracer = Globals::tracerProvider()->getTracer('test', '1.0', 'https://schemas.opentelemetry.io/1.30.0', ['a_string' => 'foo', 'a_bool' => true, 'a_int' => 3]);
 $tracer->spanBuilder('test')->startSpan()->end();
 ?>
+--XFAIL--
+Tracer with instrumentation scope not implemented
 --EXPECTF--
-FOOOO
 Spans
 Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "change-me"
+		Name         : "test"
+		Version  : "1.0"
+		SchemaUrl: "https://schemas.opentelemetry.io/1.30.0"
+		Attributes   : ???
 
 	Name        : test
 	TraceId     : %s
