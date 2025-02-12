@@ -1,5 +1,7 @@
 --TEST--
 Fetch a span builder from globals
+--EXTENSIONS--
+otel
 --FILE--
 <?php
 use OpenTelemetry\Globals;

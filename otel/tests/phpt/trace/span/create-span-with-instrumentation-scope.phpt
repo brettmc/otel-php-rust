@@ -1,5 +1,7 @@
 --TEST--
 Create a span with instrumentation scope
+--EXTENSIONS--
+otel
 --FILE--
 <?php
 use OpenTelemetry\Globals;

@@ -5,7 +5,6 @@ use phper::{
 use std::{
     convert::Infallible,
 };
-use std::mem::take;
 use opentelemetry::trace::{
     SpanKind,
     Span,
@@ -33,9 +32,10 @@ pub fn make_tracer_class() -> ClassEntity<Option<BoxedTracer>> {
 
     class
         .add_method("spanBuilder", Visibility::Public, |this, arguments| {
-            let state = take(this.as_mut_state());
+            let tracer = this.as_state().as_ref().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-            let span_builder = state.as_ref().expect("Uh-oh").span_builder(name);
+            //todo tracer disappears after one span?
+            let span_builder = tracer.span_builder(name);
             let mut object = SPAN_BUILDER_CLASS.init_object()?;
             *object.as_mut_state() = Some(span_builder);
             Ok::<_, phper::Error>(object)

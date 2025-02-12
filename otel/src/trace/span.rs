@@ -13,6 +13,9 @@ use opentelemetry::trace::{
     Status,
     SpanContext,
 };
+use std::sync::Arc;
+use opentelemetry::Context;
+use opentelemetry::trace::TraceContextExt;
 use opentelemetry::global::{
     BoxedSpan,
 };
@@ -102,6 +105,14 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
             let mut object = SPAN_CONTEXT_CLASS.init_object()?;
             *object.as_mut_state() = Some(span_context);
             Ok::<_, phper::Error>(object)
+        });
+
+    class
+        .add_method("activate", Visibility::Public, |_this, _arguments| -> phper::Result<()> {
+            // let span: BoxedSpan = this.as_mut_state().as_ref().unwrap().clone();
+            // let ctx = Context::current().with_span(span); //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
+            // let _guard = ctx.attach();
+            Ok(())
         });
 
     class

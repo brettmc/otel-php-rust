@@ -1,5 +1,6 @@
 use crate::{
     trace::{
+        //scope::{make_scope_class},
         span::{make_span_class},
         span_builder::{make_span_builder_class},
         status_code::{make_status_code_class},
@@ -9,13 +10,22 @@ use crate::{
     },
     globals::{make_globals_class},
 };
-use phper::{modules::Module, php_get_module};
-use opentelemetry::{global};
+use phper::{
+    modules::Module,
+    php_get_module,
+};
+use std::sync::OnceLock;
+use opentelemetry::{
+    global,
+};
 use opentelemetry_sdk::propagation::TraceContextPropagator;
-use opentelemetry_sdk::trace::TracerProvider;
+use opentelemetry_sdk::trace::{
+    SdkTracerProvider,
+};
 use opentelemetry_stdout::SpanExporter;
 
 pub mod trace{
+    pub mod scope;
     pub mod span;
     pub mod span_builder;
     pub mod span_context;
@@ -25,6 +35,8 @@ pub mod trace{
 }
 pub mod globals;
 
+static TRACER_PROVIDER: OnceLock<SdkTracerProvider> = OnceLock::new();
+
 #[php_get_module]
 pub fn get_module() -> Module {
     let mut module = Module::new(
@@ -33,6 +45,7 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_AUTHORS"),
     );
 
+    //module.add_class(make_scope_class());
     module.add_class(make_tracer_provider_class());
     module.add_class(make_tracer_class());
     module.add_class(make_span_class());
@@ -43,13 +56,16 @@ pub fn get_module() -> Module {
 
     module.on_module_init(|| {
         global::set_text_map_propagator(TraceContextPropagator::new());
-        let provider = TracerProvider::builder()
-            .with_simple_exporter(SpanExporter::default())
+        let provider = SdkTracerProvider::builder()
+            .with_batch_exporter(SpanExporter::default())
             .build();
-        global::set_tracer_provider(provider);
+        let _ = TRACER_PROVIDER.set(provider);
+        global::set_tracer_provider(TRACER_PROVIDER.get().unwrap().clone());
     });
     module.on_module_shutdown(|| {
-        global::shutdown_tracer_provider();
+        if let Some(provider) = TRACER_PROVIDER.get() {
+            let _ = provider.shutdown();
+        }
     });
 
     module

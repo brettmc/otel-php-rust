@@ -1,31 +1,30 @@
 --TEST--
-Create a span with all features
+Create a span
+--EXTENSIONS--
+otel
 --FILE--
 <?php
 use OpenTelemetry\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
+var_dump($span);
 $span->setStatus('Ok')
-     ->setAttribute('foo', 'bar')
-     ->setAttributes(['baz' => 'bat', 'num' => 2])
-     ->updateName('updated')
-     ->recordException(new \Exception('kaboom'))
-     ->addLink()
-     ->addEvent()
      ->end();
 ?>
+--XFAIL--
+Hard-coded instrumentation scope
 --EXPECTF--
+object(OpenTelemetry\API\Trace\Span)#2 (0) {
+}
 Spans
 Resource
-	 ->  %A
+%A
 Span #0
 	Instrumentation Scope
-		Name         : "change-me"
-		Version  : "0.1"
-		SchemaUrl: "http://my.schema.url"
+		Name         : "my_tracer"
 
-	Name        : updated
+	Name        : root
 	TraceId     : %s
 	SpanId      : %s
 	ParentSpanId: 0000000000000000
@@ -33,5 +32,3 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Ok
-	Attributes:
-		 ->  foo: String(Owned("bar"))

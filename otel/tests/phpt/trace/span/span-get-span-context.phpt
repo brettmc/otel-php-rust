@@ -1,5 +1,7 @@
 --TEST--
 Get SpanContext from a Span
+--EXTENSIONS--
+otel
 --FILE--
 <?php
 use OpenTelemetry\Globals;
@@ -13,7 +15,6 @@ var_dump([
     'is_valid' => $context->isValid(),
     'is_remote' => $context->isRemote(),
 ]);
-$span->end();
 ?>
 --EXPECTF--
 object(OpenTelemetry\API\Trace\SpanContext)#1 (0) {
@@ -33,11 +34,14 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-%A
+		Name         : "change-me"
+		Version  : "0.1"
+		SchemaUrl: "http://my.schema.url"
 
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s
+	TraceFlags  : TraceFlags(1)
 	ParentSpanId: 0000000000000000
 	Kind        : Internal
 	Start time: %s
