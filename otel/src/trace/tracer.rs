@@ -34,7 +34,6 @@ pub fn make_tracer_class() -> ClassEntity<Option<BoxedTracer>> {
         .add_method("spanBuilder", Visibility::Public, |this, arguments| {
             let tracer = this.as_state().as_ref().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-            //todo tracer disappears after one span?
             let span_builder = tracer.span_builder(name);
             let mut object = SPAN_BUILDER_CLASS.init_object()?;
             *object.as_mut_state() = Some(span_builder);

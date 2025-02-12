@@ -1,7 +1,5 @@
 use phper::{
-    // alloc::ToRefOwned,
     classes::{ClassEntity, StaticStateClass, Visibility},
-    // functions::Argument,
 };
 use std::{
     convert::Infallible,
@@ -65,21 +63,18 @@ pub fn make_span_context_class() -> ClassEntity<Option<SpanContext>> {
         Ok::<_, phper::Error>(object)
     });
 
-    // Method to check if span is valid
     class.add_method("isValid", Visibility::Public, |this, _| {
         let state = this.as_state();
         let is_valid = state.as_ref().expect("kaboom").is_valid();
         Ok::<_, phper::Error>(is_valid)
     });
 
-    // Method to get trace_id
     class.add_method("getTraceId", Visibility::Public, |this, _| {
         let state = this.as_state();
         let trace_id = state.as_ref().expect("kaboom").trace_id().to_string();
         Ok::<_, phper::Error>(trace_id)
     });
 
-    // Method to get span_id
     class.add_method("getSpanId", Visibility::Public, |this, _| {
         let state = this.as_state();
         let span_id = state.as_ref().expect("kaboom").span_id().to_string();

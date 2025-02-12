@@ -4,7 +4,6 @@ use phper::{
 use std::{
     convert::Infallible,
 };
-// use std::mem::take;
 //use opentelemetry::InstrumentationScope;
 use opentelemetry::global::GlobalTracerProvider;
 use opentelemetry::trace::TracerProvider;
@@ -25,7 +24,6 @@ pub fn make_tracer_provider_class() -> ClassEntity<Option<GlobalTracerProvider>>
     });
 
     class.add_method("getTracer", Visibility::Public, |this, arguments| {
-        //let state = take(this.as_mut_state());
         let provider = this.as_state().as_ref().unwrap();
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         // let version = arguments[1].expect_z_str()?.to_str()?.to_string();
@@ -38,11 +36,6 @@ pub fn make_tracer_provider_class() -> ClassEntity<Option<GlobalTracerProvider>>
         let mut object = TRACER_CLASS.init_object()?;
         *object.as_mut_state() = Some(tracer);
         Ok::<_, phper::Error>(object)
-    });
-
-    class.add_method("shutdown", Visibility::Public, |this, _| -> phper::Result<()> {
-        let _provider = this.as_state().as_ref().expect("TracerProvider is not initialized");
-        Ok(())
     });
 
     class
