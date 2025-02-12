@@ -5,6 +5,7 @@ use std::{
     convert::Infallible,
 };
 use std::mem::take;
+use opentelemetry::InstrumentationScope;
 use opentelemetry::global::GlobalTracerProvider;
 use opentelemetry::trace::TracerProvider;
 use crate::trace::tracer::TRACER_CLASS;
@@ -26,7 +27,13 @@ pub fn make_tracer_provider_class() -> ClassEntity<Option<GlobalTracerProvider>>
     class.add_method("getTracer", Visibility::Public, |this, arguments| {
         let state = take(this.as_mut_state());
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-        let tracer = state.as_ref().expect("TracerProvider is not initialized").tracer(name);
+        let version = arguments[1].expect_z_str()?.to_str()?.to_string();
+        let schema_url = arguments[2].expect_z_str()?.to_str()?.to_string();
+        let scope = InstrumentationScope::builder(name)
+            .with_version(version)
+            .with_schema_url(schema_url)
+            .build();
+        let tracer = state.as_ref().expect("TracerProvider is not initialized").tracer_with_scope(scope);
         let mut object = TRACER_CLASS.init_object()?;
         *object.as_mut_state() = Some(tracer);
         Ok::<_, phper::Error>(object)

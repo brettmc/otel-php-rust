@@ -6,7 +6,7 @@ publish = false
 
 [lib]
 name = "otel"
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 phper = "0.14.1"
