@@ -11,8 +11,8 @@ use opentelemetry::Context;
 use opentelemetry::trace::TraceContextExt;
 use opentelemetry::trace::{
     Span,
-    Status,
     SpanContext,
+    Status,
 };
 use opentelemetry::global::{
     BoxedSpan,
@@ -42,9 +42,32 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
 
     //@todo use status from arguments
     class
-        .add_method("setStatus", Visibility::Public, |this, _arguments| {
+        .add_method("setStatus", Visibility::Public, |this, arguments| {
             let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
-            span.set_status(Status::Ok);
+            let status = match arguments[0].expect_z_str()?.to_str() {
+                Ok(s) => s.to_string(),
+                Err(_) => return Ok(this.to_ref_owned()), // Ignore invalid UTF-8 input
+            };
+            let description = match arguments[1].expect_z_str()?.to_str() {
+                Ok(s) => s.to_string(),
+                Err(_) => "".to_string(),
+            };
+            match status.as_str() {
+                "Ok" => {
+                    span.set_status(Status::Ok);
+                }
+                "Unset" => {
+                    span.set_status(Status::Unset);
+                }
+                "Error" => {
+                    span.set_status(Status::Error {
+                        description: description.into(),
+                    });
+                }
+                _ => {
+
+                }
+            };
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
         .argument(Argument::by_val("code"))

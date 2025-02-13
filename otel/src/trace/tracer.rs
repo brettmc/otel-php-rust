@@ -6,9 +6,6 @@ use std::{
     convert::Infallible,
 };
 use opentelemetry::trace::{
-    SpanKind,
-    Span,
-    Status,
     Tracer,
 };
 use opentelemetry::global::{
