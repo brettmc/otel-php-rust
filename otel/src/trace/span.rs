@@ -6,16 +6,16 @@ use phper::{
 use std::{
     convert::Infallible,
 };
-use opentelemetry::KeyValue;
-use opentelemetry::Context;
-use opentelemetry::trace::TraceContextExt;
-use opentelemetry::trace::{
-    Span,
-    SpanContext,
-    Status,
-};
-use opentelemetry::global::{
-    BoxedSpan,
+use opentelemetry::{
+    Context,
+    KeyValue,
+    global::BoxedSpan,
+    trace::{
+        Span,
+        SpanContext,
+        Status,
+        TraceContextExt,
+    }
 };
 use crate::trace::span_context::SPAN_CONTEXT_CLASS;
 

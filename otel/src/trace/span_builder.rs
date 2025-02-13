@@ -3,14 +3,18 @@ use phper::{
 };
 use std::{
     convert::Infallible,
+    mem::take,
 };
-use std::mem::take;
-use opentelemetry::trace::{
-    SpanBuilder,
+use opentelemetry::{
+    InstrumentationScope,
+    global::{
+        self,
+        BoxedSpan,
+    },
+    trace::{
+        SpanBuilder,
+    }
 };
-use opentelemetry::InstrumentationScope;
-use opentelemetry::global;
-use opentelemetry::global::BoxedSpan;
 use crate::trace::span::SPAN_CLASS;
 
 const SPAN_BUILDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\SpanBuilder";

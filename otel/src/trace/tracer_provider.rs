@@ -5,17 +5,17 @@ use std::{
     convert::Infallible,
     sync::Arc,
 };
-//use opentelemetry::InstrumentationScope;
-use opentelemetry::global::GlobalTracerProvider;
-use opentelemetry_stdout::SpanExporter;
-use opentelemetry::trace::TracerProvider;
 use opentelemetry::{
+    //InstrumentationScope
+    global::GlobalTracerProvider,
     KeyValue,
+    trace::TracerProvider,
 };
-use opentelemetry_sdk::trace::{
-    SdkTracerProvider,
+use opentelemetry_stdout::SpanExporter;
+use opentelemetry_sdk::{
+    trace::SdkTracerProvider,
+    Resource,
 };
-use opentelemetry_sdk::Resource;
 use once_cell::sync::Lazy;
 use crate::trace::tracer::TRACER_CLASS;
 

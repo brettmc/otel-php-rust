@@ -5,11 +5,13 @@ use phper::{
 use std::{
     convert::Infallible,
 };
-use opentelemetry::trace::{
-    Tracer,
-};
-use opentelemetry::global::{
-    BoxedTracer,
+use opentelemetry::{
+    global::{
+        BoxedTracer,
+    },
+    trace::{
+        Tracer,
+    }
 };
 use crate::trace::span_builder::SPAN_BUILDER_CLASS;
 

@@ -24,9 +24,9 @@ use std::sync::{
 use opentelemetry::{
     global,
 };
-use opentelemetry_sdk::propagation::TraceContextPropagator;
-use opentelemetry_sdk::trace::{
-    SdkTracerProvider,
+use opentelemetry_sdk::{
+    propagation::TraceContextPropagator,
+    trace::SdkTracerProvider,
 };
 
 pub mod trace{

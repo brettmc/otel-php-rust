@@ -1,5 +1,8 @@
 use phper::{
-    classes::{ClassEntity, Visibility},
+    classes::{
+        ClassEntity,
+        Visibility,
+    },
 };
 use opentelemetry::global;
 use crate::trace::tracer_provider::TRACER_PROVIDER_CLASS;

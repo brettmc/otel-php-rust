@@ -1,5 +1,9 @@
 use phper::{
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{
+        ClassEntity,
+        StaticStateClass,
+        Visibility,
+    },
 };
 use std::{
     convert::Infallible,
