@@ -2,6 +2,8 @@
 Create a span with Error status + description
 --EXTENSIONS--
 otel
+--ENV--
+OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
 use OpenTelemetry\Globals;

@@ -4,6 +4,7 @@ use phper::{
     functions::Argument,
 };
 use std::{
+    borrow::Cow,
     convert::Infallible,
 };
 use opentelemetry::{
@@ -40,7 +41,6 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
             Ok(())
         });
 
-    //@todo use status from arguments
     class
         .add_method("setStatus", Visibility::Public, |this, arguments| {
             let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
@@ -48,10 +48,17 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
                 Ok(s) => s.to_string(),
                 Err(_) => return Ok(this.to_ref_owned()), // Ignore invalid UTF-8 input
             };
-            let description = match arguments[1].expect_z_str()?.to_str() {
-                Ok(s) => s.to_string(),
-                Err(_) => "".to_string(),
-            };
+            let description: Cow<'static, str> = arguments
+                .get(1)
+                .map(|d| d.expect_z_str())
+                .transpose()?
+                .map(|d| {
+                    match d.to_str() {
+                        Ok(s) => Cow::Owned(s.to_string()),
+                        Err(_) => Cow::Borrowed(""),
+                    }
+                })
+                .unwrap_or(Cow::Borrowed(""));
             match status.as_str() {
                 "Ok" => {
                     span.set_status(Status::Ok);
@@ -61,7 +68,7 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
                 }
                 "Error" => {
                     span.set_status(Status::Error {
-                        description: description.into(),
+                        description,
                     });
                 }
                 _ => {

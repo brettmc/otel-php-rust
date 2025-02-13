@@ -2,6 +2,8 @@
 Create a span with all features
 --EXTENSIONS--
 otel
+--ENV--
+OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
 use OpenTelemetry\Globals;

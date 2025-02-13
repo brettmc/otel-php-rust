@@ -2,6 +2,8 @@
 Get SpanContext from a Span
 --EXTENSIONS--
 otel
+--ENV--
+OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
 use OpenTelemetry\Globals;

@@ -3,6 +3,7 @@ use phper::{
 };
 use std::{
     convert::Infallible,
+    env,
     sync::Arc,
 };
 use opentelemetry::{
@@ -11,7 +12,12 @@ use opentelemetry::{
     KeyValue,
     trace::TracerProvider,
 };
-use opentelemetry_stdout::SpanExporter;
+use opentelemetry_stdout::SpanExporter as StdoutSpanExporter;
+use opentelemetry_otlp::{
+    Protocol,
+    SpanExporter as OtlpSpanExporter,
+    WithExportConfig,
+};
 use opentelemetry_sdk::{
     trace::SdkTracerProvider,
     Resource,
@@ -30,12 +36,25 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
         .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
         .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
         .build();
-    let provider = SdkTracerProvider::builder()
+
+    let mut builder = SdkTracerProvider::builder();
+    if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
+        let exporter = StdoutSpanExporter::default();
+        builder = builder.with_batch_exporter(exporter);
+    } else {
+        let exporter = OtlpSpanExporter::builder()
+            .with_http()
+            .with_protocol(Protocol::HttpBinary) // Can change to `HttpJson`
+            .build()
+            .expect("Failed to create OTLP trace exporter");
+        builder = builder.with_batch_exporter(exporter);
+    }
+    let provider = builder
         .with_resource(resource)
-        .with_batch_exporter(SpanExporter::default())
         .build();
     Arc::new(provider)
 });
+//TODO https://github.com/open-telemetry/opentelemetry-rust/blob/opentelemetry-otlp-0.28.0/opentelemetry-otlp/examples/basic-otlp/src/main.rs
 
 pub fn get_tracer_provider() -> &'static Arc<SdkTracerProvider> {
     &TRACER_PROVIDER

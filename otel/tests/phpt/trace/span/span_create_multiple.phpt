@@ -2,6 +2,8 @@
 Create multiple root spans
 --EXTENSIONS--
 otel
+--ENV--
+OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
 use OpenTelemetry\Globals;
