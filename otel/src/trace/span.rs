@@ -13,9 +13,6 @@ use opentelemetry::trace::{
     Status,
     SpanContext,
 };
-use std::sync::Arc;
-use opentelemetry::Context;
-use opentelemetry::trace::TraceContextExt;
 use opentelemetry::global::{
     BoxedSpan,
 };

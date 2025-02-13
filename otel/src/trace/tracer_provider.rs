@@ -3,15 +3,43 @@ use phper::{
 };
 use std::{
     convert::Infallible,
+    sync::Arc,
 };
 //use opentelemetry::InstrumentationScope;
 use opentelemetry::global::GlobalTracerProvider;
+use opentelemetry_stdout::SpanExporter;
 use opentelemetry::trace::TracerProvider;
+use opentelemetry::{
+    KeyValue,
+};
+use opentelemetry_sdk::trace::{
+    SdkTracerProvider,
+};
+use opentelemetry_sdk::Resource;
+use once_cell::sync::Lazy;
 use crate::trace::tracer::TRACER_CLASS;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
 
 pub static TRACER_PROVIDER_CLASS: StaticStateClass<Option<GlobalTracerProvider>> = StaticStateClass::null();
+
+static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
+    let resource = Resource::builder()
+        .with_service_name("my_service_name")
+        .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
+        .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
+        .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
+        .build();
+    let provider = SdkTracerProvider::builder()
+        .with_resource(resource)
+        .with_batch_exporter(SpanExporter::default())
+        .build();
+    Arc::new(provider)
+});
+
+pub fn get_tracer_provider() -> &'static Arc<SdkTracerProvider> {
+    &TRACER_PROVIDER
+}
 
 pub fn make_tracer_provider_class() -> ClassEntity<Option<GlobalTracerProvider>> {
     let mut class =
