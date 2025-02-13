@@ -6,4 +6,4 @@ build:
 	cargo build --release
 test: build
 	@echo "Running tests..."
-	php tests/run-tests.php -q --show-diff
+	php ~/run-tests.php -q --show-diff

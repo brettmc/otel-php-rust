@@ -1,6 +1,5 @@
 use phper::{
     alloc::ToRefOwned,
-    // echo,
     classes::{ClassEntity, StaticStateClass, Visibility},
     functions::Argument,
 };
@@ -8,6 +7,8 @@ use std::{
     convert::Infallible,
 };
 use opentelemetry::KeyValue;
+use opentelemetry::Context;
+use opentelemetry::trace::TraceContextExt;
 use opentelemetry::trace::{
     Span,
     Status,
@@ -106,6 +107,15 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
             let mut object = SPAN_CONTEXT_CLASS.init_object()?;
             *object.as_mut_state() = Some(span_context);
             Ok::<_, phper::Error>(object)
+        });
+
+    class
+        .add_static_method("getCurrent", Visibility::Public, |_| {
+            let ctx = Context::current();
+            let _span = ctx.span();
+            let mut _object = SPAN_CLASS.init_object()?;
+            //*object.as_mut_state() = Some(span);
+            Ok::<_, phper::Error>(_object)
         });
 
     class

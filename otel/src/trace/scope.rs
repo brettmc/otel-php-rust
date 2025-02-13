@@ -1,4 +1,4 @@
-/*use phper::{
+use phper::{
     classes::{ClassEntity, StaticStateClass, Visibility},
 };
 use std::{
@@ -27,4 +27,4 @@ pub fn make_scope_class() -> ClassEntity<Option<Context>> {
         });
 
     class
-}*/
+}

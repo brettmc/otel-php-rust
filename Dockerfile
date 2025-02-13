@@ -8,7 +8,8 @@ RUN groupadd -g 1000 php-rust \
 RUN apt-get update \
   && apt-get install -y llvm-dev libclang-dev
 
-RUN ln -s /usr/src/myapp/target/release/libotel.so $(php-config --extension-dir)/otel.so
+RUN ln -s /usr/src/myapp/target/release/libotel.so $(php-config --extension-dir)/otel.so \
+  && cp $(php-config --lib-dir)/php/build/run-tests.php /home/php-rust
 
 USER php-rust
 
