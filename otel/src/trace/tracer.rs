@@ -42,18 +42,4 @@ pub fn make_tracer_class() -> ClassEntity<Option<BoxedTracer>> {
         .argument(Argument::by_val("name"));
 
     class
-        .add_method("test", Visibility::Public, |this, arguments| -> phper::Result<()> {
-            let tracer = this.as_state().as_ref().unwrap();
-            let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-            let mut span = tracer
-                .span_builder(name)
-                .with_kind(SpanKind::Server)
-                .start(tracer);
-            span.set_status(Status::Ok);
-            span.end();
-            Ok(())
-        })
-        .argument(Argument::by_val("name"));
-
-    class
 }
