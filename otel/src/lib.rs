@@ -1,4 +1,7 @@
 use crate::{
+    context::{
+        context::{make_context_class},
+    },
     trace::{
         //scope::{make_scope_class},
         span::{make_span_class},
@@ -30,6 +33,9 @@ use opentelemetry_sdk::{
 };
 use tokio::runtime::Runtime;
 
+pub mod context{
+    pub mod context;
+}
 pub mod trace{
     pub mod scope;
     pub mod span;
@@ -53,6 +59,7 @@ pub fn get_module() -> Module {
     );
 
     //module.add_class(make_scope_class());
+    module.add_class(make_context_class());
     module.add_class(make_tracer_provider_class());
     module.add_class(make_tracer_class());
     module.add_class(make_span_class());
@@ -62,6 +69,7 @@ pub fn get_module() -> Module {
     module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
+        //TODO: configure internal logging, redirect to php error log?
         let runtime = Runtime::new().expect("Failed to create Tokio runtime");
         RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
 
