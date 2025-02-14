@@ -4,7 +4,7 @@ Get tracer from tracer provider
 otel
 --FILE--
 <?php
-use OpenTelemetry\Globals;
+use OpenTelemetry\API\Globals;
 
 $tracer = Globals::tracerProvider()->getTracer("my_tracer");
 var_dump($tracer);

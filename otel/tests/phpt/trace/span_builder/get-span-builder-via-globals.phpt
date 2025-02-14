@@ -4,7 +4,7 @@ Fetch a span builder from globals
 otel
 --FILE--
 <?php
-use OpenTelemetry\Globals;
+use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
 $provider = Globals::tracerProvider();

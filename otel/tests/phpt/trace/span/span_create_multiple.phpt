@@ -6,7 +6,7 @@ otel
 OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
-use OpenTelemetry\Globals;
+use OpenTelemetry\API\Globals;
 
 $tracer = Globals::tracerProvider()->getTracer('my_tracer');
 

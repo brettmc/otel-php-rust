@@ -8,7 +8,7 @@ OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 OTEL_EXPORTER_OTLP_TIMEOUT=1500
 --FILE--
 <?php
-use OpenTelemetry\Globals;
+use OpenTelemetry\API\Globals;
 
 Globals::tracerProvider()
     ->getTracer('my_tracer')

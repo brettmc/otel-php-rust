@@ -7,7 +7,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4317
 OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 --FILE--
 <?php
-use OpenTelemetry\Globals;
+use OpenTelemetry\API\Globals;
 
 Globals::tracerProvider()
     ->getTracer('my_tracer')

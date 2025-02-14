@@ -4,7 +4,7 @@ Get multiple tracer providers from Globals
 otel
 --FILE--
 <?php
-use OpenTelemetry\Globals;
+use OpenTelemetry\API\Globals;
 
 $one = Globals::tracerProvider();
 var_dump($one);
