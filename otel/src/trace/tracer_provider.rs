@@ -11,7 +11,6 @@ use opentelemetry::{
     global::GlobalTracerProvider,
     KeyValue,
     trace::TracerProvider,
-    // trace::noop::NoopTracerProvider,
 };
 use opentelemetry_stdout::SpanExporter as StdoutSpanExporter;
 use opentelemetry_otlp::{
@@ -20,7 +19,10 @@ use opentelemetry_otlp::{
     WithExportConfig,
 };
 use opentelemetry_sdk::{
-    trace::SdkTracerProvider,
+    trace::{
+        Sampler::AlwaysOff,
+        SdkTracerProvider,
+    },
     Resource,
 };
 use once_cell::sync::Lazy;
@@ -32,10 +34,13 @@ const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvi
 pub static TRACER_PROVIDER_CLASS: StaticStateClass<Option<GlobalTracerProvider>> = StaticStateClass::null();
 
 static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
-    // if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
-    //     let provider = NoopTracerProvider::new();
-    //     return Arc::new(provider);
-    // }
+    if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
+        let provider = SdkTracerProvider::builder()
+            .with_resource(Resource::builder_empty().build())
+            .with_sampler(AlwaysOff)
+            .build();
+        return Arc::new(provider);
+    }
     let resource = Resource::builder()
         .with_service_name("my_service_name")
         .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
