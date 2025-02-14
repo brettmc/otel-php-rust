@@ -28,6 +28,7 @@ use opentelemetry_sdk::{
     propagation::TraceContextPropagator,
     trace::SdkTracerProvider,
 };
+use tokio::runtime::Runtime;
 
 pub mod trace{
     pub mod scope;
@@ -41,6 +42,7 @@ pub mod trace{
 pub mod globals;
 
 static TRACER_PROVIDER: OnceLock<Arc<SdkTracerProvider>> = OnceLock::new();
+static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -60,6 +62,9 @@ pub fn get_module() -> Module {
     module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
+        let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+        RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
+
         global::set_text_map_propagator(TraceContextPropagator::new());
         let provider = get_tracer_provider().clone();
         let _ = TRACER_PROVIDER.set(provider.clone());
@@ -69,7 +74,15 @@ pub fn get_module() -> Module {
         if let Some(provider) = TRACER_PROVIDER.get() {
             let _ = provider.shutdown();
         }
+        //not required? should be dropped on shutdown
+        // if let Some(runtime) = RUNTIME.get() {
+        //     let _ = runtime; //drop runtime
+        // }
     });
 
     module
+}
+
+pub fn get_runtime() -> &'static Runtime {
+    RUNTIME.get().expect("Tokio runtime not initialized")
 }

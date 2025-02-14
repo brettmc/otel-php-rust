@@ -20,10 +20,7 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "change-me"
-		Version  : "0.1"
-		SchemaUrl: "http://my.schema.url"
-
+%A
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s
@@ -35,10 +32,7 @@ Span #0
 	Status: Unset
 Span #1
 	Instrumentation Scope
-		Name         : "change-me"
-		Version  : "0.1"
-		SchemaUrl: "http://my.schema.url"
-
+%A
 	Name        : two
 	TraceId     : %s
 	SpanId      : %s
@@ -50,10 +44,7 @@ Span #1
 	Status: Unset
 Span #2
 	Instrumentation Scope
-		Name         : "change-me"
-		Version  : "0.1"
-		SchemaUrl: "http://my.schema.url"
-
+%A
 	Name        : three
 	TraceId     : %s
 	SpanId      : %s

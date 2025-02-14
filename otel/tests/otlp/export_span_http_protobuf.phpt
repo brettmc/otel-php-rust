@@ -1,5 +1,5 @@
 --TEST--
-Create a span
+Export a span: http/protobuf
 --EXTENSIONS--
 otel
 --ENV--
@@ -10,7 +10,13 @@ OTEL_EXPORTER_OTLP_TIMEOUT=1500
 <?php
 use OpenTelemetry\Globals;
 
-Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan()->setStatus('Error', 'kaboom')->end();
+Globals::tracerProvider()
+    ->getTracer('my_tracer')
+    ->spanBuilder('root')
+    ->setAttribute('exporter', 'http/protobuf')
+    ->startSpan()
+    ->setStatus('Error', 'kaboom')
+    ->end();
 var_dump('done');
 ?>
 --EXPECT--

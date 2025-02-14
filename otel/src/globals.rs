@@ -7,6 +7,7 @@ use phper::{
 use opentelemetry::global;
 use crate::trace::tracer_provider::TRACER_PROVIDER_CLASS;
 
+// TODO: move to \OpenTelemetry\API namespace
 const GLOBALS_CLASS_NAME: &str = "OpenTelemetry\\Globals";
 
 pub fn make_globals_class() -> ClassEntity<()> {

@@ -36,10 +36,7 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "change-me"
-		Version  : "0.1"
-		SchemaUrl: "http://my.schema.url"
-
+%A
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s
