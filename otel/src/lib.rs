@@ -4,6 +4,7 @@ use crate::{
     },
     trace::{
         //scope::{make_scope_class},
+        current_span::{make_current_span_class},
         span::{make_span_class},
         span_builder::{make_span_builder_class},
         status_code::{make_status_code_class},
@@ -37,6 +38,7 @@ pub mod context{
     pub mod context;
 }
 pub mod trace{
+    pub mod current_span;
     pub mod scope;
     pub mod span;
     pub mod span_builder;
@@ -59,6 +61,7 @@ pub fn get_module() -> Module {
     );
 
     //module.add_class(make_scope_class());
+    module.add_class(make_current_span_class());
     module.add_class(make_context_class());
     module.add_class(make_tracer_provider_class());
     module.add_class(make_tracer_class());

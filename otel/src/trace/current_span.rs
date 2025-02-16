@@ -8,43 +8,44 @@ use std::{
     convert::Infallible,
 };
 use opentelemetry::{
-    // Context,
+    Context,
     KeyValue,
-    global::BoxedSpan,
     trace::{
-        Span,
         SpanContext,
         Status,
-        // TraceContextExt,
+        TraceContextExt,
     }
 };
 use crate::trace::span_context::SPAN_CONTEXT_CLASS;
-use crate::trace::current_span::CURRENT_SPAN_CLASS;
 
-const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
+/// Since you can't do much with a SpanRef, instead of returning a BoxedSpan from Span::getCurrent, we
+/// just return this class (which should/will implement SpanInterface). It always operates on whatever
+/// the "current span" is, rather than it being a "real" span.
 
-pub static SPAN_CLASS: StaticStateClass<Option<BoxedSpan>> = StaticStateClass::null();
+const CURRENT_SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\CurrentSpan";
+pub static CURRENT_SPAN_CLASS: StaticStateClass<()> = StaticStateClass::null();
 
-pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
+pub fn make_current_span_class() -> ClassEntity<()> {
+    //let mut class = ClassEntity::<()>::new(CURRENT_SPAN_CLASS_NAME);
     let mut class =
-        ClassEntity::<Option<BoxedSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
-
-    class.bind(&SPAN_CLASS);
+        ClassEntity::<()>::new_with_default_state_constructor(CURRENT_SPAN_CLASS_NAME);
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });
 
     class
-        .add_method("end", Visibility::Public, |this, _| -> phper::Result<()> {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+        .add_method("end", Visibility::Public, |_, _| -> phper::Result<()> {
+            let ctx = Context::current();
+            let span = ctx.span();
             span.end();
             Ok(())
         });
 
     class
         .add_method("setStatus", Visibility::Public, |this, arguments| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let ctx = Context::current();
+            let span = ctx.span();
             let status = match arguments[0].expect_z_str()?.to_str() {
                 Ok(s) => s.to_string(),
                 Err(_) => return Ok(this.to_ref_owned()), // Ignore invalid UTF-8 input
@@ -83,7 +84,8 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let ctx = Context::current();
+            let span = ctx.span();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let value = arguments[1].expect_z_str()?.to_str()?.to_string();
             span.set_attribute(KeyValue::new(name, value));
@@ -92,7 +94,8 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let ctx = Context::current();
+            let _span = ctx.span();
             let attributes = arguments[0].expect_z_arr()?;
             for (_key, _value) in attributes.iter() {
                 //TODO: iterate over attributes, apply to span
@@ -104,7 +107,8 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
 
     class
         .add_method("updateName", Visibility::Public, |this, arguments| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let ctx = Context::current();
+            let span = ctx.span();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             span.update_name(name);
             Ok::<_, phper::Error>(this.to_ref_owned())
@@ -112,48 +116,36 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
 
     class
         .add_method("recordException", Visibility::Public, |this, _arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
-            //TODO: implement
+            let ctx = Context::current();
+            let _span = ctx.span();
+            //TODO: implement record_error
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("addLink", Visibility::Public, |this, _arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let ctx = Context::current();
+            let _span = ctx.span();
             //TODO: implement
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("addEvent", Visibility::Public, |this, _arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
-            //TODO: implement
+            let ctx = Context::current();
+            let _span = ctx.span();
+            //TODO: implement add_event
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
-        .add_method("getContext", Visibility::Public, |this, _| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+        .add_method("getContext", Visibility::Public, |_, _| {
+            let ctx = Context::current();
+            let span = ctx.span();
             let span_context: SpanContext = span.span_context().clone();
             let mut object = SPAN_CONTEXT_CLASS.init_object()?;
             *object.as_mut_state() = Some(span_context);
             Ok::<_, phper::Error>(object)
-        });
-
-    class
-        .add_static_method("getCurrent", Visibility::Public, |_| {
-            let object = CURRENT_SPAN_CLASS.init_object()?;
-            Ok::<_, phper::Error>(object)
-        });
-
-    class
-        .add_method("activate", Visibility::Public, |_this, _arguments| -> phper::Result<()> {
-            //TODO: activate span, wrap `guard` in a Scope than can be `detached()`ed
-            // let span: BoxedSpan = this.as_mut_state().as_ref().unwrap().clone();
-            // let ctx = Context::current().with_span(span); //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
-            // let _guard = ctx.attach();
-            //let _guard = span.activate();
-            Ok(())
         });
 
     class
