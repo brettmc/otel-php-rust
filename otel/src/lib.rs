@@ -3,7 +3,7 @@ use crate::{
         context::{make_context_class},
     },
     trace::{
-        //scope::{make_scope_class},
+        scope::{make_scope_class},
         current_span::{make_current_span_class},
         span::{make_span_class},
         span_builder::{make_span_builder_class},
@@ -62,7 +62,7 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_AUTHORS"),
     );
 
-    //module.add_class(make_scope_class());
+    module.add_class(make_scope_class());
     module.add_class(make_current_span_class());
     module.add_class(make_context_class());
     module.add_class(make_tracer_provider_class());
@@ -89,10 +89,6 @@ pub fn get_module() -> Module {
         if let Some(provider) = TRACER_PROVIDER.get() {
             let _ = provider.shutdown();
         }
-        //not required? should be dropped on shutdown
-        // if let Some(runtime) = RUNTIME.get() {
-        //     let _ = runtime; //drop runtime
-        // }
     });
 
     module

@@ -26,6 +26,7 @@ From this bash shell, you can `make test` to build the extension and run the tes
 
 ## What works?
 
+* Auto-instrumentation of userland code (see `tests/auto/*`)
 * TracerProvider globally registered in MINIT, and shutdown on MSHUTDOWN
 * Spans can be built through a SpanBuilder, some updated made (not all implemented yet), and `end()`ed
 * Spans export to stdout
@@ -46,8 +47,9 @@ $span
 
 ## What doesn't work? (todo list)
 
-The biggest thing that doesn't work is being able to `activate()` a span, so that
-later spans are parented to the active span.
+The biggest thing that doesn't work is being able to `activate()` a span (or a context), so that
+later spans are parented to the active span. I can't work out how to store the returned `guard`
+so that it can be de-referenced later.
 
 ### SpanBuilder
 * doesn't keep a reference to the tracer, and instead fetches a new tracer each time (losing any InstrumentationScope)
@@ -63,6 +65,9 @@ guard in another class, eg `Scope` to allow `Scope->detach()`
 
 ### StatusCode
 * not implemented. PR accepted in `phper` to allow adding consts to classes & interfaces to enable this.
+
+### Auto-instrumented internal functions
+Seems to be an issue with `zend_execute_internal` not being initialized at MINIT or RINIT.
 
 ## The future
 
