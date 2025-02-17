@@ -22,14 +22,21 @@ Quick-start:
 * `make build`
 * `make bash`
 
-From this bash shell, you can `make test` to build the extension and run the tests.
+From this bash shell, there is another Makefile to build the extension and run the tests.
+Tests are organised as:
+
+- `auto` - auto-instrumentation
+- `otlp` - otlp (`http/protobuf` + `grpc`) exporting to a local collector
+- `phpt` - test the API via PHP code
+
+For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
 ## What works?
 
 * Auto-instrumentation of userland code (see `tests/auto/*`)
 * TracerProvider globally registered in MINIT, and shutdown on MSHUTDOWN
 * Spans can be built through a SpanBuilder, some updated made (not all implemented yet), and `end()`ed
-* Spans export to stdout
+* Spans export to stdout, otlp
 * Get SpanContext from a Span
 
 ```php
