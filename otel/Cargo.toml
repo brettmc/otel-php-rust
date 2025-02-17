@@ -1,0 +1,23 @@
+[package]
+name = "otel"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "otel"
+crate-type = ["cdylib"]
+
+[dependencies]
+phper = "0.14.1"
+opentelemetry = { version = "0.28.0", features = ["internal-logs"] }
+opentelemetry-stdout = "0.28.0"
+opentelemetry_sdk = "0.28.0"
+opentelemetry-otlp = { version = "0.28.0" , features = ["grpc-tonic"] }
+tokio = { version = "1.0", features = ["full"] }
+once_cell = "1.20.3"
+anyhow = "1.0.95"
+chrono = "0.4.39"
+
+[dev-dependencies]
+phper-test = "0.14.1"

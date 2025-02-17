@@ -1,0 +1,12 @@
+services:
+  php:
+    build:
+      context: .
+    volumes:
+    - ./otel/:/usr/src/myapp
+    user: php-rust
+  collector:
+    image: otel/opentelemetry-collector-contrib
+    command: [ "--config=/etc/otel-collector-config.yml" ]
+    volumes:
+      - ./files/collector/otel-collector-config.yml:/etc/otel-collector-config.yml
