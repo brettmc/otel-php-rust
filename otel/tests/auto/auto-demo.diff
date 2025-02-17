@@ -1,7 +1,0 @@
-001+ on_function_begin
-002+ on_function_begin
-003+ on_function_begin
-     string(4) "test"
-005+ on_function_end
-006+ on_function_end
-007+ on_function_end
