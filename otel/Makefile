@@ -10,3 +10,6 @@ test: build
 export: build
 	@echo "Running live export tests..."
 	php ~/run-tests.php -q --show-diff tests/otlp/
+auto: build
+	@echo "Running auto-instrumentation tests..."
+	php ~/run-tests.php -q --show-diff tests/auto/

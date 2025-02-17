@@ -20,6 +20,7 @@ use crate::{
 use phper::{
     modules::Module,
     php_get_module,
+    sys::zend_observer_fcall_register,
 };
 use std::sync::{
     Arc,
@@ -48,8 +49,10 @@ pub mod trace{
     pub mod tracer_provider;
 }
 pub mod globals;
+pub mod observer;
 
 static TRACER_PROVIDER: OnceLock<Arc<SdkTracerProvider>> = OnceLock::new();
+static OBSERVER_REGISTERED: OnceLock<bool> = OnceLock::new();
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
 #[php_get_module]
@@ -80,6 +83,12 @@ pub fn get_module() -> Module {
         let provider = get_tracer_provider().clone();
         let _ = TRACER_PROVIDER.set(provider.clone());
         global::set_tracer_provider((*provider).clone());
+
+        if OBSERVER_REGISTERED.set(true).is_ok() {
+            unsafe {
+                zend_observer_fcall_register(Some(observer::on_function_call));
+            };
+        }
     });
     module.on_module_shutdown(|| {
         if let Some(provider) = TRACER_PROVIDER.get() {
