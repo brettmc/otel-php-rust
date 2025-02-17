@@ -42,10 +42,14 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         Err(_) => (None, None), // Handle errors gracefully
     };
 
-    if class_name.as_deref() == Some("DemoClass") /*&& function_name.as_deref() == Some("test")*/ {
+    if should_trace(class_name.as_deref(), function_name.as_deref()) {
         // println!("Matched: DemoClass::test is running!");
         let tracer = global::tracer("php-auto-instrumentation");
-        let span_name = format!("{}::{}", class_name.as_deref().unwrap_or("<unknown>"), function_name.as_deref().unwrap_or("<unknown>"));
+        let span_name = format!(
+            "{}::{}",
+            class_name.as_deref().unwrap_or("<global>"),
+            function_name.as_deref().unwrap_or("<anonymous>")
+        );
         let span = tracer.start(span_name);
         let ctx = Context::current_with_span(span);
         let _guard = ctx.attach();
@@ -92,4 +96,13 @@ fn get_function_and_class_name(
         .transpose()?;
 
     Ok((function_name, class_name))
+}
+
+fn should_trace(class_name: Option<&str>, function_name: Option<&str>) -> bool {
+    match (class_name, function_name) {
+        (Some("DemoClass"), Some(_)) => true, // ✅ Trace any method in `DemoClass`
+        (None, Some("demoFunction")) => true, // ✅ Trace `demoFunction` when there's no class
+        (Some("DemoClass"), None) => true,    // ✅ (Just in case) Handle class `DemoClass` with no method
+        _ => false,                           // ✅ Do not trace other functions
+    }
 }
