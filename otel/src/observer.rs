@@ -1,77 +1,81 @@
+use chrono::prelude::*;
 use phper::{
+    sys,
+    values::ExecuteData,
     strings::ZStr,
-    values::{ExecuteData},
-    sys::zend_observer_fcall_handlers,
-    sys::zend_execute_data,
 };
+use std::ptr::null_mut;
 use opentelemetry::{
     global,
-    global::BoxedSpan,
     Context,
     trace::{
-        Span,
         Tracer,
         TraceContextExt,
-    },
+    }
 };
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 
-static mut ACTIVE_SPANS: Option<Mutex<HashMap<usize, BoxedSpan>>> = None;
+static mut UPSTREAM_EXECUTE_EX: Option<
+    unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data),
+> = None;
 
-pub unsafe extern "C" fn on_function_begin(execute_data: *mut zend_execute_data) {
-    println!("on_function_begin");
-    if let Some(execute_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        if let Ok((Some(function), Some(class))) = get_function_and_class_name(execute_data) {
-            if class == "DemoClass" && function == "test" {
-                let tracer = global::tracer("php-auto-instrumentation");
-                let span: BoxedSpan = tracer.start("DemoClass::test");
+// This function swaps out the PHP exec function for our own. Allowing us to wrap it.
+pub fn register_exec_functions() {
+    unsafe {
+        UPSTREAM_EXECUTE_EX = sys::zend_execute_ex;
+        sys::zend_execute_ex = Some(execute_ex);
+    }
+}
 
-                // let active_spans = ACTIVE_SPANS.get_or_insert_with(|| Mutex::new(HashMap::new()));
-                // active_spans.lock().unwrap().insert(execute_data as *const _ as usize, span.clone());
+// This is our exec function that wraps the upstream PHP one.
+// This allows us to gather our execution timing data.
+unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
+    let execute_data = match ExecuteData::try_from_mut_ptr(execute_data) {
+        Some(execute_data) => execute_data,
+        None => {
+            upstream_execute_ex(None);
+            return;
+        }
+    };
 
-                // ✅ Use a reference to the stored span for activation
-                let ctx = Context::current_with_span(span);
-                let _guard = ctx.attach();
-            }
+    let (function_name, class_name) = match get_function_and_class_name(execute_data) {
+        Ok(names) => names,
+        Err(_) => (None, None), // Handle errors gracefully
+    };
+
+    if class_name.as_deref() == Some("DemoClass") /*&& function_name.as_deref() == Some("test")*/ {
+        // println!("Matched: DemoClass::test is running!");
+        let tracer = global::tracer("php-auto-instrumentation");
+        let span_name = format!("{}::{}", class_name.as_deref().unwrap_or("<unknown>"), function_name.as_deref().unwrap_or("<unknown>"));
+        let span = tracer.start(span_name);
+        let ctx = Context::current_with_span(span);
+        let _guard = ctx.attach();
+        upstream_execute_ex(Some(execute_data));
+    } else {
+        upstream_execute_ex(Some(execute_data));
+    }
+
+    // Run the upstream function and record the duration.
+    // let start = get_unix_timestamp_micros();
+    // upstream_execute_ex(Some(execute_data));
+    // let end = get_unix_timestamp_micros();
+}
+
+#[inline]
+fn upstream_execute_ex(execute_data: Option<&mut ExecuteData>) {
+    unsafe {
+        if let Some(f) = UPSTREAM_EXECUTE_EX {
+            f(execute_data
+                .map(ExecuteData::as_mut_ptr)
+                .unwrap_or(null_mut()))
         }
     }
 }
 
-/// ✅ Function observer hook (end)
-pub unsafe extern "C" fn on_function_end(execute_data: *mut zend_execute_data, _retval: *mut phper::sys::zval) {
-    println!("on_function_end");
-    // if let Some(active_spans) = ACTIVE_SPANS.as_mut() {
-    //     if let Some(span) = active_spans.lock().unwrap().remove(&(execute_data as *const _ as usize)) {
-    //         span.end(); // ✅ End the span when function exits
-    //     }
-    // }
-
-    ()
+pub fn get_unix_timestamp_micros() -> i64 {
+    let now = Utc::now();
+    now.timestamp_micros()
 }
 
-pub unsafe extern "C" fn on_function_call(execute_data: *mut zend_execute_data) -> zend_observer_fcall_handlers {
-    /*if let Some(execute_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        match get_function_and_class_name(execute_data) {
-            Ok((Some(function), Some(class))) if class == "DemoClass" && function == "test" => {
-                println!("✅ Entered {}::{}", class, function);
-            }
-            Ok((Some(function), None)) if function == "test" => {
-                println!("✅ Entered function {}", function);
-            }
-            _ => {}
-        }
-    }*/
-
-    // zend_observer_fcall_handlers { begin: None, end: None }
-
-    zend_observer_fcall_handlers {
-        begin: Some(on_function_begin),
-        end: Some(on_function_end),
-    }
-}
-
-/// ✅ Extracts the class and function name from `zend_execute_data`
 fn get_function_and_class_name(
     execute_data: &mut ExecuteData,
 ) -> anyhow::Result<(Option<String>, Option<String>)> {
