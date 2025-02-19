@@ -10,15 +10,86 @@ use opentelemetry::{
     global,
     Context,
     trace::{
+        Span,
         Tracer,
         TraceContextExt,
     }
 };
 
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use opentelemetry::global::BoxedSpan;
+use opentelemetry::ContextGuard;
+
 static mut UPSTREAM_EXECUTE_EX: Option<
     unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data),
 > = None;
 static mut UPSTREAM_EXECUTE_INTERNAL: Option<unsafe extern "C" fn(*mut sys::zend_execute_data, *mut sys::zval)> = None;
+
+
+lazy_static! {
+    static ref ACTIVE_SPANS: Mutex<HashMap<usize, BoxedSpan>> = Mutex::new(HashMap::new());
+
+}
+
+pub unsafe extern "C" fn on_function_begin(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
+    if let Some(execute_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+        let (function_name, class_name) = match get_function_and_class_name(execute_data) {
+            Ok(names) => names,
+            Err(_) => (None, None), // Handle errors gracefully
+        };
+        let span_name = format!(
+            "{}::{}",
+            class_name.as_deref().unwrap_or("<global>"),
+            function_name.as_deref().unwrap_or("<anonymous>")
+        );
+        println!("BEGIN: {}", span_name.clone());
+
+        let parent_context = Context::current();
+        let tracer = global::tracer("php_observer");
+        let span = tracer.start(span_name);
+        let ctx = Context::current_with_span(span);
+        let _guard = ctx.attach();
+
+        if execute_data.func().get_internal_handler().is_some() {
+            if let Some(exec_fn) = sys::zend_execute_internal {
+                exec_fn(execute_data.as_mut_ptr(), execute_data.get_return_value().unwrap_or(std::ptr::null_mut()));
+            }
+        } else {
+            if let Some(exec_fn) = sys::zend_execute_ex {
+                exec_fn(execute_data.as_mut_ptr());
+            }
+        }
+    }
+
+    sys::zend_observer_fcall_handlers {
+        begin: None,
+        end: None,
+    }
+}
+
+/*pub unsafe extern "C" fn on_function_end(execute_data: *mut sys::zend_execute_data, _retval: *mut sys::zval) {
+    if let Some(execute_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+        let (function_name, class_name) = match get_function_and_class_name(execute_data) {
+            Ok(names) => names,
+            Err(_) => (None, None),
+        };
+        let span_name = format!(
+            "{}::{}",
+            class_name.as_deref().unwrap_or("<global>"),
+            function_name.as_deref().unwrap_or("<anonymous>")
+        );
+        println!("END: {}", span_name.clone());
+
+        let mut active_spans = ACTIVE_SPANS.lock().unwrap();
+        if let Some(mut span) = active_spans.remove(&(execute_data.as_ptr() as usize)) {
+            span.end(); // ✅ End the span
+        }
+    }
+}*/
+
+
 
 // This function swaps out the PHP exec function for our own. Allowing us to wrap it.
 pub fn register_exec_functions() {

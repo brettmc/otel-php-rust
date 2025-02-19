@@ -1,7 +1,7 @@
 use phper::{
     classes::{
         ClassEntity,
-        StaticStateClass,
+        StateClass,
         Visibility,
     },
 };
@@ -11,14 +11,11 @@ use std::{
 use opentelemetry::Context;
 
 const SCOPE_CLASS_NAME: &str = "OpenTelemetry\\API\\Context\\Scope";
-
-pub static SCOPE_CLASS: StaticStateClass<Option<Context>> = StaticStateClass::null();
+pub type ScopeClass = StateClass<Option<Context>>;
 
 pub fn make_scope_class() -> ClassEntity<Option<Context>> {
     let mut class =
         ClassEntity::<Option<Context>>::new_with_default_state_constructor(SCOPE_CLASS_NAME);
-
-    class.bind(&SCOPE_CLASS);
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())

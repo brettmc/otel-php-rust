@@ -1,6 +1,6 @@
 use phper::{
     alloc::ToRefOwned,
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{ClassEntity, StateClass, Visibility},
     functions::Argument,
 };
 use std::{
@@ -16,17 +16,16 @@ use opentelemetry::{
         TraceContextExt,
     }
 };
-use crate::trace::span_context::SPAN_CONTEXT_CLASS;
+use crate::trace::span_context::SpanContextClass;
 
 /// Since you can't do much with a SpanRef, instead of returning a BoxedSpan from Span::getCurrent, we
 /// just return this class (which should/will implement SpanInterface). It always operates on whatever
 /// the "current span" is, rather than it being a "real" span.
 
 const CURRENT_SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\CurrentSpan";
-pub static CURRENT_SPAN_CLASS: StaticStateClass<()> = StaticStateClass::null();
+pub type CurrentSpanClass = StateClass<()>;
 
-pub fn make_current_span_class() -> ClassEntity<()> {
-    //let mut class = ClassEntity::<()>::new(CURRENT_SPAN_CLASS_NAME);
+pub fn make_current_span_class(span_context_class: SpanContextClass) -> ClassEntity<()> {
     let mut class =
         ClassEntity::<()>::new_with_default_state_constructor(CURRENT_SPAN_CLASS_NAME);
 
@@ -139,11 +138,11 @@ pub fn make_current_span_class() -> ClassEntity<()> {
         });
 
     class
-        .add_method("getContext", Visibility::Public, |_, _| {
+        .add_method("getContext", Visibility::Public, move |_, _| {
             let ctx = Context::current();
             let span = ctx.span();
             let span_context: SpanContext = span.span_context().clone();
-            let mut object = SPAN_CONTEXT_CLASS.init_object()?;
+            let mut object = span_context_class.init_object()?;
             *object.as_mut_state() = Some(span_context);
             Ok::<_, phper::Error>(object)
         });

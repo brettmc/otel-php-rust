@@ -1,5 +1,5 @@
 use phper::{
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{ClassEntity, StateClass, Visibility},
 };
 use std::{
     convert::Infallible,
@@ -14,21 +14,19 @@ use opentelemetry::trace::{
 
 const SPAN_CONTEXT_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\SpanContext";
 
-pub static SPAN_CONTEXT_CLASS: StaticStateClass<Option<SpanContext>> = StaticStateClass::null();
+pub type SpanContextClass = StateClass<Option<SpanContext>>;
 
 pub fn make_span_context_class() -> ClassEntity<Option<SpanContext>> {
     let mut class =
         ClassEntity::<Option<SpanContext>>::new_with_default_state_constructor(SPAN_CONTEXT_CLASS_NAME);
 
-    class.bind(&SPAN_CONTEXT_CLASS);
-
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });
 
-    class.add_static_method("getInvalid", Visibility::Public, |_| {
+    class.add_static_method("getInvalid", Visibility::Public, move |_arguments| {
         let span_context = SpanContext::empty_context();
-        let mut object = SPAN_CONTEXT_CLASS.init_object()?;
+        let mut object = class.init_object()?;
         *object.as_mut_state() = Some(span_context);
         Ok::<_, phper::Error>(object)
     });
@@ -43,7 +41,7 @@ pub fn make_span_context_class() -> ClassEntity<Option<SpanContext>> {
             false,
             TraceState::default(), //todo
         );
-        let mut object = SPAN_CONTEXT_CLASS.init_object()?;
+        let mut object = class.init_object()?;
         *object.as_mut_state() = Some(span_context);
         Ok::<_, phper::Error>(object)
     });
@@ -58,7 +56,7 @@ pub fn make_span_context_class() -> ClassEntity<Option<SpanContext>> {
             true,
             TraceState::default(), //todo
         );
-        let mut object = SPAN_CONTEXT_CLASS.init_object()?;
+        let mut object = class.init_object()?;
         *object.as_mut_state() = Some(span_context);
         Ok::<_, phper::Error>(object)
     });

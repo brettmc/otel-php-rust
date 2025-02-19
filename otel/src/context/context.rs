@@ -1,6 +1,6 @@
 use phper::{
     alloc::ToRefOwned,
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{ClassEntity, StateClass, Visibility},
     functions::Argument,
     values::ZVal,
 };
@@ -13,8 +13,7 @@ use opentelemetry::{
 };
 
 const CONTEXT_CLASS_NAME: &str = "OpenTelemetry\\Context\\Context";
-
-pub static CONTEXT_CLASS: StaticStateClass<Option<Context>> = StaticStateClass::null();
+pub type ContextClass = StateClass<Option<Context>>;
 
 #[derive(Debug)]
 struct Test(String);
@@ -23,15 +22,13 @@ pub fn make_context_class() -> ClassEntity<Option<Context>> {
     let mut class =
         ClassEntity::<Option<Context>>::new_with_default_state_constructor(CONTEXT_CLASS_NAME);
 
-    class.bind(&CONTEXT_CLASS);
-
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });
 
     class.add_static_method("getCurrent", Visibility::Public, |_| {
         let context = Context::current();
-        let mut object = CONTEXT_CLASS.init_object()?;
+        let mut object = class.init_object()?;
         *object.as_mut_state() = Some(context);
         Ok::<_, phper::Error>(object)
     });
