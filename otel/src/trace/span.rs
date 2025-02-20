@@ -151,9 +151,9 @@ pub fn make_span_class(
     //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
     class
         .add_method("activate", Visibility::Public, |this, _arguments| -> phper::Result<()> {
-            let span: &Arc<BoxedSpan> = this.as_mut_state().as_ref().unwrap();
-            let ctx = Context::current_with_span(Arc::clone(span));
-            let _guard = ctx.attach();
+            // let span: &Arc<BoxedSpan> = this.as_mut_state().as_ref().unwrap();
+            // let ctx = Context::current_with_span(Arc::clone(span));
+            // let _guard = ctx.attach();
             Ok(())
         });
 

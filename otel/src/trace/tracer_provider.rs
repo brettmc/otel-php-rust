@@ -88,8 +88,8 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
         Ok::<_, Infallible>(())
     });
 
-    class.add_method("getTracer", Visibility::Public, move |this, arguments| {
-        let provider = this.as_state().as_ref().unwrap();
+    class.add_method("getTracer", Visibility::Public, move |_this, arguments| {
+        let provider = get_tracer_provider();
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         //TODO implement (optional) version, schema_url, attributes
         // let version = arguments[1].expect_z_str()?.to_str()?.to_string();

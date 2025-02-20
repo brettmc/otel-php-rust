@@ -64,13 +64,13 @@ pub fn get_module() -> Module {
     );
 
     let span_context_class = module.add_class(make_span_context_class());
-    let _scope_class = module.add_class(make_scope_class());
+    let scope_class = module.add_class(make_scope_class());
     let current_span_class = module.add_class(make_current_span_class(span_context_class.clone()));
     let _context_class = module.add_class(make_context_class());
     let span_class = module.add_class(make_span_class(span_context_class, current_span_class.clone()));
     let span_builder_class = module.add_class(make_span_builder_class(span_class));
 
-    let tracer_class = module.add_class(make_tracer_class(span_builder_class));
+    let tracer_class = module.add_class(make_tracer_class(span_builder_class, scope_class));
     let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class));
     let _globals_class = module.add_class(make_globals_class(tracer_provider_class));
     let _status_code_class = module.add_class(make_status_code_class());
