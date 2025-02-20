@@ -3,7 +3,7 @@
 
 build:
 	@echo "Building..."
-	cargo build --release
+	cargo build
 test: build
 	@echo "Running tests..."
 	php ~/run-tests.php -q --show-diff tests/phpt/

@@ -87,7 +87,7 @@ pub fn get_module() -> Module {
 
         //register_exec_functions();
         unsafe {
-            sys::zend_observer_fcall_register(Some(observer::on_function_begin));
+            sys::zend_observer_fcall_register(Some(observer::observer_instrument));
         }
     });
     module.on_module_shutdown(|| {
