@@ -20,19 +20,19 @@ use std::cell::RefCell;
 use opentelemetry::ContextGuard;
 
 thread_local! {
-    static SPAN_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());
+    static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());
 }
 
 fn store_guard(exec_ptr: *mut sys::zend_execute_data, guard: ContextGuard) {
     let key = exec_ptr as usize;
-    SPAN_GUARD_MAP.with(|map| {
+    CONTEXT_GUARD_MAP.with(|map| {
         map.borrow_mut().insert(key, guard);
     });
 }
 
 fn take_guard(exec_ptr: *mut sys::zend_execute_data) -> Option<ContextGuard> {
     let key = exec_ptr as usize;
-    SPAN_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
+    CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
 }
 
 pub unsafe extern "C" fn observer_begin(execute_data: *mut sys::zend_execute_data) {
