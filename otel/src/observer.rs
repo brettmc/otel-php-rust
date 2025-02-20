@@ -1,5 +1,4 @@
 // copied from https://github.com/skpr/compass/blob/v1.2.0/extension/src/execute.rs
-use chrono::prelude::*;
 use phper::{
     sys,
     values::{
@@ -7,27 +6,38 @@ use phper::{
     },
     strings::ZStr,
 };
-use std::ptr::null_mut;
 use opentelemetry::{
     global,
     Context,
     trace::{
-        Span,
         Tracer,
         TraceContextExt,
     }
 };
 
-use lazy_static::lazy_static;
 use std::collections::HashMap;
-use std::sync::Mutex;
-use std::ffi::CStr;
-use opentelemetry::global::BoxedSpan;
+use std::cell::RefCell;
 use opentelemetry::ContextGuard;
 
+thread_local! {
+    static SPAN_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());
+}
+
+fn store_guard(exec_ptr: *mut sys::zend_execute_data, guard: ContextGuard) {
+    let key = exec_ptr as usize;
+    SPAN_GUARD_MAP.with(|map| {
+        map.borrow_mut().insert(key, guard);
+    });
+}
+
+fn take_guard(exec_ptr: *mut sys::zend_execute_data) -> Option<ContextGuard> {
+    let key = exec_ptr as usize;
+    SPAN_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
+}
+
 pub unsafe extern "C" fn observer_begin(execute_data: *mut sys::zend_execute_data) {
-    if let Some(execute_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        let (function_name, class_name) = match get_function_and_class_name(execute_data) {
+    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
             Ok(names) => names,
             Err(_) => (None, None), // Handle errors gracefully
         };
@@ -36,33 +46,23 @@ pub unsafe extern "C" fn observer_begin(execute_data: *mut sys::zend_execute_dat
             class_name.as_deref().unwrap_or("<global>"),
             function_name.as_deref().unwrap_or("<anonymous>")
         );
-        println!("[BEGIN: {}]", span_name.clone());
+        let tracer = global::tracer("php-auto-instrumentation");
+        let span = tracer.start(span_name);
+        let ctx = Context::current_with_span(span);
+        let guard = ctx.attach();
+        store_guard(execute_data, guard);
     }
 }
 
 pub unsafe extern "C" fn observer_end(
     execute_data: *mut sys::zend_execute_data,
-    return_value: *mut sys::zval,
+    _return_value: *mut sys::zval,
 ) {
-    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
-            Ok(names) => names,
-            Err(_) => (None, None),
-        };
-
-        let span_name = format!(
-            "{}::{}",
-            class_name.as_deref().unwrap_or("<global>"),
-            function_name.as_deref().unwrap_or("<anonymous>")
-        );
-
-        let ret_type = if !return_value.is_null() {
-            let type_cstr = CStr::from_ptr(sys::zend_zval_type_name(return_value));
-            type_cstr.to_string_lossy().into_owned()
-        } else {
-            "null".to_owned()
-        };
-        println!("[END {}(): {}]", span_name, ret_type);
+    if let Some(guard) = take_guard(execute_data) {
+        // Dropping the guard detaches the context and finishes the span.
+        drop(guard);
+    } else {
+        println!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
     }
 }
 
@@ -83,11 +83,6 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
         begin: None,
         end: None,
     }
-}
-
-pub fn get_unix_timestamp_micros() -> i64 {
-    let now = Utc::now();
-    now.timestamp_micros()
 }
 
 //coped from https://github.com/apache/skywalking-php/blob/v0.8.0/src/execute.rs#L283
