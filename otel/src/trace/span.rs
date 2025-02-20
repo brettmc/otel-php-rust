@@ -8,18 +8,19 @@ use std::{
     convert::Infallible,
 };
 use opentelemetry::{
-    // Context,
+    Context,
     KeyValue,
     global::BoxedSpan,
     trace::{
         Span,
         SpanContext,
         Status,
-        // TraceContextExt,
+        TraceContextExt,
     }
 };
 use crate::trace::span_context::SpanContextClass;
 use crate::trace::current_span::CurrentSpanClass;
+use std::sync::Arc;
 
 const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
 
@@ -147,13 +148,12 @@ pub fn make_span_class(
             Ok::<_, phper::Error>(object)
         });
 
+    //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
     class
-        .add_method("activate", Visibility::Public, |_this, _arguments| -> phper::Result<()> {
-            //TODO: activate span, wrap `guard` in a Scope than can be `detached()`ed
-            // let span: BoxedSpan = this.as_mut_state().as_ref().unwrap().clone();
-            // let ctx = Context::current().with_span(span); //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
-            // let _guard = ctx.attach();
-            //let _guard = span.activate();
+        .add_method("activate", Visibility::Public, |this, _arguments| -> phper::Result<()> {
+            let span: &Arc<BoxedSpan> = this.as_mut_state().as_ref().unwrap();
+            let ctx = Context::current_with_span(Arc::clone(span));
+            let _guard = ctx.attach();
             Ok(())
         });
 
