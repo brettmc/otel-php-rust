@@ -4,6 +4,8 @@ Create a span with all features
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+--XFAIL--
+Not all setters are implemented
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

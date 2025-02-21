@@ -16,11 +16,11 @@ use crate::{
         span_context::{make_span_context_class},
     },
     globals::{make_globals_class},
-    observer::{register_exec_functions},
 };
 use phper::{
     modules::Module,
     php_get_module,
+    sys,
 };
 use std::sync::{
     Arc,
@@ -62,16 +62,17 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_AUTHORS"),
     );
 
-    module.add_class(make_scope_class());
-    module.add_class(make_current_span_class());
-    module.add_class(make_context_class());
-    module.add_class(make_tracer_provider_class());
-    module.add_class(make_tracer_class());
-    module.add_class(make_span_class());
-    module.add_class(make_span_builder_class());
-    module.add_class(make_span_context_class());
-    module.add_class(make_globals_class());
-    module.add_class(make_status_code_class());
+    let span_context_class = module.add_class(make_span_context_class());
+    let scope_class = module.add_class(make_scope_class());
+    let current_span_class = module.add_class(make_current_span_class(span_context_class.clone()));
+    let _context_class = module.add_class(make_context_class());
+    let span_class = module.add_class(make_span_class(span_context_class, current_span_class.clone()));
+    let span_builder_class = module.add_class(make_span_builder_class(span_class));
+
+    let tracer_class = module.add_class(make_tracer_class(span_builder_class, scope_class));
+    let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class));
+    let _globals_class = module.add_class(make_globals_class(tracer_provider_class));
+    let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
         //TODO: configure internal logging, redirect to php error log?
@@ -83,7 +84,9 @@ pub fn get_module() -> Module {
         let _ = TRACER_PROVIDER.set(provider.clone());
         global::set_tracer_provider((*provider).clone());
 
-        register_exec_functions();
+        unsafe {
+            sys::zend_observer_fcall_register(Some(observer::observer_instrument));
+        }
     });
     module.on_module_shutdown(|| {
         if let Some(provider) = TRACER_PROVIDER.get() {

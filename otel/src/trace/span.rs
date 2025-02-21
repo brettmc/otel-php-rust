@@ -1,6 +1,6 @@
 use phper::{
     alloc::ToRefOwned,
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{ClassEntity, StateClass, Visibility},
     functions::Argument,
 };
 use std::{
@@ -8,28 +8,30 @@ use std::{
     convert::Infallible,
 };
 use opentelemetry::{
-    // Context,
+    Context,
     KeyValue,
     global::BoxedSpan,
     trace::{
         Span,
         SpanContext,
         Status,
-        // TraceContextExt,
+        TraceContextExt,
     }
 };
-use crate::trace::span_context::SPAN_CONTEXT_CLASS;
-use crate::trace::current_span::CURRENT_SPAN_CLASS;
+use crate::trace::span_context::SpanContextClass;
+use crate::trace::current_span::CurrentSpanClass;
+use std::sync::Arc;
 
 const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
 
-pub static SPAN_CLASS: StaticStateClass<Option<BoxedSpan>> = StaticStateClass::null();
+pub type SpanClass = StateClass<Option<BoxedSpan>>;
 
-pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
+pub fn make_span_class(
+    span_context_class: SpanContextClass,
+    current_span_class: CurrentSpanClass,
+) -> ClassEntity<Option<BoxedSpan>> {
     let mut class =
         ClassEntity::<Option<BoxedSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
-
-    class.bind(&SPAN_CLASS);
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
@@ -132,27 +134,26 @@ pub fn make_span_class() -> ClassEntity<Option<BoxedSpan>> {
         });
 
     class
-        .add_method("getContext", Visibility::Public, |this, _| {
+        .add_method("getContext", Visibility::Public, move |this, _| {
             let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
             let span_context: SpanContext = span.span_context().clone();
-            let mut object = SPAN_CONTEXT_CLASS.init_object()?;
+            let mut object = span_context_class.init_object()?;
             *object.as_mut_state() = Some(span_context);
             Ok::<_, phper::Error>(object)
         });
 
     class
-        .add_static_method("getCurrent", Visibility::Public, |_| {
-            let object = CURRENT_SPAN_CLASS.init_object()?;
+        .add_static_method("getCurrent", Visibility::Public, move |_| {
+            let object = current_span_class.init_object()?;
             Ok::<_, phper::Error>(object)
         });
 
+    //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
     class
-        .add_method("activate", Visibility::Public, |_this, _arguments| -> phper::Result<()> {
-            //TODO: activate span, wrap `guard` in a Scope than can be `detached()`ed
-            // let span: BoxedSpan = this.as_mut_state().as_ref().unwrap().clone();
-            // let ctx = Context::current().with_span(span); //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
+        .add_method("activate", Visibility::Public, |this, _arguments| -> phper::Result<()> {
+            // let span: &Arc<BoxedSpan> = this.as_mut_state().as_ref().unwrap();
+            // let ctx = Context::current_with_span(Arc::clone(span));
             // let _guard = ctx.attach();
-            //let _guard = span.activate();
             Ok(())
         });
 

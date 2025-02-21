@@ -1,11 +1,10 @@
-// copied from https://github.com/skpr/compass/blob/v1.2.0/extension/src/execute.rs
-use chrono::prelude::*;
 use phper::{
     sys,
-    values::ExecuteData,
+    values::{
+        ExecuteData,
+    },
     strings::ZStr,
 };
-use std::ptr::null_mut;
 use opentelemetry::{
     global,
     Context,
@@ -15,125 +14,74 @@ use opentelemetry::{
     }
 };
 
-static mut UPSTREAM_EXECUTE_EX: Option<
-    unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data),
-> = None;
-static mut UPSTREAM_EXECUTE_INTERNAL: Option<unsafe extern "C" fn(*mut sys::zend_execute_data, *mut sys::zval)> = None;
+use std::collections::HashMap;
+use std::cell::RefCell;
+use opentelemetry::ContextGuard;
 
-// This function swaps out the PHP exec function for our own. Allowing us to wrap it.
-pub fn register_exec_functions() {
-    unsafe {
-        UPSTREAM_EXECUTE_EX = sys::zend_execute_ex;
-        sys::zend_execute_ex = Some(execute_ex);
-
-        //TODO: sys::zend_execute_internal seems not set at MINIT...
-        // UPSTREAM_EXECUTE_INTERNAL = sys::zend_execute_internal;
-        // sys::zend_execute_internal = Some(execute_internal);
-    }
+thread_local! {
+    static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());
 }
 
-unsafe extern "C" fn execute_internal(execute_data: *mut sys::zend_execute_data, return_value: *mut sys::zval) {
-    // println!("execute_internal");
-    let execute_data = match ExecuteData::try_from_mut_ptr(execute_data) {
-        Some(execute_data) => execute_data,
-        None => {
-            // println!("execute_internal::None");
-            upstream_execute_internal(None, Some(return_value));
-            return;
-        }
-    };
+fn store_guard(exec_ptr: *mut sys::zend_execute_data, guard: ContextGuard) {
+    let key = exec_ptr as usize;
+    CONTEXT_GUARD_MAP.with(|map| {
+        map.borrow_mut().insert(key, guard);
+    });
+}
 
-    let (function_name, class_name) = match get_function_and_class_name(execute_data) {
-        Ok(names) => names,
-        Err(_) => (None, None), // Handle errors gracefully
-    };
+fn take_guard(exec_ptr: *mut sys::zend_execute_data) -> Option<ContextGuard> {
+    let key = exec_ptr as usize;
+    CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
+}
 
-    if should_trace(class_name.as_deref(), function_name.as_deref()) {
-        let tracer = global::tracer("php-auto-instrumentation");
+pub unsafe extern "C" fn observer_begin(execute_data: *mut sys::zend_execute_data) {
+    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
+            Ok(names) => names,
+            Err(_) => (None, None),
+        };
         let span_name = format!(
             "{}::{}",
             class_name.as_deref().unwrap_or("<global>"),
             function_name.as_deref().unwrap_or("<anonymous>")
         );
-        let span = tracer.start(span_name);
-        let ctx = Context::current_with_span(span);
-        let _guard = ctx.attach();
-        // println!("execute_internal::traced");
-        upstream_execute_internal(Some(execute_data), Some(return_value));
-    } else {
-        // println!("execute_internal::not-traced");
-        upstream_execute_internal(Some(execute_data), Some(return_value));
-    }
-}
-
-// This is our exec function that wraps the upstream PHP one.
-// This allows us to gather our execution timing data.
-unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
-    let execute_data = match ExecuteData::try_from_mut_ptr(execute_data) {
-        Some(execute_data) => execute_data,
-        None => {
-            upstream_execute_ex(None);
-            return;
-        }
-    };
-
-    let (function_name, class_name) = match get_function_and_class_name(execute_data) {
-        Ok(names) => names,
-        Err(_) => (None, None), // Handle errors gracefully
-    };
-
-    if should_trace(class_name.as_deref(), function_name.as_deref()) {
         let tracer = global::tracer("php-auto-instrumentation");
-        let span_name = format!(
-            "{}::{}",
-            class_name.as_deref().unwrap_or("<global>"),
-            function_name.as_deref().unwrap_or("<anonymous>")
-        );
         let span = tracer.start(span_name);
         let ctx = Context::current_with_span(span);
-        let _guard = ctx.attach();
-        upstream_execute_ex(Some(execute_data));
+        let guard = ctx.attach();
+        store_guard(execute_data, guard);
+    }
+}
+
+pub unsafe extern "C" fn observer_end(
+    execute_data: *mut sys::zend_execute_data,
+    _return_value: *mut sys::zval,
+) {
+    if let Some(guard) = take_guard(execute_data) {
+        // Dropping the guard detaches the context and finishes the span.
+        drop(guard);
     } else {
-        upstream_execute_ex(Some(execute_data));
+        println!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
     }
-
-    // Run the upstream function and record the duration.
-    // let start = get_unix_timestamp_micros();
-    // upstream_execute_ex(Some(execute_data));
-    // let end = get_unix_timestamp_micros();
 }
 
-#[inline]
-fn upstream_execute_ex(execute_data: Option<&mut ExecuteData>) {
-    unsafe {
-        if let Some(f) = UPSTREAM_EXECUTE_EX {
-            f(execute_data
-                .map(ExecuteData::as_mut_ptr)
-                .unwrap_or(null_mut()))
+pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
+    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
+            Ok(names) => names,
+            Err(_) => (None, None),
+        };
+        if should_trace(class_name.as_deref(), function_name.as_deref()) {
+            return sys::zend_observer_fcall_handlers {
+                begin: Some(observer_begin),
+                end: Some(observer_end),
+            };
         }
     }
-}
-
-#[inline]
-fn upstream_execute_internal(execute_data: Option<&mut ExecuteData>, return_value: Option<*mut sys::zval>) {
-    unsafe {
-        if let Some(f) = UPSTREAM_EXECUTE_INTERNAL {
-            // ✅ Ensure both arguments have valid pointers before calling
-            let execute_data_ptr = execute_data.map(ExecuteData::as_mut_ptr).unwrap_or(null_mut());
-            let return_value_ptr = return_value.unwrap_or(null_mut());
-
-            println!("Calling original zend_execute_internal...");
-            f(execute_data_ptr, return_value_ptr);
-            println!("Finished executing internal function.");
-        } else {
-            println!("UPSTREAM_EXECUTE_INTERNAL is None, internal function not executed.");
-        }
+    sys::zend_observer_fcall_handlers {
+        begin: None,
+        end: None,
     }
-}
-
-pub fn get_unix_timestamp_micros() -> i64 {
-    let now = Utc::now();
-    now.timestamp_micros()
 }
 
 //coped from https://github.com/apache/skywalking-php/blob/v0.8.0/src/execute.rs#L283
@@ -155,6 +103,8 @@ fn get_function_and_class_name(
     Ok((function_name, class_name))
 }
 
+//TODO implement plugins for various applications/PSRs/etc, and query
+//     each of them for interest in this function/method
 fn should_trace(class_name: Option<&str>, function_name: Option<&str>) -> bool {
     match (class_name, function_name) {
         (Some("DemoClass"), Some(_)) => true,

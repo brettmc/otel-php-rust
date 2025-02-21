@@ -1,5 +1,5 @@
 use phper::{
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{ClassEntity, StateClass, Visibility},
 };
 use std::{
     convert::Infallible,
@@ -26,12 +26,12 @@ use opentelemetry_sdk::{
     Resource,
 };
 use once_cell::sync::Lazy;
-use crate::trace::tracer::TRACER_CLASS;
+use crate::trace::tracer::TracerClass;
 use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
 
-pub static TRACER_PROVIDER_CLASS: StaticStateClass<Option<GlobalTracerProvider>> = StaticStateClass::null();
+pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>;
 
 static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
@@ -80,18 +80,16 @@ pub fn get_tracer_provider() -> &'static Arc<SdkTracerProvider> {
     &TRACER_PROVIDER
 }
 
-pub fn make_tracer_provider_class() -> ClassEntity<Option<GlobalTracerProvider>> {
+pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Option<GlobalTracerProvider>> {
     let mut class =
         ClassEntity::<Option<GlobalTracerProvider>>::new_with_default_state_constructor(TRACER_PROVIDER_CLASS_NAME);
-
-    class.bind(&TRACER_PROVIDER_CLASS);
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });
 
-    class.add_method("getTracer", Visibility::Public, |this, arguments| {
-        let provider = this.as_state().as_ref().unwrap();
+    class.add_method("getTracer", Visibility::Public, move |_this, arguments| {
+        let provider = get_tracer_provider();
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         //TODO implement (optional) version, schema_url, attributes
         // let version = arguments[1].expect_z_str()?.to_str()?.to_string();
@@ -101,7 +99,7 @@ pub fn make_tracer_provider_class() -> ClassEntity<Option<GlobalTracerProvider>>
         //     .with_schema_url(schema_url)
              .build();
         let tracer = provider.tracer_with_scope(scope);
-        let mut object = TRACER_CLASS.init_object()?;
+        let mut object = tracer_class.init_object()?;
         *object.as_mut_state() = Some(tracer);
         Ok::<_, phper::Error>(object)
     });
