@@ -39,8 +39,11 @@ pub fn make_tracer_class(span_builder_class: SpanBuilderClass, scope_class: Scop
         })
         .argument(Argument::by_val("name"));
 
+    // TODO remove this, it's just for testing. It is a working implementation of starting
+    //      and activating a span, however is not the correct way to do it (should use span
+    //      builder to create and start a span, then activate it.
     class
-        .add_method("startSpan", Visibility::Public, move |this, arguments| {
+        .add_method("startAndActivateSpan", Visibility::Public, move |this, arguments| {
             let tracer = this.as_state().as_ref().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let span = tracer.start(name);

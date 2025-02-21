@@ -14,8 +14,6 @@ var_dump($span);
 $span->setStatus('Ok')
      ->end();
 ?>
---XFAIL--
-Hard-coded instrumentation scope
 --EXPECTF--
 object(OpenTelemetry\API\Trace\Span)#2 (0) {
 }
@@ -24,11 +22,12 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "my_tracer"
+		Name         : "%s"
 
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s
+	TraceFlags  : TraceFlags(1)
 	ParentSpanId: 0000000000000000
 	Kind        : Internal
 	Start time: %s

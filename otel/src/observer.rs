@@ -1,4 +1,3 @@
-// copied from https://github.com/skpr/compass/blob/v1.2.0/extension/src/execute.rs
 use phper::{
     sys,
     values::{
@@ -39,7 +38,7 @@ pub unsafe extern "C" fn observer_begin(execute_data: *mut sys::zend_execute_dat
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
         let (function_name, class_name) = match get_function_and_class_name(exec_data) {
             Ok(names) => names,
-            Err(_) => (None, None), // Handle errors gracefully
+            Err(_) => (None, None),
         };
         let span_name = format!(
             "{}::{}",
@@ -104,6 +103,8 @@ fn get_function_and_class_name(
     Ok((function_name, class_name))
 }
 
+//TODO implement plugins for various applications/PSRs/etc, and query
+//     each of them for interest in this function/method
 fn should_trace(class_name: Option<&str>, function_name: Option<&str>) -> bool {
     match (class_name, function_name) {
         (Some("DemoClass"), Some(_)) => true,

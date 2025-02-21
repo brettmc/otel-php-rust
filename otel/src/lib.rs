@@ -16,7 +16,6 @@ use crate::{
         span_context::{make_span_context_class},
     },
     globals::{make_globals_class},
-    // observer::{register_exec_functions},
 };
 use phper::{
     modules::Module,
@@ -85,7 +84,6 @@ pub fn get_module() -> Module {
         let _ = TRACER_PROVIDER.set(provider.clone());
         global::set_tracer_provider((*provider).clone());
 
-        //register_exec_functions();
         unsafe {
             sys::zend_observer_fcall_register(Some(observer::observer_instrument));
         }
