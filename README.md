@@ -33,9 +33,9 @@ For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
 ## What works?
 
-* Auto-instrumentation of userland code (see `tests/auto/*`)
+* Auto-instrumentation of userland and internal code, via zend_observer API (see `tests/auto/*`)
 * TracerProvider globally registered in MINIT, and shutdown on MSHUTDOWN
-* Spans can be built through a SpanBuilder, some updated made (not all implemented yet), and `end()`ed
+* Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
 * Spans export to stdout, otlp
 * Get SpanContext from a Span
 
@@ -54,27 +54,20 @@ $span
 
 ## What doesn't work? (todo list)
 
-The biggest thing that doesn't work is being able to `activate()` a span (or a context), so that
-later spans are parented to the active span. I can't work out how to store the returned `guard`
-so that it can be de-referenced later.
+The biggest thing that doesn't work is being able to `activate()` a span, so that
+later spans are parented to the active span. I can get it to work via `SpanBuilder::startAndActivateSpan()`, but
+not when I try to start a span (and wrap an opentelemetry-rust span object, which could be a BoxedSpan or a Span,
+depending on how I obtain the tracer).
 
 ### SpanBuilder
 * doesn't keep a reference to the tracer, and instead fetches a new tracer each time (losing any InstrumentationScope)
 
 ### Span
-* `activate()` only keeps the span active until the returned `guard` immediately goes out of scope. Need to stash the 
-guard in another class, eg `Scope` to allow `Scope->detach()`
 * `getCurrent()` can fetch the current span as a `SpanRef`, but doesn't do anything useful with it
 * `setAttributes`, `addEvent`, `addLink`, `recordException` are no-ops
 
-### Scope
-* not implemented
-
 ### StatusCode
 * not implemented. PR accepted in `phper` to allow adding consts to classes & interfaces to enable this.
-
-### Auto-instrumented internal functions
-Seems to be an issue with `zend_execute_internal` not being initialized at MINIT or RINIT.
 
 ## The future
 
