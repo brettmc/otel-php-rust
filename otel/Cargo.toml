@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # phper = "0.14.1"
-phper = { git = "https://github.com/brettmc/phper.git", branch = "is_internal" }
+phper = { git = "https://github.com/phper-framework/phper.git", branch = "master" }
 opentelemetry = { version = "0.28.0", features = ["internal-logs"] }
 opentelemetry-stdout = "0.28.0"
 opentelemetry_sdk = "0.28.0"
