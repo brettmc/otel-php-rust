@@ -18,9 +18,14 @@ use crate::{
     globals::{make_globals_class},
 };
 use phper::{
+    sg,
+    functions::call,
     modules::Module,
     php_get_module,
+    sys::sapi_module,
     sys,
+    arrays::ZArr,
+    values::{ZVal},
 };
 use std::sync::{
     Arc,
@@ -34,6 +39,8 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use tokio::runtime::Runtime;
+use std::ffi::CStr;
+use opentelemetry::trace::SpanKind;
 
 pub mod context{
     pub mod context;
@@ -50,9 +57,17 @@ pub mod trace{
 }
 pub mod globals;
 pub mod observer;
+use opentelemetry::trace::Tracer;
+use opentelemetry::Context;
+use opentelemetry::trace::TraceContextExt;
+use std::cell::RefCell;
+use std::ptr;
 
 static TRACER_PROVIDER: OnceLock<Arc<SdkTracerProvider>> = OnceLock::new();
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+thread_local! {
+    static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = RefCell::new(None);
+}
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -93,8 +108,54 @@ pub fn get_module() -> Module {
             let _ = provider.shutdown();
         }
     });
+    module.on_request_init(|| {
+        // TODO move all of this into a new file, request.rs
+        let sapi = get_sapi_module_name();
+        if sapi == "cli" {
+            return;
+        }
+        let span_name = match get_request_method() {
+            Some(method) => format!("HTTP {}", method),
+            None => "HTTP".to_string(),
+        };
+        let tracer = global::tracer("php_request");
+        let mut span_builder = tracer.span_builder(span_name);
+        span_builder.span_kind = Some(SpanKind::Server);
+        // TODO set other span attributes from request
+        let span = tracer.build_with_context(span_builder, &Context::current());
+        let ctx = Context::current_with_span(span);
+        let guard = ctx.attach();
+
+        OTEL_REQUEST_GUARD.with(|slot| {
+            *slot.borrow_mut() = Some(guard);
+        });
+    });
+    module.on_request_shutdown(|| {
+        OTEL_REQUEST_GUARD.with(|slot| {
+            *slot.borrow_mut() = None;
+        });
+    });
 
     module
+}
+
+fn get_sapi_module_name() -> String {
+    unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
+}
+
+fn get_request_method() -> Option<String> {
+    unsafe {
+        unsafe {
+            let request_info = sg!(request_info);
+            let method_ptr = request_info.request_method;
+
+            if !method_ptr.is_null() {
+                Some(std::ffi::CStr::from_ptr(method_ptr).to_string_lossy().into_owned())
+            } else {
+                None
+            }
+        }
+    }
 }
 
 pub fn get_runtime() -> &'static Runtime {
