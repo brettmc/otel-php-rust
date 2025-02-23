@@ -34,6 +34,7 @@ For the `otlp` tests, be sure to `docker compose up -d collector` first.
 ## What works?
 
 * Auto-instrumentation of userland and internal code, via zend_observer API (see `tests/auto/*`)
+* Start a span in RINIT for non-`cli` SAPIs
 * TracerProvider globally registered in MINIT, and shutdown on MSHUTDOWN
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
 * Spans export to stdout, otlp
