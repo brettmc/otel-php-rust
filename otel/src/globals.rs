@@ -6,12 +6,6 @@ use phper::{
 };
 use opentelemetry::global;
 use crate::trace::tracer_provider::TracerProviderClass;
-use phper::arrays::ZArr;
-use phper::values::ZVal;
-use phper::sys;
-use std::ptr;
-use phper::sg;
-use phper::arrays::ZArray;
 
 const GLOBALS_CLASS_NAME: &str = "OpenTelemetry\\API\\Globals";
 
