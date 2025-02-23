@@ -49,6 +49,7 @@ pub mod trace{
     pub mod tracer_provider;
 }
 pub mod globals;
+pub mod request;
 pub mod observer;
 
 static TRACER_PROVIDER: OnceLock<Arc<SdkTracerProvider>> = OnceLock::new();
@@ -92,6 +93,12 @@ pub fn get_module() -> Module {
         if let Some(provider) = TRACER_PROVIDER.get() {
             let _ = provider.shutdown();
         }
+    });
+    module.on_request_init(|| {
+        request::init();
+    });
+    module.on_request_shutdown(|| {
+        request::shutdown();
     });
 
     module
