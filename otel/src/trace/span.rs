@@ -5,6 +5,7 @@ use phper::{
 };
 use std::{
     borrow::Cow,
+    cell::RefCell,
     convert::Infallible,
 };
 use opentelemetry::{
@@ -12,7 +13,6 @@ use opentelemetry::{
     KeyValue,
     trace::{
         Span,
-        SpanContext,
         Status,
         TraceContextExt,
     }
@@ -25,6 +25,10 @@ use crate::trace::{
 };
 
 const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
+
+thread_local! {
+    static CONTEXT_STORAGE: RefCell<Option<Context>> = RefCell::new(None);
+}
 
 pub type SpanClass = StateClass<Option<SdkSpan>>;
 
@@ -42,9 +46,14 @@ pub fn make_span_class(
 
     class
         .add_method("end", Visibility::Public, |this, _| -> phper::Result<()> {
-            if let Some(span) = this.as_mut_state().as_mut() {
-                span.end();
-            }
+            this.as_mut_state()
+                .as_mut()
+                .map(|span| span.end())
+                .or_else(|| {
+                    CONTEXT_STORAGE.with(|storage| {
+                        storage.borrow().as_ref().map(|ctx| ctx.span().end())
+                    })
+                });
             Ok(())
         });
 
@@ -139,10 +148,22 @@ pub fn make_span_class(
 
     class
         .add_method("getContext", Visibility::Public, move |this, _| {
-            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
-            let span_context: SpanContext = span.span_context().clone();
+            // get SdkSpan (pre-activate) or SpanRef (post-activate)
+            let span_context = this.as_state()
+                .as_ref()
+                .map(|span| span.span_context().clone()) // If an SdkSpan exists, get its SpanContext
+                .or_else(|| {
+                    CONTEXT_STORAGE.with(|storage| {
+                        storage.borrow().as_ref().map(|ctx| ctx.span().span_context().clone())
+                    })
+                });
             let mut object = span_context_class.init_object()?;
-            *object.as_mut_state() = Some(span_context);
+            match span_context {
+                Some(ctx) => {
+                    *object.as_mut_state() = Some(ctx);
+                }
+                None => {}, //TODO this shouldn't happen!
+            }
             Ok::<_, phper::Error>(object)
         });
 
@@ -156,6 +177,8 @@ pub fn make_span_class(
         .add_method("activate", Visibility::Public, move |this, _arguments| {
             let span = this.as_mut_state().take().expect("No span stored!");
             let ctx = Context::current_with_span(span);
+            CONTEXT_STORAGE.with(|storage| *storage.borrow_mut() = Some(ctx.clone()));
+
             let guard = ctx.attach();
 
             let mut object = scope_class.init_object()?;

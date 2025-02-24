@@ -12,12 +12,38 @@ $tracer = Globals::tracerProvider()->getTracer('my_tracer');
 $root = $tracer->spanBuilder('root')->startSpan();
 $scope = $root->activate();
 $child = $tracer->spanBuilder('child')->startSpan();
-//var_dump($child->getContext()->getTraceId());
-//var_dump($root->getContext()->getTraceId());
-//assert($child->getContext()->getTraceId() === $root->getContext()->getTraceId());
+assert($child->getContext()->getTraceId() === $root->getContext()->getTraceId());
 $child->end();
 $root->end();
 $scope->detach();
-//TODO make some assertions to confirm it worked
 ?>
 --EXPECTF--
+Spans
+Resource
+%A
+Span #0
+	Instrumentation Scope
+		Name         : "%s"
+
+	Name        : child
+	TraceId     : %s
+	SpanId      : %s
+	TraceFlags  : TraceFlags(1)
+	ParentSpanId: %s
+	Kind        : Internal
+	Start time: %s
+	End time: %s
+	Status: Unset
+Span #1
+	Instrumentation Scope
+		Name         : "%s"
+
+	Name        : root
+	TraceId     : %s
+	SpanId      : %s
+	TraceFlags  : TraceFlags(1)
+	ParentSpanId: 0000000000000000
+	Kind        : Internal
+	Start time: %s
+	End time: %s
+	Status: Unset
