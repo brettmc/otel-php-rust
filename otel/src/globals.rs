@@ -4,7 +4,6 @@ use phper::{
         Visibility,
     },
 };
-use opentelemetry::global;
 use crate::trace::tracer_provider::TracerProviderClass;
 
 const GLOBALS_CLASS_NAME: &str = "OpenTelemetry\\API\\Globals";

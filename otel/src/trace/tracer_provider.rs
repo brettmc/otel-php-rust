@@ -31,7 +31,7 @@ use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
 
-pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>;
+pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO dont need to wrap anything
 
 static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {

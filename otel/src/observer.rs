@@ -6,6 +6,7 @@ use phper::{
     strings::ZStr,
 };
 use opentelemetry::{
+    ContextGuard,
     global,
     Context,
     trace::{
@@ -13,10 +14,10 @@ use opentelemetry::{
         TraceContextExt,
     }
 };
-
-use std::collections::HashMap;
-use std::cell::RefCell;
-use opentelemetry::ContextGuard;
+use std::{
+    collections::HashMap,
+    cell::RefCell,
+};
 
 thread_local! {
     static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());

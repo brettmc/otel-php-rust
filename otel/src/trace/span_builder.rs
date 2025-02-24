@@ -7,16 +7,19 @@ use std::{
     mem::take,
 };
 use opentelemetry::{
+    Context,
+    InstrumentationScope,
     KeyValue,
-    global::{
-        self,
-        BoxedSpan,
-    },
     trace::{
         SpanBuilder,
+        Tracer,
+        TracerProvider,
     }
 };
-use crate::trace::span::SpanClass;
+use crate::trace::{
+    span::SpanClass,
+    tracer_provider::get_tracer_provider,
+};
 
 const SPAN_BUILDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\SpanBuilder";
 
@@ -45,11 +48,12 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<Option<Span
 
     class
         .add_method("startSpan", Visibility::Public, move |this, _| {
-            let state = take(this.as_mut_state());
-            //TODO: store+use tracer used to build this
-            let tracer = global::tracer("default");
-            let builder = state.as_ref().expect("SpanBuilder is not initialized");
-            let span: BoxedSpan = builder.clone().start(&tracer);
+            let span_builder = take(this.as_mut_state()).expect("SpanBuilder missing");
+            let provider = get_tracer_provider();
+            let scope = InstrumentationScope::builder("php_rust")
+                .build();
+            let tracer = provider.tracer_with_scope(scope);
+            let span = tracer.build_with_context(span_builder, &Context::current());
             let mut object = span_class.init_object()?;
             *object.as_mut_state() = Some(span);
             Ok::<_, phper::Error>(object)

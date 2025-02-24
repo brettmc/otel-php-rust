@@ -6,10 +6,8 @@ use phper::{
     },
 };
 use std::{
-    cell::RefCell,
     convert::Infallible,
 };
-use opentelemetry::Context;
 use opentelemetry::ContextGuard;
 
 const SCOPE_CLASS_NAME: &str = "OpenTelemetry\\API\\Context\\Scope";

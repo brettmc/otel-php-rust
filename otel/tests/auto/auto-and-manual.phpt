@@ -20,7 +20,7 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "default"
+		Name         : "%s"
 
 	Name        : manual-span
 	TraceId     : %s

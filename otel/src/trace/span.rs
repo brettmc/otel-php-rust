@@ -10,7 +10,6 @@ use std::{
 use opentelemetry::{
     Context,
     KeyValue,
-    global::BoxedSpan,
     trace::{
         Span,
         SpanContext,
@@ -18,20 +17,24 @@ use opentelemetry::{
         TraceContextExt,
     }
 };
-use crate::trace::span_context::SpanContextClass;
-use crate::trace::current_span::CurrentSpanClass;
-use std::sync::Arc;
+use opentelemetry_sdk::trace::Span as SdkSpan;
+use crate::trace::{
+    span_context::SpanContextClass,
+    current_span::CurrentSpanClass,
+    scope::ScopeClass,
+};
 
 const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
 
-pub type SpanClass = StateClass<Option<BoxedSpan>>;
+pub type SpanClass = StateClass<Option<SdkSpan>>;
 
 pub fn make_span_class(
+    scope_class: ScopeClass,
     span_context_class: SpanContextClass,
     current_span_class: CurrentSpanClass,
-) -> ClassEntity<Option<BoxedSpan>> {
+) -> ClassEntity<Option<SdkSpan>> {
     let mut class =
-        ClassEntity::<Option<BoxedSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
+        ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
@@ -39,14 +42,15 @@ pub fn make_span_class(
 
     class
         .add_method("end", Visibility::Public, |this, _| -> phper::Result<()> {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
-            span.end();
+            if let Some(span) = this.as_mut_state().as_mut() {
+                span.end();
+            }
             Ok(())
         });
 
     class
         .add_method("setStatus", Visibility::Public, |this, arguments| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let status = match arguments[0].expect_z_str()?.to_str() {
                 Ok(s) => s.to_string(),
                 Err(_) => return Ok(this.to_ref_owned()), // Ignore invalid UTF-8 input
@@ -85,7 +89,7 @@ pub fn make_span_class(
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let value = arguments[1].expect_z_str()?.to_str()?.to_string();
             span.set_attribute(KeyValue::new(name, value));
@@ -94,7 +98,7 @@ pub fn make_span_class(
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let attributes = arguments[0].expect_z_arr()?;
             for (_key, _value) in attributes.iter() {
                 //TODO: iterate over attributes, apply to span
@@ -106,7 +110,7 @@ pub fn make_span_class(
 
     class
         .add_method("updateName", Visibility::Public, |this, arguments| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             span.update_name(name);
             Ok::<_, phper::Error>(this.to_ref_owned())
@@ -114,28 +118,28 @@ pub fn make_span_class(
 
     class
         .add_method("recordException", Visibility::Public, |this, _arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             //TODO: implement
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("addLink", Visibility::Public, |this, _arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             //TODO: implement
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("addEvent", Visibility::Public, |this, _arguments| {
-            let _span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             //TODO: implement
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("getContext", Visibility::Public, move |this, _| {
-            let span: &mut BoxedSpan = this.as_mut_state().as_mut().unwrap();
+            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let span_context: SpanContext = span.span_context().clone();
             let mut object = span_context_class.init_object()?;
             *object.as_mut_state() = Some(span_context);
@@ -148,13 +152,15 @@ pub fn make_span_class(
             Ok::<_, phper::Error>(object)
         });
 
-    //@see https://docs.rs/opentelemetry/latest/opentelemetry/trace/trait.TraceContextExt.html#examples-1
     class
-        .add_method("activate", Visibility::Public, |this, _arguments| -> phper::Result<()> {
-            // let span: &Arc<BoxedSpan> = this.as_mut_state().as_ref().unwrap();
-            // let ctx = Context::current_with_span(Arc::clone(span));
-            // let _guard = ctx.attach();
-            Ok(())
+        .add_method("activate", Visibility::Public, move |this, _arguments| {
+            let span = this.as_mut_state().take().expect("No span stored!");
+            let ctx = Context::current_with_span(span);
+            let guard = ctx.attach();
+
+            let mut object = scope_class.init_object()?;
+            *object.as_mut_state() = Some(guard);
+            Ok::<_, phper::Error>(object)
         });
 
     class
