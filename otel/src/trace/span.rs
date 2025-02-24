@@ -18,9 +18,11 @@ use opentelemetry::{
     }
 };
 use opentelemetry_sdk::trace::Span as SdkSpan;
-use crate::trace::span_context::SpanContextClass;
-use crate::trace::current_span::CurrentSpanClass;
-use crate::trace::scope::ScopeClass;
+use crate::trace::{
+    span_context::SpanContextClass,
+    current_span::CurrentSpanClass,
+    scope::ScopeClass,
+};
 
 const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
 
