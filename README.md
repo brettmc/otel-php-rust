@@ -4,7 +4,7 @@
 
 This is a prototype PHP extension, using [phper](https://github.com/phper-framework/phper)
 to expose [opentelemetry-rust](https://opentelemetry.io/docs/languages/rust/) via PHP
-classes.
+classes and implement auto-instrumentation.
 
 The initial idea was to implement the PHP API in an extension, which could be a
 drop-in replacement for the core of opentelemetry-php. Since 3rd parties are
@@ -53,12 +53,11 @@ $span
     ->end();
 ```
 
-## What doesn't work? (todo list)
+## What doesn't work or isn't implemented? (todo list)
 
-The biggest thing that doesn't work is being able to `activate()` a span, so that
-later spans are parented to the active span. I can get it to work via `SpanBuilder::startAndActivateSpan()`, but
-not when I try to start a span (and wrap an opentelemetry-rust span object, which could be a BoxedSpan or a Span,
-depending on how I obtain the tracer).
+### RINIT
+
+* Context propagation from incoming request headers
 
 ### SpanBuilder
 * doesn't keep a reference to the tracer, and instead fetches a new tracer each time (losing any InstrumentationScope)

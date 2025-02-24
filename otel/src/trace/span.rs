@@ -59,7 +59,6 @@ pub fn make_span_class(
 
     class
         .add_method("setStatus", Visibility::Public, |this, arguments| {
-            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let status = match arguments[0].expect_z_str()?.to_str() {
                 Ok(s) => s.to_string(),
                 Err(_) => return Ok(this.to_ref_owned()), // Ignore invalid UTF-8 input
@@ -75,22 +74,21 @@ pub fn make_span_class(
                     }
                 })
                 .unwrap_or(Cow::Borrowed(""));
-            match status.as_str() {
-                "Ok" => {
-                    span.set_status(Status::Ok);
-                }
-                "Unset" => {
-                    span.set_status(Status::Unset);
-                }
-                "Error" => {
-                    span.set_status(Status::Error {
-                        description,
-                    });
-                }
-                _ => {
-
-                }
+            let status_code = match status.as_str() {
+                "Ok" => Status::Ok,
+                "Unset" => Status::Unset,
+                "Error" => Status::Error {description},
+                _ => Status::Unset,
             };
+
+            this.as_mut_state()
+                .as_mut()
+                .map(|span| span.set_status(status_code.clone()))
+                .or_else(|| {
+                    CONTEXT_STORAGE.with(|storage| {
+                        storage.borrow().as_ref().map(|ctx| ctx.span().set_status(status_code))
+                    })
+                });
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
         .argument(Argument::by_val("code"))
@@ -98,16 +96,23 @@ pub fn make_span_class(
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
-            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let value = arguments[1].expect_z_str()?.to_str()?.to_string();
-            span.set_attribute(KeyValue::new(name, value));
+            let attribute = KeyValue::new(name, value);
+            this.as_mut_state()
+                .as_mut()
+                .map(|span| span.set_attribute(attribute.clone()))
+                .or_else(|| {
+                    CONTEXT_STORAGE.with(|storage| {
+                        storage.borrow().as_ref().map(|ctx| ctx.span().set_attribute(attribute))
+                    })
+                });
+
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
-            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let attributes = arguments[0].expect_z_arr()?;
             for (_key, _value) in attributes.iter() {
                 //TODO: iterate over attributes, apply to span
@@ -119,39 +124,42 @@ pub fn make_span_class(
 
     class
         .add_method("updateName", Visibility::Public, |this, arguments| {
-            let span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-            span.update_name(name);
+            this.as_mut_state()
+                .as_mut()
+                .map(|span| span.update_name(name.clone()))
+                .or_else(|| {
+                    CONTEXT_STORAGE.with(|storage| {
+                        storage.borrow().as_ref().map(|ctx| ctx.span().update_name(name))
+                    })
+                });
+
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("recordException", Visibility::Public, |this, _arguments| {
-            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             //TODO: implement
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("addLink", Visibility::Public, |this, _arguments| {
-            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             //TODO: implement
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("addEvent", Visibility::Public, |this, _arguments| {
-            let _span: &mut SdkSpan = this.as_mut_state().as_mut().unwrap();
             //TODO: implement
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
     class
         .add_method("getContext", Visibility::Public, move |this, _| {
-            // get SdkSpan (pre-activate) or SpanRef (post-activate)
             let span_context = this.as_state()
                 .as_ref()
-                .map(|span| span.span_context().clone()) // If an SdkSpan exists, get its SpanContext
+                .map(|span| span.span_context().clone())
                 .or_else(|| {
                     CONTEXT_STORAGE.with(|storage| {
                         storage.borrow().as_ref().map(|ctx| ctx.span().span_context().clone())
