@@ -4,17 +4,20 @@ Activate a span, create child span
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
---XFAIL--
-Should not use startAndActivate span
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
 $tracer = Globals::tracerProvider()->getTracer('my_tracer');
 
-$scope = $tracer->startAndActivateSpan('root');
-$scope2 = $tracer->startAndActivateSpan('child');
+$root = $tracer->spanBuilder('root')->startSpan();
+$scope = $root->activate();
+$child = $tracer->spanBuilder('child')->startSpan();
+//var_dump($child->getContext()->getTraceId());
+//var_dump($root->getContext()->getTraceId());
 //assert($child->getContext()->getTraceId() === $root->getContext()->getTraceId());
-//$child->end();
-//$root->end();
+$child->end();
+$root->end();
+$scope->detach();
+//TODO make some assertions to confirm it worked
 ?>
 --EXPECTF--

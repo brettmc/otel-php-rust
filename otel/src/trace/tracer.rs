@@ -7,6 +7,7 @@ use std::{
 };
 use opentelemetry::{
     trace::{
+        SpanBuilder,
         Tracer,
     }
 };
@@ -30,9 +31,9 @@ pub fn make_tracer_class(span_builder_class: SpanBuilderClass, scope_class: Scop
 
     class
         .add_method("spanBuilder", Visibility::Public, move |this, arguments| {
-            let tracer = this.as_state().as_ref().unwrap();
+            let tracer: &SdkTracer = this.as_state().as_ref().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-            let span_builder = tracer.span_builder(name);
+            let span_builder: SpanBuilder = tracer.span_builder(name);
             let mut object = span_builder_class.init_object()?;
             *object.as_mut_state() = Some(span_builder);
             Ok::<_, phper::Error>(object)
@@ -44,7 +45,7 @@ pub fn make_tracer_class(span_builder_class: SpanBuilderClass, scope_class: Scop
     //      builder to create and start a span, then activate it.
     class
         .add_method("startAndActivateSpan", Visibility::Public, move |this, arguments| {
-            let tracer = this.as_state().as_ref().unwrap();
+            let tracer: &SdkTracer = this.as_state().as_ref().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let span = tracer.start(name);
             let ctx = Context::current_with_span(span);
