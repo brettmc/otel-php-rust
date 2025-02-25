@@ -51,7 +51,11 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
         let exporter = StdoutSpanExporter::default();
-        builder = builder.with_batch_exporter(exporter);
+        if env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple") {
+            builder = builder.with_simple_exporter(exporter);
+        } else {
+            builder = builder.with_batch_exporter(exporter);
+        }
     } else {
         if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
             let exporter = OtlpSpanExporter::builder()

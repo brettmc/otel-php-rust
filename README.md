@@ -25,18 +25,20 @@ Quick-start:
 From this bash shell, there is another Makefile to build the extension and run the tests.
 Tests are organised as:
 
-- `auto` - auto-instrumentation
-- `otlp` - otlp (`http/protobuf` + `grpc`) exporting to a local collector
-- `phpt` - test the API via PHP code
+- `test` - all tests
+- `test-auto` - auto-instrumentation
+- `test-otlp` - otlp (`http/protobuf` + `grpc`) exporting to a local collector
+- `test-phpt` - test the API via PHP code
 
 For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
 ## What works?
 
 * Auto-instrumentation of userland and internal code, via zend_observer API (see `tests/auto/*`)
-* Start a span in RINIT for non-`cli` SAPIs
+* Start a span in RINIT for non-`cli` SAPIs, use `traceparent` headers, set HTTP response code in RSHUTDOWN
 * TracerProvider globally registered in MINIT, and shutdown on MSHUTDOWN
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
+* Spans can be `activate()`d, and scope detached
 * Spans export to stdout, otlp
 * Get SpanContext from a Span
 
@@ -55,15 +57,19 @@ $span
 
 ## What doesn't work or isn't implemented? (todo list)
 
+### Tracers
+
+Tracers are re-fetched all over the shop from tracer_provider.rs
+
 ### RINIT
 
-* Context propagation from incoming request headers
+* Context propagation from incoming request headers doesn't correctly set IsRemote (when root span fetched via `Span::getCurrent()`)
 
 ### SpanBuilder
 * doesn't keep a reference to the tracer, and instead fetches a new tracer each time (losing any InstrumentationScope)
 
 ### Span
-* `getCurrent()` can fetch the current span as a `SpanRef`, but doesn't do anything useful with it
+* `getCurrent()` fetches the current span as a `SpanRef`, and presents it as a CurrentSpan (which mirrors Span, but they don't share an interface)
 * `setAttributes`, `addEvent`, `addLink`, `recordException` are no-ops
 
 ### StatusCode
