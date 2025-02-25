@@ -14,7 +14,7 @@ use OpenTelemetry\API\Trace\StatusCode;
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
 $span->setStatus('Ok')
      ->setAttribute('foo', 'bar')
-     ->setAttributes(['baz' => 'bat', 'num' => 2])
+     ->setAttributes(['baz' => 'bat', 'num' => 2, 'pi' => 3.14159, 'a' => [1,2,3,4,5]])
      ->updateName('updated')
      ->recordException(new \Exception('kaboom'))
      ->addLink()
@@ -27,10 +27,7 @@ Resource
 	 ->  %A
 Span #0
 	Instrumentation Scope
-		Name         : "change-me"
-		Version  : "0.1"
-		SchemaUrl: "http://my.schema.url"
-
+%A
 	Name        : updated
 	TraceId     : %s
 	SpanId      : %s
@@ -43,4 +40,9 @@ Span #0
 	Attributes:
 		 ->  foo: String(Owned("bar"))
 		 ->  baz: String(Owned("bat"))
-		 ->  num: Integer(Owned(2))
+		 ->  num: I64(2)
+		 ->  pi: F64(3.14159)
+		 ->  a: Array(I64([1, 2, 3, 4, 5]))
+    Events:
+    Links:
+    Exceptions:
