@@ -5,11 +5,17 @@ build:
 	@echo "Building..."
 	cargo build
 test: build
-	@echo "Running tests..."
+	@echo "Running all tests..."
+	php ~/run-tests.php -q --show-diff tests/
+test-func: build
+	@echo "Running functional tests..."
 	php ~/run-tests.php -q --show-diff tests/phpt/
-export: build
+test-export: build
 	@echo "Running live export tests..."
 	php ~/run-tests.php -q --show-diff tests/otlp/
-auto: build
+test-auto: build
 	@echo "Running auto-instrumentation tests..."
 	php ~/run-tests.php -q --show-diff tests/auto/
+test-http: build
+	@echo "Running HTTP tests with built-in webserver..."
+	php ~/run-tests.php -q --show-diff tests/http/
