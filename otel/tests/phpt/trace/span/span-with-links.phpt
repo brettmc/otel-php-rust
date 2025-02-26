@@ -1,28 +1,21 @@
 --TEST--
-Modify span after activate
---DESCRIPTION--
-Span is stored as an SdkSpan or SpanRef, depending on whether it has been activated or not
+Create a span with link
 --EXTENSIONS--
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+--XFAIL--
+Panics on retrieve rust span context from PHP object
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
-use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\SpanContext;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
+$span->addLink(SpanContext::create('2b4ef3412d587ce6e7880fb27a316b8c', '7480a670201f6340'));
 $scope = $span->activate();
-$span->setStatus('Ok')
-     ->setAttribute('foo', 'bar')
-     ->setAttributes(['baz' => 'bat', 'num' => 2])
-     ->updateName('updated')
-     ->recordException(new \Exception('kaboom'))
-     //->addLink(SpanContext::create('2b4ef3412d587ce6e7880fb27a316b8c', '7480a670201f6340'))
-     ->addEvent()
-     ->end();
- $scope->detach();
+//add link after activate goes through a SpanRef
+$span->addLink(SpanContext::create('fffff3412d587ce6e7880fb27a316b8c', 'ffffa670201f6340'));
 ?>
 --EXPECTF--
 Spans
@@ -31,7 +24,6 @@ Resource
 Span #0
 	Instrumentation Scope
 %A
-
 	Name        : updated
 	TraceId     : %s
 	SpanId      : %s
@@ -42,4 +34,6 @@ Span #0
 	End time: %s
 	Status: Ok
 	Attributes:
-%A
+    Links:
+        FirstLink:
+        SecondLink:

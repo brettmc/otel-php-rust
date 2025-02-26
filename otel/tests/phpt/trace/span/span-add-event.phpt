@@ -1,15 +1,18 @@
 --TEST--
-Create a span with Error status + description
+Create a span with event
 --EXTENSIONS--
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+--XFAIL--
+addEvent not implemented
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
-$span->setStatus('Error', 'kaboom')->end();
+$span->addEvent('my-event', ['foo' => 'bar'])
+     ->end();
 ?>
 --EXPECTF--
 Spans
@@ -27,4 +30,9 @@ Span #0
 	Kind        : Internal
 	Start time: %s
 	End time: %s
-	Status: Error { description: "kaboom" }
+	Events:
+	Event #0
+    	Name      : my-event
+    	Timestamp : %s
+    	Attributes:
+    		 ->  foo: String(Owned("bar"))

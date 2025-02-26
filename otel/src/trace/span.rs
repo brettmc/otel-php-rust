@@ -4,7 +4,7 @@ use phper::{
     classes::{ClassEntity, StateClass, Visibility},
     errors::ThrowObject,
     functions::Argument,
-    objects::ZObject,
+    objects::{ZObj, ZObject},
     values::ZVal,
 };
 use std::{
@@ -20,6 +20,7 @@ use opentelemetry::{
     StringValue,
     trace::{
         Span,
+        SpanContext,
         Status,
         TraceContextExt,
     }
@@ -179,8 +180,13 @@ pub fn make_span_class(
         });
 
     class
-        .add_method("addLink", Visibility::Public, |this, _arguments| {
-            //TODO: implement
+        .add_method("addLink", Visibility::Public, |this, arguments| {
+            let span_context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
+            // TODO panics here: called `Option::unwrap()` on a `None` value
+            let _span_context: &SpanContext = unsafe {
+                span_context_obj.as_state_obj::<SpanContext>().as_state()
+            };
+
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 

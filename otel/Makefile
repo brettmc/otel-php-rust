@@ -9,7 +9,7 @@ test: build
 	php ~/run-tests.php -q --show-diff tests/
 test-func: build
 	@echo "Running functional tests..."
-	php ~/run-tests.php -q --show-diff tests/phpt/
+	php ~/run-tests.php -q tests/phpt/
 test-export: build
 	@echo "Running live export tests..."
 	php ~/run-tests.php -q --show-diff tests/otlp/
