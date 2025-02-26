@@ -4,15 +4,15 @@ Create a span with event
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
---XFAIL--
-addEvent not implemented
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
-$span->addEvent('my-event', ['foo' => 'bar'])
-     ->end();
+$span
+    ->addEvent('my-event', ['foo' => 'bar'])
+    ->addEvent('another-event')
+    ->end();
 ?>
 --EXPECTF--
 Spans
@@ -30,9 +30,13 @@ Span #0
 	Kind        : Internal
 	Start time: %s
 	End time: %s
+	Status: Unset
 	Events:
 	Event #0
-    	Name      : my-event
-    	Timestamp : %s
-    	Attributes:
-    		 ->  foo: String(Owned("bar"))
+	Name      : my-event
+	Timestamp : %s
+	Attributes:
+		 ->  foo: String(Owned("bar"))
+	Event #1
+	Name      : another-event
+	Timestamp : %s

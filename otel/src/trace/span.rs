@@ -191,8 +191,34 @@ pub fn make_span_class(
         });
 
     class
-        .add_method("addEvent", Visibility::Public, |this, _arguments| {
-            //TODO: implement
+        .add_method("addEvent", Visibility::Public, |this, arguments| {
+            let event_name = arguments[0].expect_z_str()?.to_str()?.to_string();
+            let mut attributes = Vec::new();
+            if let Some(array) = arguments.get(1).and_then(|attrs| attrs.as_z_arr()) {
+                for (key, value) in array.iter() {
+                    match key {
+                        IterKey::Index(_) => {}, // Skip integer keys
+                        IterKey::ZStr(zstr) => {
+                            if let Some(key_str) = zstr.to_str().ok().map(|s| s.to_string()) {
+                                if let Some(kv) = zval_to_key_value(&key_str, value) {
+                                    attributes.push(kv);
+                                }
+                            }
+                        },
+                    };
+                }
+            }
+
+
+            this.as_mut_state()
+                .as_mut()
+                .map(|span| span.add_event(event_name.clone(), attributes.clone()))
+                .or_else(|| {
+                    CONTEXT_STORAGE.with(|storage| {
+                        storage.borrow().as_ref().map(|ctx| ctx.span().add_event(event_name.clone(), attributes.clone()))
+                    })
+                });
+
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
 
