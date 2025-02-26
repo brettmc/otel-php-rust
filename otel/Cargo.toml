@@ -9,8 +9,8 @@ name = "otel"
 crate-type = ["cdylib"]
 
 [dependencies]
-# phper = "0.14.1"
-phper = { git = "https://github.com/phper-framework/phper.git", rev = "901d6a7" }
+phper = "0.15.0"
+#phper = { git = "https://github.com/phper-framework/phper.git", rev = "92e40cc" }#\
 opentelemetry = { version = "0.28.0", features = ["internal-logs"] }
 opentelemetry-http = "0.28.0"
 opentelemetry-stdout = "0.28.0"
