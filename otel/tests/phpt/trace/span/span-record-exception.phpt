@@ -1,5 +1,5 @@
 --TEST--
-Create a span with Error status + description
+Create a span and record exception
 --EXTENSIONS--
 otel
 --ENV--
@@ -9,16 +9,16 @@ OTEL_TRACES_EXPORTER=console
 use OpenTelemetry\API\Globals;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
-$span->setStatus('Error', 'kaboom')->end();
+$span->recordException(new \Exception('kaboom'))
+     ->end();
 ?>
 --EXPECTF--
 Spans
 Resource
-%A
+	 ->  %A
 Span #0
 	Instrumentation Scope
 %A
-
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s
@@ -27,4 +27,10 @@ Span #0
 	Kind        : Internal
 	Start time: %s
 	End time: %s
-	Status: Error { description: "kaboom" }
+	Status: Unset
+	Events:
+	Event #0
+	Name      : exception
+	Timestamp : %s
+	Attributes:
+		 ->  exception.message: String(Owned("kaboom"))

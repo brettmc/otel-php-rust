@@ -6,7 +6,7 @@ build:
 	cargo build
 test: build
 	@echo "Running all tests..."
-	php ~/run-tests.php -q --show-diff tests/
+	php ~/run-tests.php -q tests/
 test-func: build
 	@echo "Running functional tests..."
 	php ~/run-tests.php -q --show-diff tests/phpt/

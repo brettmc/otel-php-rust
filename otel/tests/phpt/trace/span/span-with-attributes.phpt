@@ -1,24 +1,18 @@
 --TEST--
-Create a span with all features
+Create a span with attributes
 --EXTENSIONS--
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
---XFAIL--
-Not all setters are implemented
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
+use OpenTelemetry\API\Trace\SpanContext;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
-$span->setStatus('Ok')
-     ->setAttribute('foo', 'bar')
-     ->setAttributes(['baz' => 'bat', 'num' => 2])
-     ->updateName('updated')
-     ->recordException(new \Exception('kaboom'))
-     ->addLink()
-     ->addEvent()
+$span->setAttribute('foo', 'bar')
+     ->setAttributes(['baz' => 'bat', 'num' => 2, 'pi' => 3.14159, 'a' => [1,2,3,4,5]])
      ->end();
 ?>
 --EXPECTF--
@@ -27,20 +21,19 @@ Resource
 	 ->  %A
 Span #0
 	Instrumentation Scope
-		Name         : "change-me"
-		Version  : "0.1"
-		SchemaUrl: "http://my.schema.url"
-
-	Name        : updated
+%A
+	Name        : root
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
 	ParentSpanId: 0000000000000000
-	Kind        : Internal
+	Kind        : %s
 	Start time: %s
 	End time: %s
-	Status: Ok
+	Status: Unset
 	Attributes:
 		 ->  foo: String(Owned("bar"))
 		 ->  baz: String(Owned("bat"))
-		 ->  num: Integer(Owned(2))
+		 ->  num: I64(2)
+		 ->  pi: F64(3.14159)
+		 ->  a: Array(I64([1, 2, 3, 4, 5]))

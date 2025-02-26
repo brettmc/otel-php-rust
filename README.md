@@ -70,7 +70,7 @@ Tracers are re-fetched all over the shop from tracer_provider.rs
 
 ### Span
 * `getCurrent()` fetches the current span as a `SpanRef`, and presents it as a CurrentSpan (which mirrors Span, but they don't share an interface)
-* `setAttributes`, `addEvent`, `addLink`, `recordException` are no-ops
+* `addLink` panics when trying to retrieve rust span-context object from a wrapped PHP SpanContext
 
 ### StatusCode
 * not implemented. PR accepted in `phper` to allow adding consts to classes & interfaces to enable this.

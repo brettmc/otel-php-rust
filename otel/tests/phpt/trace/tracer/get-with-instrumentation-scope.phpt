@@ -1,5 +1,5 @@
 --TEST--
-Create a span with instrumentation scope
+Get a tracer with instrumentation scope
 --EXTENSIONS--
 otel
 --ENV--
