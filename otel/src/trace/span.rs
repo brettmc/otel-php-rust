@@ -4,7 +4,7 @@ use phper::{
     classes::{ClassEntity, StateClass, Visibility},
     errors::ThrowObject,
     functions::Argument,
-    objects::{ZObj,ZObject},
+    objects::ZObject,
     values::ZVal,
 };
 use std::{
@@ -164,9 +164,8 @@ pub fn make_span_class(
 
     class
         .add_method("recordException", Visibility::Public, |this, arguments| {
-            let t: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let z_obj: ZObject = t.to_ref_owned();
-            if let Ok(throwable) = ThrowObject::new(z_obj) {
+            let t: ZObject = arguments[0].expect_mut_z_obj()?.to_ref_owned();
+            if let Ok(throwable) = ThrowObject::new(t) {
                 this.as_mut_state()
                     .as_mut()
                     .map(|span| span.record_error(&throwable))
