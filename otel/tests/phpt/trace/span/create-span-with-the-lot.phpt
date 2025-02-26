@@ -43,6 +43,12 @@ Span #0
 		 ->  num: I64(2)
 		 ->  pi: F64(3.14159)
 		 ->  a: Array(I64([1, 2, 3, 4, 5]))
-    Events:
+	Events:
+	Event #0
+	Name      : exception
+	Timestamp : %s
+	Attributes:
+		 ->  exception.message: String(Owned("kaboom"))
+
     Links:
     Exceptions:

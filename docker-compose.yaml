@@ -4,6 +4,7 @@ services:
       context: .
     volumes:
     - ./otel/:/usr/src/myapp
+    - ./.cargo/registry:/home/php-rust/.cargo/registry
     user: php-rust
   collector:
     image: otel/opentelemetry-collector-contrib
