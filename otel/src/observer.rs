@@ -102,19 +102,6 @@ fn get_function_and_class_name(
     Ok((function_name, class_name))
 }
 
-//TODO implement plugins for various applications/PSRs/etc, and query
-//     each of them for interest in this function/method
-//TODO should accept a ClassEntry, so that we can test for interfaces etc?
-// fn should_trace(class_name: Option<&str>, function_name: Option<&str>) -> bool {
-//     match (class_name, function_name) {
-//         (Some("DemoClass"), Some(_)) => true,
-//         (None, Some("demoFunction")) => true,
-//         (Some("DemoClass"), None) => true,
-//         (None, Some("str_contains")) => true,
-//         _ => false,
-//     }
-// }
-
 fn should_trace(func: &ZFunc) -> bool {
     // println!("should_trace");
 
@@ -140,40 +127,29 @@ fn should_trace(func: &ZFunc) -> bool {
         None => return false,
     };
 
-    let known_interfaces = &["IDemo", "IDemo::foo"];
-    for &iface_name in known_interfaces {
-        match ClassEntry::from_globals(iface_name) {
+    let known_interfaces = &["IDemo::foo", "IDemo::bar"];
+    for &iface_entry in known_interfaces {
+        let parts: Vec<&str> = iface_entry.split("::").collect();
+        if parts.len() != 2 {
+            println!("Skipping malformed interface entry: {}", iface_entry);
+            continue;
+        }
+        let interface_name = parts[0];
+        let method_name = parts[1];
+
+        match ClassEntry::from_globals(interface_name) {
             Ok(iface_ce) => {
-                // println!("interface CE found: {}", iface_name);
+                // println!("interface CE found: {}", interface_name);
                 if ce.is_instance_of(&iface_ce) {
-                    // println!("it matches!");
-                    return true;
+                    if iface_ce.has_method(method_name) {
+                        // println!("match on interface + method");
+                        return true;
+                    }
                 }
             }
-            Err(_) => {
-                // println!("interface CE not found: {}", iface_name);
-            }
+            Err(_) => {}
         }
     }
-
-    // let (function_name, class_name) = match get_function_and_class_name(exec_data) {
-    //     Ok(names) => names,
-    //     Err(_) => (None, None),
-    // };
-
-    /*for &iface_name in known_interfaces {
-        let mut iface_zstr = ZString::new(iface_name);
-        let iface_ce_ptr = unsafe { zend_lookup_class(iface_zstr.as_mut_ptr()) };
-        if !iface_ce_ptr.is_null() {
-            // Convert interface `zend_class_entry*` to `ClassEntry`
-            let iface_ce = unsafe { ClassEntry::from_ptr(iface_ce_ptr) };
-
-            // Check if the class implements the interface
-            if ce.is_instance_of(&iface_ce) {
-                return true;
-            }
-        }
-    }*/
 
     false
 }
