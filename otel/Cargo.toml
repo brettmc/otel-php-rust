@@ -26,4 +26,4 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 
 [dev-dependencies]
-phper-test = "0.14.1"
+phper-test = "0.15.0"

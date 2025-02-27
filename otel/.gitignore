@@ -7,3 +7,16 @@ Cargo.lock
 *.out
 *.php
 *.sh
+
+Makefile.fragments
+Makefile.objects
+autom4te.cache
+build
+config.m4
+config.h
+config.h.in*
+config.nice
+config.status
+configure
+configure.ac
+libtool
