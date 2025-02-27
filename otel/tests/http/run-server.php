@@ -6,7 +6,6 @@ function run_server(string $file, array $options): void {
     $docRoot = __DIR__;
     $router = $docRoot . '/' . $file;
     $server_log = sprintf('/tmp/server-%s.log', uniqid());
-    $response_log = sprintf('/tmp/response-%s.log', uniqid());
 
     // Start the PHP built-in web server
     $cmd = sprintf(
