@@ -34,6 +34,7 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use tokio::runtime::Runtime;
+use tracing_subscriber::{filter::LevelFilter, Registry, prelude::*};
 
 pub mod context{
     pub mod context;
@@ -51,6 +52,7 @@ pub mod trace{
 pub mod globals;
 pub mod request;
 pub mod observer;
+pub mod logging;
 
 static TRACER_PROVIDER: OnceLock<Arc<SdkTracerProvider>> = OnceLock::new();
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
@@ -76,7 +78,13 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
-        //TODO: configure internal logging, redirect to php error log?
+        //TODO: this logs to stdout, redirect to php error log?
+        // let subscriber = FmtSubscriber::builder()
+        //     .with_max_level(tracing::Level::WARN)
+        //     .finish();
+        let subscriber = Registry::default().with(logging::PhpErrorLogLayer).with(LevelFilter::WARN);
+        tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+
         let runtime = Runtime::new().expect("Failed to create Tokio runtime");
         RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
 
