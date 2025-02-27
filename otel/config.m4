@@ -1,6 +1,22 @@
 PHP_ARG_ENABLE(otel, whether to enable otel, [ --enable-otel Enable otel])
 
 if test "$PHP_OTEL" != "no"; then
+  AC_MSG_CHECKING([for libclang shared libraries])
+  LIBCLANG_PATH=$(find /usr/lib /usr/local/lib /lib /opt/homebrew/lib -name "libclang.so*" 2>/dev/null | head -n1)
+  if test -z "$LIBCLANG_PATH"; then
+    AC_MSG_ERROR([libclang.so not found])
+  else
+    AC_MSG_RESULT([found $LIBCLANG_PATH])
+  fi
+
+  AC_MSG_CHECKING([for LLVM shared libraries])
+  LIBLLVM_PATH=$(find /usr/lib /usr/local/lib /lib /opt/homebrew/lib -name "libLLVM.so*" 2>/dev/null | head -n1)
+  if test -z "$LIBLLVM_PATH"; then
+    AC_MSG_ERROR([libLLVM.so not found])
+  else
+    AC_MSG_RESULT([found $LIBLLVM_PATH])
+  fi
+
   AC_PATH_PROG([CARGO], [cargo])
   if test -z "$CARGO"; then
     AC_MSG_ERROR([Cargo not found! Install Rust via https://rustup.rs])
@@ -12,14 +28,13 @@ if test "$PHP_OTEL" != "no"; then
   fi
 
   RUSTC_VERSION=$($RUSTC --version | cut -d' ' -f2)
-  echo "rustc === ::${RUSTC_VERSION}::"
   RUSTC_REQUIRED_VERSION="1.85.0"
   AC_MSG_CHECKING([Rust version found: $RUSTC_VERSION])
 
   # Compare versions using Autoconf's built-in version comparison
   AS_VERSION_COMPARE([$RUSTC_REQUIRED_VERSION], [$RUSTC_VERSION],
     [AC_MSG_RESULT([OK])]
-    , []
+    , [AC_MSG_RESULT([OK])]
     , [AC_MSG_ERROR([rustc >= $RUSTC_REQUIRED_VERSION is required])]
   )
 
