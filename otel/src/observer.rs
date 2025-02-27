@@ -111,12 +111,15 @@ fn should_trace(func: &ZFunc) -> bool {
         Err(_) => return false, // If the function name is not valid UTF-8, return false
     };
     // println!("function_name: {:?}", function_name);
+    #[cfg(feature="test")]
     let known_functions = &[
         "DemoClass::test",
         "DemoClass::inner",
         "demoFunction",
         "str_contains",
     ];
+    #[cfg(not(feature="test"))]
+    let known_functions = &[];
     if known_functions.iter().any(|&name| function_name_str == name) {
         return true;
     }

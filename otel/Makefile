@@ -8,6 +8,9 @@ build:
 	@echo "Building..."
 	cargo build --release
 	cp target/release/libotel.so modules/otel.so
+build-test:
+	@echo "Building for test..."
+	cargo build --features test
 install: build
 	@echo "Installing..."
 	cp ${EXTENSION_FILE} ${EXTENSION_INSTALL_PATH}
@@ -15,18 +18,18 @@ install: build
 	@echo "📌 To enable it, add 'extension=$(EXTENSION_NAME).so' to php.ini"
 clean:
 	cargo clean
-test: build
+test: build-test
 	@echo "Running all tests..."
 	php ~/run-tests.php -q tests/
-test-func: build
+test-func: build-test
 	@echo "Running functional tests..."
 	php ~/run-tests.php -q --show-diff tests/phpt/
-test-export: build
+test-export: build-test
 	@echo "Running live export tests..."
 	php ~/run-tests.php -q --show-diff tests/otlp/
-test-auto: build
+test-auto: build-test
 	@echo "Running auto-instrumentation tests..."
 	php ~/run-tests.php -q --show-diff tests/auto/
-test-http: build
+test-http: build-test
 	@echo "Running HTTP tests with built-in webserver..."
 	php ~/run-tests.php -q --show-diff tests/http/
