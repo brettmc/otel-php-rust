@@ -1,9 +1,19 @@
 .PHONY: all build test
 .DEFAULT_GOAL: build
+EXTENSION_NAME = otel
+EXTENSION_FILE = target/release/lib${EXTENSION_NAME}.so
+EXTENSION_INSTALL_PATH = $(shell php-config --extension-dir)/${EXTENSION_NAME}.so
 
 build:
 	@echo "Building..."
-	cargo build
+	cargo build --release
+install: build
+	@echo "Installing..."
+	cp ${EXTENSION_FILE} ${EXTENSION_INSTALL_PATH}
+	@echo "✅ Installed $(EXTENSION_NAME) to $(EXTENSION_INSTALL_PATH)"
+	@echo "📌 To enable it, add 'extension=$(EXTENSION_NAME).so' to php.ini"
+clean:
+	cargo clean
 test: build
 	@echo "Running all tests..."
 	php ~/run-tests.php -q tests/
