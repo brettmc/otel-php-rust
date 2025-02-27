@@ -4,6 +4,9 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[features]
+test = []
+
 [lib]
 name = "otel"
 crate-type = ["cdylib"]
