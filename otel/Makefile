@@ -7,6 +7,7 @@ EXTENSION_INSTALL_PATH = $(shell php-config --extension-dir)/${EXTENSION_NAME}.s
 build:
 	@echo "Building..."
 	cargo build --release
+	cp target/release/libotel.so modules/otel.so
 install: build
 	@echo "Installing..."
 	cp ${EXTENSION_FILE} ${EXTENSION_INSTALL_PATH}
