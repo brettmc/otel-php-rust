@@ -1,0 +1,15 @@
+{
+  "name": "brettmc/otel-php-rust",
+  "description": "Prototype SDK + auto-instrumentation using Rust",
+  "type": "php-ext",
+  "minimum-stability": "dev",
+  "license": "Apache-2.0",
+  "php-ext": {
+    "extension-name": "otel",
+    "build-path": "otel"
+  },
+  "support-zts": "false",
+  "require": {
+    "php": "^8.0"
+  }
+}
