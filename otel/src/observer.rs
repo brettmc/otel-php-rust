@@ -119,7 +119,7 @@ fn should_trace(func: &ZFunc) -> bool {
         "str_contains",
     ];
     #[cfg(not(feature="test"))]
-    let known_functions = &[];
+    let known_functions: &[&str] = &[];
     if known_functions.iter().any(|&name| function_name_str == name) {
         return true;
     }
