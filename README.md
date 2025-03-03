@@ -10,6 +10,14 @@ The initial idea was to implement the PHP API in an extension, which could be a
 drop-in replacement for the core of opentelemetry-php. Since 3rd parties are
 strongly encouraged to only depend on the API, this should be all they need.
 
+## Installation
+
+### PIE (PHP Installer for Extensions)
+
+Requires `llvm-dev`, `libclang-dev`, rust compiler and cargo.
+
+`php pie.phar install brettmc/otel-php-rust:dev-main`
+
 ## Development
 
 Using docker + compose, `Dockerfile` provides PHP 8.4 + rust environment to build and

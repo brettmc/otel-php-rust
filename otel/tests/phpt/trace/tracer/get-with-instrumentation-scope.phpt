@@ -28,6 +28,7 @@ Span #0
 	Name        : test
 	TraceId     : %s
 	SpanId      : %s
+	TraceFlags  : TraceFlags(1)
 	ParentSpanId: 0000000000000000
 	Kind        : Internal
 	Start time: %s

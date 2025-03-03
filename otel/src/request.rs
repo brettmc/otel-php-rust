@@ -31,13 +31,17 @@ pub fn init() {
         sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
     }
     let sapi = get_sapi_module_name();
+    tracing::debug!("sapi module name is: {}", sapi.clone());
+    //TODO apache2handler (mod_php) doesn't run RINIT/RSHUTDOWN
     if sapi == "cli" {
+        tracing::debug!("not auto-creating root span...");
         return;
     }
     let span_name = match get_request_method() {
         Some(method) => format!("HTTP {}", method),
         None => "HTTP".to_string(),
     };
+    tracing::debug!("otel request is being traced, name={}", span_name.clone());
     let tracer_provider = tracer_provider::get_tracer_provider();
     let scope = InstrumentationScope::builder("php_request").build();
     let tracer = tracer_provider.tracer_with_scope(scope);
