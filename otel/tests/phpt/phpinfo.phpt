@@ -14,5 +14,5 @@ version => %s
 opentelemetry-rust => %s
 
 Directive => Local Value => Master Value
-otel.log_level => warn => warn
+otel.log_level => error => error
 %A

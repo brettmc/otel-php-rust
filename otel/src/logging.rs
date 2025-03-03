@@ -58,9 +58,9 @@ where
 
         unsafe {
             let error_type = match *event.metadata().level() {
-                Level::ERROR => E_WARNING,
+                Level::ERROR => E_WARNING, //ERROR will halt PHP
                 Level::WARN => E_WARNING,
-                _ => E_NOTICE, // INFO and DEBUG as NOTICE
+                _ => E_NOTICE,
             };
 
             // Send to PHP error log

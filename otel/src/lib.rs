@@ -65,7 +65,7 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_AUTHORS"),
     );
     module.add_info("opentelemetry-rust", "0.28.0");
-    module.add_ini("otel.log_level", "warn".to_string(), Policy::All);
+    module.add_ini("otel.log_level", "error".to_string(), Policy::All);
 
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(make_scope_class());
@@ -95,8 +95,13 @@ pub fn get_module() -> Module {
         }
     });
     module.on_module_shutdown(|| {
+        tracing::debug!("MSHUTDOWN::Shutting down OpenTelemetry exporter...");
         if let Some(provider) = TRACER_PROVIDER.get() {
-            let _ = provider.shutdown();
+            let shutdown_result = provider.shutdown();
+            match shutdown_result {
+                Ok(_) => tracing::debug!("MSHUTDOWN::OpenTelemetry tracer provider shutdown success"),
+                Err(err) => tracing::warn!("MSHUTDOWN::Failed to shutdown OpenTelemetry tracer provider: {:?}", err),
+            }
         }
     });
     module.on_request_init(|| {

@@ -31,13 +31,16 @@ pub fn init() {
         sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
     }
     let sapi = get_sapi_module_name();
+    tracing::debug!("sapi module name is: {}", sapi.clone());
     if sapi == "cli" {
+        tracing::debug!("not tracing");
         return;
     }
     let span_name = match get_request_method() {
         Some(method) => format!("HTTP {}", method),
         None => "HTTP".to_string(),
     };
+    tracing::debug!("otel request is being traced, name={}", span_name.clone());
     let tracer_provider = tracer_provider::get_tracer_provider();
     let scope = InstrumentationScope::builder("php_request").build();
     let tracer = tracer_provider.tracer_with_scope(scope);
@@ -63,6 +66,7 @@ pub fn shutdown() {
     }
 
     OTEL_REQUEST_GUARD.with(|slot| {
+        tracing::debug!("ending request span, code={}", response_code);
         *slot.borrow_mut() = None;
     });
 }

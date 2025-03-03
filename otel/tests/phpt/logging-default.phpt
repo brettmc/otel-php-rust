@@ -17,5 +17,7 @@ Globals::tracerProvider()
     ->startSpan()
     ->end();
 ?>
---EXPECT--
+--EXPECTF--
 Warning: PHP Shutdown: opentelemetry_sdk: BatchSpanProcessor.ExportError message= name=BatchSpanProcessor.ExportError error=Operation failed: reqwest::Error { kind: Request, url: "http://does-not-exist:4318/v1/traces", source: hyper_util::client::legacy::Error(Connect, ConnectError("dns error", Custom { kind: Uncategorized, error: "failed to lookup address information: Temporary failure in name resolution" })) } in Unknown on line 0
+
+Warning: PHP Shutdown: otel: event src/lib.rs:%i message=MSHUTDOWN::Failed to shutdown OpenTelemetry tracer provider: InternalFailure("Shutdown errors: [InternalFailure(\"Operation failed: reqwest::Error { kind: Request, url: \\\"http://does-not-exist:4318/v1/traces\\\", source: hyper_util::client::legacy::Error(Connect, ConnectError(\\\"dns error\\\", Custom { kind: Uncategorized, error: \\\"failed to lookup address information: Temporary failure in name resolution\\\" })) }\")]") in Unknown on line 0
