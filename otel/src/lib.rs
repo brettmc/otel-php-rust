@@ -18,6 +18,7 @@ use crate::{
     globals::{make_globals_class},
 };
 use phper::{
+    ini::Policy,
     modules::Module,
     php_get_module,
     sys,
@@ -34,7 +35,6 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use tokio::runtime::Runtime;
-use tracing_subscriber::{filter::LevelFilter, Registry, prelude::*};
 
 pub mod context{
     pub mod context;
@@ -64,6 +64,8 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_AUTHORS"),
     );
+    module.add_info("opentelemetry-rust", "0.28.0");
+    module.add_ini("otel.log_level", "warn".to_string(), Policy::All);
 
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(make_scope_class());
@@ -78,12 +80,7 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
-        //TODO: this logs to stdout, redirect to php error log?
-        // let subscriber = FmtSubscriber::builder()
-        //     .with_max_level(tracing::Level::WARN)
-        //     .finish();
-        let subscriber = Registry::default().with(logging::PhpErrorLogLayer).with(LevelFilter::WARN);
-        tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+        logging::init();
 
         let runtime = Runtime::new().expect("Failed to create Tokio runtime");
         RUNTIME.set(runtime).expect("Failed to store Tokio runtime");

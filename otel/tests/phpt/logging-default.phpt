@@ -2,6 +2,8 @@
 Test internal errors logged
 --EXTENSIONS--
 otel
+--INI--
+otel.log_level="warn"
 --ENV--
 OTEL_EXPORTER_OTLP_ENDPOINT=http://does-not-exist:4318
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf

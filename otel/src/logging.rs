@@ -1,8 +1,24 @@
+use phper::ini::{ini_get};
 use phper::sys::{php_error_docref, E_WARNING, E_NOTICE};
 use tracing::{Event, Level, Subscriber, field::{Visit, Field}};
-use tracing_subscriber::{layer::Context, Layer};
-use std::ffi::CString;
+use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
+use std::ffi::{CString, CStr};
 use std::fmt::{self, Write};
+
+pub fn init() {
+    let log_level = ini_get::<Option<&CStr>>("otel.log_level")
+        .and_then(|cstr| cstr.to_str().ok())
+        .unwrap_or("none");
+    let level_filter = match log_level {
+        "error" => LevelFilter::ERROR,
+        "warn" => LevelFilter::WARN,
+        "info" => LevelFilter::INFO,
+        "debug" => LevelFilter::DEBUG,
+        _ => LevelFilter::OFF,
+    };
+    let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+}
 
 /// A visitor that captures structured log fields into a string.
 struct LogVisitor {
