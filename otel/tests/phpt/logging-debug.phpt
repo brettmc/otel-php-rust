@@ -3,7 +3,8 @@ Test internal errors logged
 --EXTENSIONS--
 otel
 --INI--
-otel.log_level="debug"
+otel.log.level="debug"
+otel.log.file="/dev/stdout"
 --ENV--
 OTEL_TRACES_EXPORTER=console
 --FILE--

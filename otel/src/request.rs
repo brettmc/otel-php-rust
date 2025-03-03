@@ -32,8 +32,9 @@ pub fn init() {
     }
     let sapi = get_sapi_module_name();
     tracing::debug!("sapi module name is: {}", sapi.clone());
+    //TODO apache2handler (mod_php) doesn't run RINIT/RSHUTDOWN
     if sapi == "cli" {
-        tracing::debug!("not tracing");
+        tracing::debug!("not auto-creating root span...");
         return;
     }
     let span_name = match get_request_method() {
@@ -66,7 +67,6 @@ pub fn shutdown() {
     }
 
     OTEL_REQUEST_GUARD.with(|slot| {
-        tracing::debug!("ending request span, code={}", response_code);
         *slot.borrow_mut() = None;
     });
 }

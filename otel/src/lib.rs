@@ -82,6 +82,7 @@ pub fn get_module() -> Module {
 
     module.on_module_init(|| {
         logging::init();
+        tracing::debug!("MINIT::logging initialized...");
 
         let runtime = Runtime::new().expect("Failed to create Tokio runtime");
         RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
