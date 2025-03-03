@@ -65,7 +65,8 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_AUTHORS"),
     );
     module.add_info("opentelemetry-rust", "0.28.0");
-    module.add_ini("otel.log_level", "error".to_string(), Policy::All);
+    module.add_ini("otel.log.level", "error".to_string(), Policy::All);
+    module.add_ini("otel.log.file", "/var/log/ext-otel.log".to_string(), Policy::All);
 
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(make_scope_class());

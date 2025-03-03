@@ -1,14 +1,25 @@
 use phper::ini::{ini_get};
-use phper::sys::{php_error_docref, E_WARNING, E_NOTICE};
-use tracing::{Event, Level, Subscriber, field::{Visit, Field}};
+use tracing::{Event, Subscriber, field::{Visit, Field}};
 use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
-use std::ffi::{CString, CStr};
+use std::ffi::{CStr};
 use std::fmt::{self, Write};
+use std::fs::OpenOptions;
+use std::io::Write as _;
+use std::sync::OnceLock;
+
+static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
 
 pub fn init() {
-    let log_level = ini_get::<Option<&CStr>>("otel.log_level")
+    let log_file = ini_get::<Option<&CStr>>("otel.log.file")
+        .and_then(|cstr| cstr.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "/var/log/ext-otel.log".to_string());
+    LOG_FILE_PATH.set(log_file).expect("LOG_FILE_PATH already initialized");
+
+    let log_level = ini_get::<Option<&CStr>>("otel.log.level")
         .and_then(|cstr| cstr.to_str().ok())
         .unwrap_or("none");
+
     let level_filter = match log_level {
         "error" => LevelFilter::ERROR,
         "warn" => LevelFilter::WARN,
@@ -17,8 +28,18 @@ pub fn init() {
         "trace" => LevelFilter::TRACE,
         _ => LevelFilter::OFF,
     };
+
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+}
+
+fn log_to_file(message: &str) {
+    //let log_file = "/var/log/ext-otel.log";
+    let log_file = LOG_FILE_PATH.get().map(|s| s.as_str()).unwrap_or("/var/log/ext-otel.log");
+
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_file) {
+        let _ = writeln!(file, "{}", message); // Ignore errors to prevent panics
+    }
 }
 
 /// A visitor that captures structured log fields into a string.
@@ -53,18 +74,6 @@ where
         event.record(&mut visitor);
         message.push_str(&visitor.message);
 
-        // Convert Rust string to C string for PHP
-        let c_message = CString::new(message).unwrap_or_else(|_| CString::new("Log message error").unwrap());
-
-        unsafe {
-            let error_type = match *event.metadata().level() {
-                Level::ERROR => E_WARNING, //ERROR will halt PHP
-                Level::WARN => E_WARNING,
-                _ => E_NOTICE,
-            };
-
-            // Send to PHP error log
-            php_error_docref(std::ptr::null(), error_type.try_into().unwrap(), c_message.as_ptr());
-        }
+        log_to_file(message.as_str());
     }
 }
