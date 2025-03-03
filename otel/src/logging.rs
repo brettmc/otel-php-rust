@@ -14,6 +14,7 @@ pub fn init() {
         "warn" => LevelFilter::WARN,
         "info" => LevelFilter::INFO,
         "debug" => LevelFilter::DEBUG,
+        "trace" => LevelFilter::TRACE,
         _ => LevelFilter::OFF,
     };
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
