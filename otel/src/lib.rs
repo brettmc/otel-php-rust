@@ -81,7 +81,6 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
-        tracing::debug!("MINIT");
         logging::init();
 
         //TODO use this if multiple grpc exporters (eg logging, metrics)
