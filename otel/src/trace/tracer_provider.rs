@@ -122,6 +122,7 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
 
     class.add_method("forceFlush", Visibility::Public, move |_, _| {
         let provider = get_tracer_provider();
+        tracing::debug!("tracer_provider::force_flush");
         let result = match provider.force_flush() {
             Ok(_) => true,
             Err(_) => false,

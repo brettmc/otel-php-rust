@@ -54,6 +54,7 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<Option<Span
                 .build();
             let tracer = provider.tracer_with_scope(scope);
             let span = tracer.build_with_context(span_builder, &Context::current());
+            tracing::debug!("SpanBuilder::Starting span");
             let mut object = span_class.init_object()?;
             *object.as_mut_state() = Some(span);
             Ok::<_, phper::Error>(object)
