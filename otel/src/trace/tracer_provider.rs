@@ -34,6 +34,7 @@ const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvi
 pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO dont need to wrap anything
 
 static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
+    let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
         let provider = SdkTracerProvider::builder()
             .with_resource(Resource::builder_empty().build())
@@ -51,7 +52,7 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
         let exporter = StdoutSpanExporter::default();
-        if env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple") {
+        if use_simple_exporter {
             builder = builder.with_simple_exporter(exporter);
         } else {
             builder = builder.with_batch_exporter(exporter);
@@ -63,7 +64,11 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
                 .with_protocol(Protocol::HttpBinary)
                 .build()
                 .expect("Failed to create OTLP http exporter");
-            builder = builder.with_batch_exporter(exporter);
+            if use_simple_exporter {
+                builder = builder.with_simple_exporter(exporter);
+            } else {
+                builder = builder.with_batch_exporter(exporter);
+            }
         } else {
             let exporter = get_runtime().block_on(async {
                 OtlpSpanExporter::builder()
@@ -71,7 +76,11 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
                     .build()
                     .expect("Failed to create OTLP grpc exporter")
             });
-            builder = builder.with_batch_exporter(exporter);
+            if use_simple_exporter {
+                builder = builder.with_simple_exporter(exporter);
+            } else {
+                builder = builder.with_batch_exporter(exporter);
+            }
         }
     }
     let provider = builder
