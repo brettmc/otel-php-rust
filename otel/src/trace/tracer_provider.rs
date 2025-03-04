@@ -35,7 +35,7 @@ pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO 
 
 static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
-    tracing::debug!("span exporter {}", if use_simple_exporter {"simple"} else {"batch"});
+    tracing::debug!("span exporter={}", if use_simple_exporter {"simple"} else {"batch"});
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
         let provider = SdkTracerProvider::builder()
             .with_resource(Resource::builder_empty().build())
@@ -118,6 +118,15 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
         let mut object = tracer_class.init_object()?;
         *object.as_mut_state() = Some(tracer);
         Ok::<_, phper::Error>(object)
+    });
+
+    class.add_method("forceFlush", Visibility::Public, move |_, _| {
+        let provider = get_tracer_provider();
+        let result = match provider.force_flush() {
+            Ok(_) => true,
+            Err(_) => false,
+        };
+        Ok::<_, phper::Error>(result)
     });
 
     class
