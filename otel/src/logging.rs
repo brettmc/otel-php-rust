@@ -14,7 +14,7 @@ pub fn init() {
         .and_then(|cstr| cstr.to_str().ok())
         .map(|s| s.to_string())
         .unwrap_or_else(|| "/var/log/ext-otel.log".to_string());
-    LOG_FILE_PATH.set(log_file).expect("LOG_FILE_PATH already initialized");
+    LOG_FILE_PATH.set(log_file.clone()).expect("LOG_FILE_PATH already initialized");
 
     let log_level = ini_get::<Option<&CStr>>("otel.log.level")
         .and_then(|cstr| cstr.to_str().ok())
@@ -31,6 +31,7 @@ pub fn init() {
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+    tracing::debug!("Logging::initialized level={} path={}", level_filter, log_file.clone());
 }
 
 fn log_to_file(message: &str) {
