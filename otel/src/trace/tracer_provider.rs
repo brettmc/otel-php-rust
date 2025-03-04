@@ -27,7 +27,7 @@ use opentelemetry_sdk::{
 };
 use once_cell::sync::Lazy;
 use crate::trace::tracer::TracerClass;
-use crate::get_runtime;
+use tokio::runtime::Runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
 
@@ -35,6 +35,7 @@ pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO 
 
 static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
+    tracing::debug!("span exporter {}", if use_simple_exporter {"simple"} else {"batch"});
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
         let provider = SdkTracerProvider::builder()
             .with_resource(Resource::builder_empty().build())
@@ -70,7 +71,9 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
                 builder = builder.with_batch_exporter(exporter);
             }
         } else {
-            let exporter = get_runtime().block_on(async {
+            tracing::debug!("Creating gRPC exporter with tokio runtime...");
+            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            let exporter = runtime.block_on(async {
                 OtlpSpanExporter::builder()
                     .with_tonic()
                     .build()
