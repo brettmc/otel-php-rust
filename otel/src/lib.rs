@@ -81,11 +81,12 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
+        tracing::debug!("MINIT");
         logging::init();
-        tracing::debug!("MINIT::logging initialized...");
 
-        let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-        RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
+        //TODO use this if multiple grpc exporters (eg logging, metrics)
+        // let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+        // RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
 
         global::set_text_map_propagator(TraceContextPropagator::new());
         let provider = get_tracer_provider().clone();
