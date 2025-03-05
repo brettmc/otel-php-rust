@@ -19,10 +19,22 @@ use opentelemetry::{
 use std::{
     collections::HashMap,
     cell::RefCell,
+    sync::Mutex,
 };
+use lazy_static::lazy_static;
+use crate::{PluginManager};
 
 thread_local! {
     static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());
+}
+
+lazy_static! {
+    static ref PLUGIN_MANAGER: Mutex<Option<PluginManager>> = Mutex::new(None);
+}
+
+pub fn init(plugin_manager: PluginManager) {
+    let mut manager_lock = PLUGIN_MANAGER.lock().unwrap();
+    *manager_lock = Some(plugin_manager);
 }
 
 fn store_guard(exec_ptr: *mut sys::zend_execute_data, guard: ContextGuard) {
@@ -69,14 +81,25 @@ pub unsafe extern "C" fn observer_end(
 }
 
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
-    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        if should_trace(exec_data.func()) {
-            return sys::zend_observer_fcall_handlers {
-                begin: Some(observer_begin),
-                end: Some(observer_end),
-            };
+    println!("observer::observer_instrument");
+    let manager_lock = PLUGIN_MANAGER.lock().unwrap();
+    if let Some(manager) = manager_lock.as_ref() {
+        for plugin in manager.plugins() {
+            if plugin.should_handle() {
+                println!("plugin should_handle");
+                let handler = plugin.get_handlers();
+                return handler;
+            }
         }
     }
+    // if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+    //     if should_trace(exec_data.func()) {
+    //         return sys::zend_observer_fcall_handlers {
+    //             begin: Some(observer_begin),
+    //             end: Some(observer_end),
+    //         };
+    //     }
+    // }
     sys::zend_observer_fcall_handlers {
         begin: None,
         end: None,

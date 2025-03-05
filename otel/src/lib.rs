@@ -35,6 +35,9 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use tokio::runtime::Runtime;
+use crate::trace::plugin_manager::PluginManager;
+use crate::trace::plugins::roadrunner::RoadRunnerPlugin;
+use crate::trace::plugins::test::TestPlugin;
 
 pub mod context{
     pub mod context;
@@ -48,6 +51,12 @@ pub mod trace{
     pub mod status_code;
     pub mod tracer;
     pub mod tracer_provider;
+    pub mod plugin_manager;
+    pub mod plugin;
+    pub mod plugins{
+        pub mod roadrunner;
+        pub mod test;
+    }
 }
 pub mod globals;
 pub mod request;
@@ -91,6 +100,11 @@ pub fn get_module() -> Module {
         let provider = get_tracer_provider().clone();
         let _ = TRACER_PROVIDER.set(provider.clone());
         global::set_tracer_provider((*provider).clone());
+
+        let mut plugin_manager = PluginManager::new();
+        plugin_manager.register_plugin(Box::new(RoadRunnerPlugin));
+        plugin_manager.register_plugin(Box::new(TestPlugin));
+        observer::init(plugin_manager);
 
         unsafe {
             sys::zend_observer_fcall_register(Some(observer::observer_instrument));
