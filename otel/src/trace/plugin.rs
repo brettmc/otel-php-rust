@@ -1,18 +1,17 @@
-use phper::sys::{zval, zend_execute_data, zend_observer_fcall_handlers, _zval_struct};
-use phper::values::{
-    ExecuteData,
+use phper::{
+    functions::ZFunc,
 };
 use std::sync::Arc;
 
 pub trait Plugin: Send + Sync {
-    /// Determines whether this plugin should be applied.
-    fn should_handle(&self) -> bool;
-
+    /// Determines whether this plugin is enabled. Could be based on .ini config, or custom logic.
+    fn is_enabled(&self) -> bool;
     fn get_handlers(&self) -> Vec<Arc<dyn Handler>>;
 }
 
 pub trait Handler: Send + Sync {
-    fn matches(&self, execute_data: &ExecuteData) -> bool;
+    /// Should the function in execute data be observed by this plugin?
+    fn matches(&self, func: &ZFunc) -> bool;
     fn get_callbacks(&self) -> HandlerCallbacks;
 }
 

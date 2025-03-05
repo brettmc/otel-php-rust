@@ -1,15 +1,18 @@
-use phper::sys::{zend_execute_data, zend_observer_fcall_handlers, _zval_struct, zval};
-use super::super::plugin::{Handler, Plugin};
+use phper::{
+    functions::ZFunc,
+};
+use std::sync::Arc;
+use crate::trace::plugin::{Handler, HandlerCallbacks, Plugin};
 pub struct RoadRunnerPlugin;
 
-/*impl Plugin for RoadRunnerPlugin {
-    fn should_handle(&self) -> bool {
+impl Plugin for RoadRunnerPlugin {
+    fn is_enabled(&self) -> bool {
         // Check if RoadRunner PSR-7 environment variables exist
         std::env::var("RR_MODE").map_or(false, |v| v == "http")
     }
 
-    fn get_handlers(&self) -> zend_observer_fcall_handlers {
-        zend_observer_fcall_handlers{begin: None, end: None}
+    fn get_handlers(&self) -> Vec<Arc<dyn Handler>> {
+        vec![Arc::new(WaitRequestHandler), Arc::new(RespondHandler)]
     }
 }
 
@@ -17,35 +20,45 @@ pub struct WaitRequestHandler;
 pub struct RespondHandler;
 
 impl Handler for WaitRequestHandler {
-    fn pre_observe(&self, _execute_data: &zend_execute_data) {
-        tracing::debug!("WaitRequestHandler pre-observed");
-        // Start tracing a new span when request starts
-        // let tracer = opentelemetry::global::tracer("roadrunner");
-        // let span = tracer.start("http.request");
+    fn matches(&self, _func: &ZFunc) -> bool {
+        false
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: Some(Self::pre_observe_trampoline),
+            post_observe: Some(Self::post_observe_trampoline),
+        }
+    }
+}
 
-        // Store span in thread-local storage or request context
-        //store_span(span);
+impl WaitRequestHandler {
+    unsafe extern "C" fn pre_observe_trampoline(_execute_data: *mut phper::sys::zend_execute_data) {
+        println!("roadrunner: pre_observe");
     }
-    extern "C" fn pre_observe_trampoline(execute_data: *mut zend_execute_data) {
-        println!("WaitRequestHandler begin");
-    }
-    extern "C" fn post_observe_trampoline(execute_data: *mut zend_execute_data, retval: *mut zval) {
-        println!("WaitRequestHandler end");
+
+    extern "C" fn post_observe_trampoline(_execute_data: *mut phper::sys::zend_execute_data, _retval: *mut phper::sys::zval) {
+        println!("roadrunner: post_observe");
     }
 }
 
 impl Handler for RespondHandler {
-    fn post_observe(&self, _execute_data: &zend_execute_data, retval: *mut _zval_struct) {
+    fn matches(&self, _func: &ZFunc) -> bool {
+        false
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: Some(Self::pre_observe_trampoline),
+            post_observe: Some(Self::post_observe_trampoline),
+        }
+    }
+}
 
-        // Retrieve and end the span after responding
-        // if let Some(span) = retrieve_span() {
-        //     span.end();
-        // }
+impl RespondHandler {
+    unsafe extern "C" fn pre_observe_trampoline(_execute_data: *mut phper::sys::zend_execute_data) {
+        println!("roadrunner: pre_observe");
     }
-    extern "C" fn pre_observe_trampoline(execute_data: *mut zend_execute_data) {
-        println!("RespondHandler begin");
+
+    extern "C" fn post_observe_trampoline(_execute_data: *mut phper::sys::zend_execute_data, _retval: *mut phper::sys::zval) {
+        println!("roadrunner: post_observe");
     }
-    extern "C" fn post_observe_trampoline(execute_data: *mut zend_execute_data, retval: *mut zval) {
-        println!("RespondHandler end");
-    }
-}*/
+}

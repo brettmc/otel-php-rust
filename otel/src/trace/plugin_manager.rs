@@ -1,15 +1,23 @@
 use super::plugin::Plugin;
+use crate::trace::plugins::{
+    test::TestPlugin,
+    roadrunner::RoadRunnerPlugin,
+};
 pub struct PluginManager {
     plugins: Vec<Box<dyn Plugin + Send + Sync>>,
 }
 
 impl PluginManager {
     pub fn new() -> Self {
-        Self { plugins: vec![] }
+        let mut manager = Self {plugins: vec![] };
+        manager.init();
+        manager
     }
 
-    pub fn register_plugin(&mut self, plugin: Box<dyn Plugin>) {
-        self.plugins.push(plugin);
+    fn init(&mut self) {
+        #[cfg(feature="test")]
+        self.plugins.push(Box::new(TestPlugin));
+        self.plugins.push(Box::new(RoadRunnerPlugin));
     }
 
     pub fn plugins(&self) -> &Vec<Box<dyn Plugin + Send + Sync>> {
