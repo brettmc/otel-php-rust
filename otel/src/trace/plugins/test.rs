@@ -1,5 +1,11 @@
 use phper::sys::{zend_execute_data, zval, zend_observer_fcall_handlers, _zval_struct};
 use super::super::plugin::{Handler, Plugin};
+use phper::values::{
+    ExecuteData,
+};
+use std::sync::Arc;
+use crate::trace::plugin::HandlerCallbacks;
+
 pub struct TestPlugin;
 
 impl Plugin for TestPlugin {
@@ -7,35 +13,32 @@ impl Plugin for TestPlugin {
         true
     }
 
-    fn get_handlers(&self) -> zend_observer_fcall_handlers {
-        zend_observer_fcall_handlers{begin: None, end: None}
+    fn get_handlers(&self) -> Vec<Arc<dyn Handler>> {
+        vec![Arc::new(TestHandler)]
     }
 }
 
 pub struct TestHandler;
 
 impl Handler for TestHandler {
-    fn pre_observe(&self, _execute_data: &zend_execute_data) {
-        tracing::debug!("default pre-observed");
-        // Start tracing a new span when request starts
-        // let tracer = opentelemetry::global::tracer("roadrunner");
-        // let span = tracer.start("http.request");
+    fn matches(&self, _execute_data: &ExecuteData) -> bool {
+        tracing::debug!("TestHandler::matches");
+        true
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: Some(Self::pre_observe_trampoline),
+            post_observe: Some(Self::post_observe_trampoline),
+        }
+    }
+}
 
-        // Store span in thread-local storage or request context
-        //store_span(span);
-    }
-    fn post_observe(&self, _execute_data: &zend_execute_data, _retval: *mut _zval_struct) {
-        tracing::debug!("default post-observed");
-        // Retrieve and end the span after responding
-        // if let Some(span) = retrieve_span() {
-        //     span.end();
-        // }
+impl TestHandler {
+    extern "C" fn pre_observe_trampoline(execute_data: *mut phper::sys::zend_execute_data) {
+        println!("TestHandler: Function Begin!");
     }
 
-    extern "C" fn pre_observe_trampoline(execute_data: *mut zend_execute_data) {
-        println!("TestHandler begin");
-    }
-    extern "C" fn post_observe_trampoline(execute_data: *mut zend_execute_data, retval: *mut zval) {
-        println!("TestHandler end");
+    extern "C" fn post_observe_trampoline(execute_data: *mut phper::sys::zend_execute_data, retval: *mut phper::sys::zval) {
+        println!("TestHandler: Function End!");
     }
 }

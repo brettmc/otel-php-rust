@@ -102,7 +102,7 @@ pub fn get_module() -> Module {
         global::set_tracer_provider((*provider).clone());
 
         let mut plugin_manager = PluginManager::new();
-        plugin_manager.register_plugin(Box::new(RoadRunnerPlugin));
+        //plugin_manager.register_plugin(Box::new(RoadRunnerPlugin));
         plugin_manager.register_plugin(Box::new(TestPlugin));
         observer::init(plugin_manager);
 

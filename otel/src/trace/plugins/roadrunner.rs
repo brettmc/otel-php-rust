@@ -2,7 +2,7 @@ use phper::sys::{zend_execute_data, zend_observer_fcall_handlers, _zval_struct, 
 use super::super::plugin::{Handler, Plugin};
 pub struct RoadRunnerPlugin;
 
-impl Plugin for RoadRunnerPlugin {
+/*impl Plugin for RoadRunnerPlugin {
     fn should_handle(&self) -> bool {
         // Check if RoadRunner PSR-7 environment variables exist
         std::env::var("RR_MODE").map_or(false, |v| v == "http")
@@ -48,4 +48,4 @@ impl Handler for RespondHandler {
     extern "C" fn post_observe_trampoline(execute_data: *mut zend_execute_data, retval: *mut zval) {
         println!("RespondHandler end");
     }
-}
+}*/

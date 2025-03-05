@@ -82,24 +82,23 @@ pub unsafe extern "C" fn observer_end(
 
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
     println!("observer::observer_instrument");
-    let manager_lock = PLUGIN_MANAGER.lock().unwrap();
-    if let Some(manager) = manager_lock.as_ref() {
-        for plugin in manager.plugins() {
-            if plugin.should_handle() {
-                println!("plugin should_handle");
-                let handler = plugin.get_handlers();
-                return handler;
+    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+        let manager_lock = PLUGIN_MANAGER.lock().unwrap();
+        if let Some(manager) = manager_lock.as_ref() {
+            for plugin in manager.plugins() {
+                for handler in plugin.get_handlers() {
+                    if handler.matches(exec_data) {
+                        let callbacks = handler.get_callbacks();
+                        return sys::zend_observer_fcall_handlers {
+                            begin: callbacks.pre_observe,
+                            end: callbacks.post_observe,
+                        }
+                    }
+                }
             }
         }
     }
-    // if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-    //     if should_trace(exec_data.func()) {
-    //         return sys::zend_observer_fcall_handlers {
-    //             begin: Some(observer_begin),
-    //             end: Some(observer_end),
-    //         };
-    //     }
-    // }
+
     sys::zend_observer_fcall_handlers {
         begin: None,
         end: None,
