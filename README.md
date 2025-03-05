@@ -40,14 +40,32 @@ Tests are organised as:
 
 For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
+## SAPI support
+
+### `cli`
+http + grpc exporters work. RINIT and RSHUTDOWN handlers called, but do not create a root span for this SAPI.
+
+This should cover cli-based PHP runtimes (roadrunner, react, etc), but has only been tested against RoadRunner.
+
+### `cli-server`
+http exporter works. RINIT and RSHUTDOWN handlers called.
+
+### `apache2handler`
+No exporters work. RINIT/RSHUTDOWN might not be called (or something might be eating log messages).
+Background sdk batch exporter process does not log and messages beyond startup, and might be getting killed.
+
+### `cgi-fcgi`
+No exporters work. RINIT/RSHUTDOWN might not be called (or something might be eating log messages).
+Background sdk batch exporter process does not log and messages beyond startup, and might be getting killed.
+
 ## What works?
 
 * Auto-instrumentation of userland and internal code, via zend_observer API (see `tests/auto/*`)
-* Start a span in RINIT for non-`cli` SAPIs, use `traceparent` headers, set HTTP response code in RSHUTDOWN
+* Start a span in RINIT for `cli-server` SAPI, use `traceparent` headers, set HTTP response code in RSHUTDOWN
 * TracerProvider globally registered in MINIT, and shutdown on MSHUTDOWN
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
 * Spans can be `activate()`d, and scope detached
-* Spans export to stdout, otlp
+* Spans export to stdout, otlp (grpc + http/protobuf)
 * Get SpanContext from a Span
 
 ```php

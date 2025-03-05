@@ -18,14 +18,21 @@ Globals::tracerProvider()
     ->end();
 ?>
 --EXPECTF--
-Notice: PHP Startup: opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048 in Unknown on line 0
+[%s] [pid=%d] [ThreadId(%d)] otel::logging: event src/logging.rs:37 message=Logging::initialized level=debug path=/dev/stdout
+[%s] [pid=%d] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:38 message=span exporter=batch
+[%s] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048
+[%s] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:28 message=RINIT::initializing
+[%s] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:35 message=RINIT::sapi module name is: cli
+[%s] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:38 message=RINIT::not auto-creating root span...
+[%s] [pid=%d] [ThreadId(%d)] otel::trace::span_builder: event src/trace/span_builder.rs:57 message=SpanBuilder::Starting span
+[%s] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:63 message=RSHUTDOWN::maybe closing root span...
+[%s] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:100 message=MSHUTDOWN::Shutting down OpenTelemetry exporter...
+[%s] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToShutdown message= name=BatchSpanProcessor.ExportingDueToShutdown
+Spans
+Resource
 %A
-Notice: PHP Shutdown: otel: event src/lib.rs:%i message=MSHUTDOWN::Shutting down OpenTelemetry exporter... in Unknown on line 0
+Span #0
 %A
-Notice: PHP Shutdown: opentelemetry_sdk: BatchSpanProcessor.ExportingDueToShutdown message= name=BatchSpanProcessor.ExportingDueToShutdown in Unknown on line 0
-%A
-Notice: PHP Shutdown: opentelemetry_sdk: BatchSpanProcessor.ThreadExiting message= name=BatchSpanProcessor.ThreadExiting reason=ShutdownRequested in Unknown on line 0
-%A
-Notice: PHP Shutdown: opentelemetry_sdk: BatchSpanProcessor.ThreadStopped message= name=BatchSpanProcessor.ThreadStopped in Unknown on line 0
-
-Notice: PHP Shutdown: otel: event src/lib.rs:%i message=MSHUTDOWN::OpenTelemetry tracer provider shutdown success in Unknown on line 0
+[%s] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadExiting message= name=BatchSpanProcessor.ThreadExiting reason=ShutdownRequested
+[%s] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStopped message= name=BatchSpanProcessor.ThreadStopped
+[%s] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:104 message=MSHUTDOWN::OpenTelemetry tracer provider shutdown success

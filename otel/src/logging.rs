@@ -6,6 +6,9 @@ use std::fmt::{self, Write};
 use std::fs::OpenOptions;
 use std::io::Write as _;
 use std::sync::OnceLock;
+use std::process;
+use std::thread;
+use chrono::Utc;
 
 static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
 
@@ -68,7 +71,17 @@ where
     S: Subscriber,
 {
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        let mut message = format!("{}: {}", event.metadata().target(), event.metadata().name());
+        let pid = process::id();
+        let thread_id = thread::current().id();
+        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
+        let mut message = format!(
+            "[{}] [pid={}] [{:?}] {}: {}",
+            timestamp,
+            pid,
+            thread_id,
+            event.metadata().target(),
+            event.metadata().name()
+        );
 
         // Capture structured log fields
         let mut visitor = LogVisitor { message: String::new() };
