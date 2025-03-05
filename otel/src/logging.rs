@@ -75,8 +75,9 @@ where
         let thread_id = thread::current().id();
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
         let mut message = format!(
-            "[{}] [pid={}] [{:?}] {}: {}",
+            "[{}] [{}] [pid={}] [{:?}] {}: {}",
             timestamp,
+            event.metadata().level(),
             pid,
             thread_id,
             event.metadata().target(),
