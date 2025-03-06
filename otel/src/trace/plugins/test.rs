@@ -25,19 +25,19 @@ impl Plugin for TestPlugin {
 pub struct DemoHandler;
 
 impl Handler for DemoHandler {
-    fn matches(&self, fqn: &str) -> bool {
-        let known_functions = &[
-            "DemoClass::test",
-            "DemoClass::inner",
-            "demoFunction",
-            "phpversion",
-        ];
-        if known_functions.iter().any(|&name| fqn == name) {
-            //println!("DemoHandler::matched: {}", fqn);
-            return true;
-        }
-        //println!("DemoHandler::not matched: {}", fqn);
-        false
+    fn get_functions(&self) -> Vec<String> {
+        vec![
+            "DemoClass::test".to_string(),
+            "DemoClass::inner".to_string(),
+            "demoFunction".to_string(),
+            "phpversion".to_string(),
+        ]
+    }
+    fn get_interfaces(&self) -> Vec<String> {
+        vec![
+            "IDemo::foo".to_string(),
+            "IDemo::bar".to_string(),
+        ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {

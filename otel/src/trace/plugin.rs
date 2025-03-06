@@ -9,7 +9,9 @@ pub trait Plugin: Send + Sync {
 pub trait Handler: Send + Sync {
     //fn get_functions(&self) -> Vec<String>;
     /// Should the function in execute data be observed by this plugin?
-    fn matches(&self, func: &str) -> bool; //TODO accept interfaces?
+    //fn matches(&self, func: &str) -> bool; //TODO accept interfaces?
+    fn get_functions(&self) -> Vec<String>;
+    fn get_interfaces(&self) -> Vec<String>;
     fn get_callbacks(&self) -> HandlerCallbacks;
 }
 

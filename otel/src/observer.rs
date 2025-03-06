@@ -60,7 +60,7 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
         let fqn = get_fqn(exec_data);
         let manager_lock = PLUGIN_MANAGER.lock().unwrap();
         if let Some(plugin_manager) = manager_lock.as_ref() {
-            if let Some(observer) = plugin_manager.get_function_observer(&fqn) {
+            if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
                 let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
                 let fqn = fqn.to_string();
                 let mut lock = observers.write().unwrap();
@@ -111,29 +111,26 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
 #[no_mangle]
 pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, _retval: *mut sys::zval) {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
-            Ok((fn_name, cls_name)) => (
-                fn_name.unwrap_or_else(|| "".to_string()),
-                cls_name.unwrap_or_else(|| "".to_string()),
-            ),
-            Err(_) => return,
-        };
+        let fqn = get_fqn(exec_data);
 
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
-        if let Some(observer) = lock.get(&function_name) {
-            //TODO get SpanRef, pass to post hooks
-            for hook in observer.post_hooks() {
-                //println!("running post hook: {} {}", function_name, class_name);
-                unsafe { hook(&mut *execute_data) };
+        if let Some(observer) = lock.get(&fqn) {
+            if let Some(guard) = take_guard(execute_data) {
+                let context = Context::current();
+                let _span_ref = context.span();
+
+                for hook in observer.post_hooks() {
+                    //println!("running post hook: {}", fqn);
+                    unsafe { hook(&mut *execute_data) }; //TODO pass span_ref into post hooks
+                }
+                // Dropping the guard detaches the context and finishes the span.
+                drop(guard);
+            } else {
+                tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
             }
         }
-        if let Some(guard) = take_guard(execute_data) {
-            // Dropping the guard detaches the context and finishes the span.
-            drop(guard);
-        } else {
-            tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
-        }
+
     }
 }
 
