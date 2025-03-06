@@ -17,7 +17,13 @@ use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
 use std::cell::RefCell;
 use opentelemetry::{
+    Context,
     ContextGuard,
+    global,
+    trace::{
+        Tracer,
+        TraceContextExt,
+    },
 };
 
 static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, FunctionObserver>>> = OnceLock::new();
@@ -81,20 +87,22 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
 #[no_mangle]
 pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_execute_data) {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
-            Ok((fn_name, cls_name)) => (
-                fn_name.unwrap_or_else(|| "".to_string()),
-                cls_name.unwrap_or_else(|| "".to_string()),
-            ),
-            Err(_) => return,
-        };
+        let fqn = get_fqn(exec_data);
 
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
-        if let Some(observer) = lock.get(&function_name) {
-            for hook in observer.pre_hooks() {
-                println!("running pre hook: {} {}", function_name, class_name);
-                unsafe { hook(&mut *execute_data) };
+        if let Some(observer) = lock.get(&fqn) {
+            if observer.has_hooks() {
+                let tracer = global::tracer("php-auto-instrumentation");
+                let span_builder = tracer.span_builder(fqn.clone());
+                for hook in observer.pre_hooks() {
+                    println!("running pre hook: {}", fqn);
+                    unsafe { hook(&mut *execute_data) };
+                }
+                let span = tracer.build_with_context(span_builder, &Context::current());
+                let ctx = Context::current_with_span(span);
+                let guard = ctx.attach();
+                store_guard(execute_data, guard);
             }
         }
     }
@@ -114,10 +122,17 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&function_name) {
+            //TODO get SpanRef, pass to post hooks
             for hook in observer.post_hooks() {
                 println!("running post hook: {} {}", function_name, class_name);
                 unsafe { hook(&mut *execute_data) };
             }
+        }
+        if let Some(guard) = take_guard(execute_data) {
+            // Dropping the guard detaches the context and finishes the span.
+            drop(guard);
+        } else {
+            println!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
         }
     }
 }
