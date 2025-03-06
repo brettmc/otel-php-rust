@@ -28,12 +28,12 @@ impl PluginManager {
         &self.plugins
     }
 
-    pub fn get_function_observer(&self, function_name: &str, _class_name: &str) -> Option<FunctionObserver> {
+    pub fn get_function_observer(&self, fqn: &str) -> Option<FunctionObserver> {
         let mut observer = FunctionObserver::new();
 
         for plugin in &self.plugins {
             for handler in plugin.get_handlers() {
-                if handler.matches(function_name) {
+                if handler.matches(fqn) {
                     let callbacks = handler.get_callbacks();
 
                     if let Some(pre) = callbacks.pre_observe {
@@ -58,11 +58,11 @@ impl PluginManager {
         }
     }
 
-    pub fn register_function_observer(&self, function_name: &str) {
+    pub fn register_function_observer(&self, fqn: &str) {
         let mut lock = FUNCTION_OBSERVERS.get_or_init(|| RwLock::new(HashMap::new())).write().unwrap();
 
-        if let Some(observer) = self.get_function_observer(function_name, "dummy") {
-            lock.insert(function_name.to_string(), observer);
+        if let Some(observer) = self.get_function_observer(fqn) {
+            lock.insert(fqn.to_string(), observer);
         }
     }
 }

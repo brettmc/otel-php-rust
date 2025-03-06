@@ -51,20 +51,14 @@ pub fn init(plugin_manager: PluginManager) {
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
     // println!("observer::observer_instrument");
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
-            Ok((fn_name, cls_name)) => (
-                fn_name.unwrap_or_else(|| "".to_string()),
-                cls_name.unwrap_or_else(|| "".to_string())
-            ),
-            Err(_) => return sys::zend_observer_fcall_handlers{begin: None, end: None},
-        };
+        let fqn = get_fqn(exec_data);
         let manager_lock = PLUGIN_MANAGER.lock().unwrap();
         if let Some(plugin_manager) = manager_lock.as_ref() {
-            if let Some(observer) = plugin_manager.get_function_observer(&function_name, &class_name) {
+            if let Some(observer) = plugin_manager.get_function_observer(&fqn) {
                 let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-                let function_name = function_name.to_string();
+                let fqn = fqn.to_string();
                 let mut lock = observers.write().unwrap();
-                lock.insert(function_name, observer);
+                lock.insert(fqn, observer);
 
                 static mut HANDLERS: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
                     begin: Some(pre_observe_c_function),
@@ -87,10 +81,10 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
 #[no_mangle]
 pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_execute_data) {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        let (function_name, _class_name) = match get_function_and_class_name(exec_data) {
+        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
             Ok((fn_name, cls_name)) => (
                 fn_name.unwrap_or_else(|| "".to_string()),
-                cls_name.unwrap_or_else(|| "".to_string())
+                cls_name.unwrap_or_else(|| "".to_string()),
             ),
             Err(_) => return,
         };
@@ -99,6 +93,7 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&function_name) {
             for hook in observer.pre_hooks() {
+                println!("running pre hook: {} {}", function_name, class_name);
                 unsafe { hook(&mut *execute_data) };
             }
         }
@@ -108,14 +103,10 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
 #[no_mangle]
 pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, _retval: *mut sys::zval) {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
-        // let (function_name, class_name) = match get_function_and_class_name(exec_data) {
-        //     Ok(names) => names,
-        //     Err(_) => (None, None),
-        // };
-        let (function_name, _class_name) = match get_function_and_class_name(exec_data) {
+        let (function_name, class_name) = match get_function_and_class_name(exec_data) {
             Ok((fn_name, cls_name)) => (
                 fn_name.unwrap_or_else(|| "".to_string()),
-                cls_name.unwrap_or_else(|| "".to_string())
+                cls_name.unwrap_or_else(|| "".to_string()),
             ),
             Err(_) => return,
         };
@@ -124,6 +115,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&function_name) {
             for hook in observer.post_hooks() {
+                println!("running post hook: {} {}", function_name, class_name);
                 unsafe { hook(&mut *execute_data) };
             }
         }
@@ -147,4 +139,14 @@ fn get_function_and_class_name(
         .transpose()?;
 
     Ok((function_name, class_name))
+}
+
+fn get_fqn(execute_data: &mut ExecuteData) -> String {
+    let (function_name, class_name) = get_function_and_class_name(execute_data).unwrap_or((None, None));
+
+    match (class_name, function_name) {
+        (Some(cls), Some(func)) => format!("{}::{}", cls, func),
+        (None, Some(func)) => func,
+        _ => "<unknown>".to_string(),
+    }
 }

@@ -26,8 +26,18 @@ pub struct DemoHandler;
 
 impl Handler for DemoHandler {
     //TODO move matching logic into shared class
-    fn matches(&self, _func: &str) -> bool {
-        true
+    fn matches(&self, fqn: &str) -> bool {
+        let known_functions = &[
+            "DemoClass::test",
+            "DemoClass::inner",
+            "demoFunction",
+            "str_contains",
+        ];
+        if known_functions.iter().any(|&name| fqn == name) {
+            println!("matched: {}", fqn);
+            return true;
+        }
+        false
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -39,13 +49,13 @@ impl Handler for DemoHandler {
 
 impl DemoHandler {
     unsafe extern "C" fn pre_callback(_execute_data: *mut phper::sys::zend_execute_data) {
-        //println!("Pre-observe hook for DemoClass::test");
+        println!("DemoHandler::pre_callback");
     }
 
     unsafe extern "C" fn post_callback(
         _execute_data: *mut phper::sys::zend_execute_data,
         _retval: *mut phper::sys::zval,
     ) {
-        //println!("Post-observe hook for DemoClass::test");
+        println!("DemoHandler::post_callback");
     }
 }
