@@ -17,7 +17,7 @@ Span #0
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
 
-	Name        : <global>::phpversion
+	Name        : phpversion
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)

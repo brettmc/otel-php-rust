@@ -21,7 +21,7 @@ Span #0
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
 
-	Name        : <global>::demoFunction
+	Name        : demoFunction
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)

@@ -96,7 +96,7 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
                 let tracer = global::tracer("php-auto-instrumentation");
                 let span_builder = tracer.span_builder(fqn.clone());
                 for hook in observer.pre_hooks() {
-                    println!("running pre hook: {}", fqn);
+                    //println!("running pre hook: {}", fqn);
                     unsafe { hook(&mut *execute_data) };
                 }
                 let span = tracer.build_with_context(span_builder, &Context::current());
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
         if let Some(observer) = lock.get(&function_name) {
             //TODO get SpanRef, pass to post hooks
             for hook in observer.post_hooks() {
-                println!("running post hook: {} {}", function_name, class_name);
+                //println!("running post hook: {} {}", function_name, class_name);
                 unsafe { hook(&mut *execute_data) };
             }
         }
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
             // Dropping the guard detaches the context and finishes the span.
             drop(guard);
         } else {
-            println!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
+            tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
         }
     }
 }

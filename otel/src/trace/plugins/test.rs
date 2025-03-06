@@ -25,18 +25,18 @@ impl Plugin for TestPlugin {
 pub struct DemoHandler;
 
 impl Handler for DemoHandler {
-    //TODO move matching logic into shared class
     fn matches(&self, fqn: &str) -> bool {
         let known_functions = &[
             "DemoClass::test",
             "DemoClass::inner",
             "demoFunction",
-            "str_contains",
+            "phpversion",
         ];
         if known_functions.iter().any(|&name| fqn == name) {
-            println!("matched: {}", fqn);
+            //println!("DemoHandler::matched: {}", fqn);
             return true;
         }
+        //println!("DemoHandler::not matched: {}", fqn);
         false
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -49,13 +49,13 @@ impl Handler for DemoHandler {
 
 impl DemoHandler {
     unsafe extern "C" fn pre_callback(_execute_data: *mut phper::sys::zend_execute_data) {
-        println!("DemoHandler::pre_callback");
+        //println!("DemoHandler::pre_callback");
     }
 
     unsafe extern "C" fn post_callback(
         _execute_data: *mut phper::sys::zend_execute_data,
         _retval: *mut phper::sys::zval,
     ) {
-        println!("DemoHandler::post_callback");
+        //println!("DemoHandler::post_callback");
     }
 }
