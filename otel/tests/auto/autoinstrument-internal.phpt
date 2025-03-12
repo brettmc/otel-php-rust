@@ -26,3 +26,5 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Unset
+	Attributes:
+		 ->  code.function.name: String(Owned("phpversion"))

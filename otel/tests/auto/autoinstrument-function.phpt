@@ -21,7 +21,7 @@ Span #0
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
 
-	Name        : demoFunction
+	Name        : i-was-renamed
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
@@ -30,3 +30,8 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Unset
+	Attributes:
+		 ->  code.function.name: String(Owned("demoFunction"))
+		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/autoinstrument-function.php"))
+		 ->  code.line.number: I64(%d)
+		 ->  my-attribute: String(Owned("my-value"))

@@ -37,8 +37,8 @@ impl PluginManager {
                     let callbacks = handler.get_callbacks();
 
                     if let Some(pre) = callbacks.pre_observe {
-                        observer.add_pre_hook(Box::new(move |execute_data| unsafe {
-                            pre(execute_data);
+                        observer.add_pre_hook(Box::new(move |execute_data, span_details| unsafe {
+                            pre(execute_data, span_details);
                         }));
                     }
 

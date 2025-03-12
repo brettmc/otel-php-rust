@@ -40,6 +40,10 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Unset
+	Attributes:
+		 ->  code.function.name: String(Owned("DemoClass::inner"))
+		 ->  code.file.path: String(Owned("%s"))
+		 ->  code.line.number: I64(%d)
 Span #1
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
@@ -53,3 +57,7 @@ Span #1
 	Start time: %s
 	End time: %s
 	Status: Unset
+	Attributes:
+		 ->  code.function.name: String(Owned("DemoClass::test"))
+		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/autoinstrument-class.php"))
+		 ->  code.line.number: I64(5)

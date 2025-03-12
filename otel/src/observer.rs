@@ -10,7 +10,10 @@ use std::{
 };
 use lazy_static::lazy_static;
 use crate::{
-    trace::plugin::FunctionObserver,
+    trace::plugin::{
+        FunctionObserver,
+        SpanDetails,
+    },
     PluginManager
 };
 use std::collections::HashMap;
@@ -19,6 +22,7 @@ use std::cell::RefCell;
 use opentelemetry::{
     Context,
     ContextGuard,
+    KeyValue,
     global,
     trace::{
         Tracer,
@@ -94,11 +98,14 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
         if let Some(observer) = lock.get(&fqn) {
             if observer.has_hooks() {
                 let tracer = global::tracer("php-auto-instrumentation");
-                let span_builder = tracer.span_builder(fqn.clone());
+                let mut span_details = SpanDetails::new(fqn.clone(), get_default_attributes(exec_data));
                 for hook in observer.pre_hooks() {
                     //println!("running pre hook: {}", fqn);
-                    unsafe { hook(&mut *execute_data) };
+                    unsafe { hook(&mut *execute_data, &mut span_details) };
                 }
+                let span_name = span_details.name().clone();
+                let span_builder = tracer.span_builder(span_name);
+                let span_builder = span_builder.with_attributes(span_details.attributes());
                 let span = tracer.build_with_context(span_builder, &Context::current());
                 let ctx = Context::current_with_span(span);
                 let guard = ctx.attach();
@@ -161,4 +168,55 @@ fn get_fqn(execute_data: &mut ExecuteData) -> String {
         (None, Some(func)) => func,
         _ => "<unknown>".to_string(),
     }
+}
+
+fn get_default_attributes(execute_data: &mut ExecuteData) -> Vec<KeyValue> {
+    let mut attributes = vec![KeyValue::new("code.function.name".to_string(), get_fqn(execute_data))];
+    unsafe {
+        if let Some((file, line)) = get_file_and_line(execute_data) {
+            //println!("Executing file: {} at line: {}", file, line);
+            attributes.push(KeyValue::new("code.file.path".to_string(), file));
+            attributes.push(KeyValue::new("code.line.number".to_string(), line as i64));
+        }
+    }
+
+    attributes
+}
+
+unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
+    let zend_execute_data = execute_data.as_ptr();
+
+    if zend_execute_data.is_null() {
+        return None;
+    }
+
+    let func = (*zend_execute_data).func;
+    if func.is_null() {
+        return None;
+    }
+
+    let func = &*func;
+
+    // Ensure it's a user-defined function before accessing op_array
+    if func.type_ as u32 != sys::ZEND_USER_FUNCTION {
+        return None; // Not a user-defined function, no file/line info available
+    }
+
+    let op_array = &func.op_array;
+
+    let file_name = if !op_array.filename.is_null() {
+        let zend_filename = &*op_array.filename;
+        let c_str = std::ffi::CStr::from_ptr(zend_filename.val.as_ptr());
+        c_str.to_string_lossy().into_owned()
+    } else {
+        "<unknown>".to_string()
+    };
+
+    let line_number = if !(*zend_execute_data).opline.is_null() {
+        (*(*zend_execute_data).opline).lineno
+    } else {
+        0
+    };
+
+    Some((file_name, line_number))
 }
