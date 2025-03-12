@@ -1,9 +1,8 @@
 use crate::trace::plugin::{Handler, HandlerCallbacks, Plugin, SpanDetails};
 use opentelemetry::{
-    Context,
     KeyValue,
+    trace::SpanRef,
 };
-use opentelemetry::trace::TraceContextExt;
 use std::sync::Arc;
 
 pub struct TestPlugin {
@@ -61,7 +60,7 @@ impl DemoHandler {
 
     unsafe extern "C" fn post_callback(
         _execute_data: *mut phper::sys::zend_execute_data,
-        _context: &Context,
+        _span_ref: &SpanRef,
         _retval: *mut phper::sys::zval,
     ) {
         //println!("DemoHandler::post_callback");
@@ -95,10 +94,9 @@ impl DemoFunctionHandler {
 
     unsafe extern "C" fn post_callback(
         _execute_data: *mut phper::sys::zend_execute_data,
-        context: &Context,
+        span_ref: &SpanRef,
         _retval: *mut phper::sys::zval,
     ) {
-        let span_ref = context.span();
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
     }
 }
