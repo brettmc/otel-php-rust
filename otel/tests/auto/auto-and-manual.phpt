@@ -49,3 +49,4 @@ Span #1
 		 ->  code.file.path: String(Owned("%s"))
 		 ->  code.line.number: I64(%d)
 		 ->  my-attribute: String(Owned("my-value"))
+		 ->  post.attribute: String(Owned("post.value"))

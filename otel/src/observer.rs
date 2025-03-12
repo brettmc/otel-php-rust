@@ -124,12 +124,12 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&fqn) {
             if let Some(guard) = take_guard(execute_data) {
-                let context = Context::current();
-                let _span_ref = context.span();
+                let mut context = Context::current();
+                //let span_ref = context.span();
 
                 for hook in observer.post_hooks() {
                     //println!("running post hook: {}", fqn);
-                    unsafe { hook(&mut *execute_data) }; //TODO pass span_ref into post hooks
+                    unsafe { hook(&mut *execute_data, &mut context) }; //TODO pass span_ref into post hooks
                 }
                 // Dropping the guard detaches the context and finishes the span.
                 drop(guard);

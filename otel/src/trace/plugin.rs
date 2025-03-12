@@ -1,7 +1,10 @@
 use std::sync::Arc;
 use opentelemetry::{
+    Context,
     KeyValue,
-    trace::SpanKind,
+    trace::{
+        SpanKind,
+    },
 };
 
 pub trait Plugin: Send + Sync {
@@ -19,11 +22,11 @@ pub trait Handler: Send + Sync {
 
 pub struct HandlerCallbacks {
     pub pre_observe: Option<unsafe extern "C" fn(*mut phper::sys::zend_execute_data, &mut SpanDetails)>,
-    pub post_observe: Option<unsafe extern "C" fn(*mut phper::sys::zend_execute_data, *mut phper::sys::zval)>,
+    pub post_observe: Option<unsafe extern "C" fn(*mut phper::sys::zend_execute_data, &Context, *mut phper::sys::zval)>,
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut phper::sys::zend_execute_data, &mut SpanDetails) + Send + Sync>;
-pub type ObserverPostHook = Box<dyn Fn(&mut phper::sys::zend_execute_data) + Send + Sync>;
+pub type ObserverPostHook = Box<dyn Fn(&mut phper::sys::zend_execute_data, &Context) + Send + Sync>;
 
 pub struct FunctionObserver {
     pre_hooks: Vec<ObserverPreHook>,
