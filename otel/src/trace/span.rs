@@ -190,10 +190,20 @@ pub fn make_span_class(
     class
         .add_method("addLink", Visibility::Public, |this, arguments| {
             let span_context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            // TODO panics here: called `Option::unwrap()` on a `None` value
-            let _span_context: &SpanContext = unsafe {
-                span_context_obj.as_state_obj::<SpanContext>().as_state()
+            let state_obj = unsafe { span_context_obj.as_state_obj::<Option<SpanContext>>() };
+            let span_context = match state_obj.as_state() {
+                Some(v) => v.clone(),
+                None => return Err(phper::Error::boxed("Invalid SpanContext object")),
             };
+
+            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let attributes = vec![];
+            if let Some(span) = this.as_mut_state().as_mut() {
+                span.add_link(span_context.clone(), attributes);
+            } else if let Some(_ctx) = get_context_instance(instance_id as u64) {
+                //SpanRef.add_link does not exist, so do nothing
+                //ctx.span().add_link(&span_context.clone(), attributes);
+            }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         });
