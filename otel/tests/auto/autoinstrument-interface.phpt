@@ -37,3 +37,7 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Unset
+	Attributes:
+		 ->  code.function.name: String(Owned("DemoClass::foo"))
+		 ->  code.file.path: String(Owned("%s"))
+		 ->  code.line.number: I64(%d)

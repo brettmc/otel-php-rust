@@ -40,7 +40,8 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<Option<Span
         let mut builder = take(span_builder);
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         let value = arguments[1].expect_z_str()?.to_str()?.to_string();
-        let attributes = [KeyValue::new(name, value)];
+        let mut attributes = builder.attributes.clone().unwrap_or_default();
+        attributes.push(KeyValue::new(name, value));
         builder = builder.with_attributes(attributes);
         *span_builder = builder;
         Ok::<_, phper::Error>(this.to_ref_owned())

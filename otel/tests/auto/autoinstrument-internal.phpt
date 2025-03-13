@@ -6,10 +6,10 @@ otel
 OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
-var_dump(str_contains('hello', 'el'));
+var_dump(phpversion());
 ?>
 --EXPECTF--
-bool(true)
+string(5) "%s"
 Spans
 Resource
 %A
@@ -17,7 +17,7 @@ Span #0
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
 
-	Name        : <global>::str_contains
+	Name        : phpversion
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
@@ -26,3 +26,5 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Unset
+	Attributes:
+		 ->  code.function.name: String(Owned("phpversion"))
