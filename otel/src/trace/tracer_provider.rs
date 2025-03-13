@@ -2,9 +2,11 @@ use phper::{
     classes::{ClassEntity, StateClass, Visibility},
 };
 use std::{
+    collections::HashMap,
     convert::Infallible,
     env,
-    sync::Arc,
+    process,
+    sync::{Arc, Mutex},
 };
 use opentelemetry::{
     InstrumentationScope,
@@ -33,7 +35,16 @@ const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvi
 
 pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO dont need to wrap anything
 
-static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
+static TRACER_PROVIDER: Lazy<Mutex<HashMap<u32, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
+    let pid = process::id();
+    let mut providers = TRACER_PROVIDER.lock().unwrap();
+    if let Some(provider) = providers.get(&pid) {
+        tracing::debug!("tracer provider already exists for pid {}", pid);
+        return provider.clone();
+    }
+    tracing::debug!("creating tracer provider for pid {}", pid);
     let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
     tracing::debug!("span exporter={}", if use_simple_exporter {"simple"} else {"batch"});
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
@@ -86,14 +97,12 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
             }
         }
     }
-    let provider = builder
+    let provider = Arc::new(builder
         .with_resource(resource)
-        .build();
-    Arc::new(provider)
-});
-
-pub fn get_tracer_provider() -> &'static Arc<SdkTracerProvider> {
-    &TRACER_PROVIDER
+        .build()
+    );
+    providers.insert(pid, provider.clone());
+    provider
 }
 
 pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Option<GlobalTracerProvider>> {
@@ -106,6 +115,7 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
 
     class.add_method("getTracer", Visibility::Public, move |_this, arguments| {
         let provider = get_tracer_provider();
+        tracing::trace!("TracerProvider in PID {} has processor: {:?}", std::process::id(), provider);
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         //TODO implement (optional) version, schema_url, attributes
         // let version = arguments[1].expect_z_str()?.to_str()?.to_string();
