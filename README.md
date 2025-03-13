@@ -95,7 +95,6 @@ Tracers are re-fetched all over the shop from tracer_provider.rs
 * doesn't keep a reference to the tracer, and instead fetches a new tracer each time (losing any InstrumentationScope)
 
 ### Span
-* `getCurrent()` fetches the current span as a `SpanRef`, and presents it as a CurrentSpan (which mirrors Span, but they don't share an interface)
 * `addLink` panics when trying to retrieve rust span-context object from a wrapped PHP SpanContext
 
 ### StatusCode

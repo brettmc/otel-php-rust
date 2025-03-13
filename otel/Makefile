@@ -11,6 +11,8 @@ build:
 build-test:
 	@echo "Building for test..."
 	cargo build --features test
+check:
+	cargo check
 install: build
 	@echo "Installing..."
 	cp ${EXTENSION_FILE} ${EXTENSION_INSTALL_PATH}
