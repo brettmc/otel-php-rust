@@ -1,18 +1,29 @@
 use phper::ini::{ini_get};
 use tracing::{Event, Subscriber, field::{Visit, Field}};
 use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
+use std::collections::HashMap;
 use std::ffi::{CStr};
 use std::fmt::{self, Write};
 use std::fs::OpenOptions;
 use std::io::Write as _;
-use std::sync::OnceLock;
+use std::sync::{LazyLock, Mutex, OnceLock};
 use std::process;
 use std::thread;
 use chrono::Utc;
 
 static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
+static LOGGER_PIDS: LazyLock<Mutex<HashMap<u32, ()>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub fn init() {
+/// Initialize logging subscriber if it's not already running for this PID for SAPIs that
+/// spawn worker processes
+pub fn init_once() {
+    let pid = process::id();
+    let mut logger_pids = LOGGER_PIDS.lock().unwrap();
+    if logger_pids.contains_key(&pid) {
+        tracing::debug!("logging already initialized for pid: {}", pid);
+        return;
+    }
+
     let log_file = ini_get::<Option<&CStr>>("otel.log.file")
         .and_then(|cstr| cstr.to_str().ok())
         .map(|s| s.to_string())
@@ -35,6 +46,7 @@ pub fn init() {
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
     tracing::debug!("Logging::initialized level={} path={}", level_filter, log_file.clone());
+    logger_pids.insert(pid, ());
 }
 
 fn log_to_file(message: &str) {
