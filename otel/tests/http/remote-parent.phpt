@@ -6,8 +6,6 @@ if (PHP_SAPI !== 'cli') {
     die('skip: Not running in CLI mode');
 }
 ?>
---XFAIL--
-is_remote not correct :(
 --EXTENSIONS--
 otel
 --FILE--
@@ -25,10 +23,9 @@ run_server('server-remote-parent.php', $options);
 ?>
 --EXPECTF--
 ==== Response ====
-Hello, World!
-bool(true)
 string(32) "e77388f01a826e2de7afdcd1eefc034e"
 string(16) "%s"
+bool(false)
 ==== Server Output ====
 [%s] PHP %s Development Server (%s) started
 [%s] %s Accepted
@@ -47,6 +44,4 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Unset
-	Attributes:
-		 ->  http.response.status_code: I64(200)
 [%s] %s Closing

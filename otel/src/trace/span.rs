@@ -201,7 +201,7 @@ pub fn make_span_class(
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.add_link(span_context.clone(), attributes);
             } else if let Some(_ctx) = get_context_instance(instance_id as u64) {
-                //SpanRef.add_link does not exist, so do nothing
+                //SpanRef.add_link does not exist, so do nothing (see unreleased https://github.com/open-telemetry/opentelemetry-rust/pull/1515 )
                 //ctx.span().add_link(&span_context.clone(), attributes);
             }
 
