@@ -33,7 +33,6 @@ pub fn init() {
     }
     let sapi = get_sapi_module_name();
     tracing::debug!("RINIT::sapi module name is: {}", sapi.clone());
-    //TODO apache2handler (mod_php) doesn't run RINIT/RSHUTDOWN
     if sapi == "cli" {
         tracing::debug!("RINIT::not auto-creating root span...");
         return;

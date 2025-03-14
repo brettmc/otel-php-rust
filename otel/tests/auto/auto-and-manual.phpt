@@ -4,6 +4,10 @@ Test auto + manual instrumentation together
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+OTEL_SPAN_PROCESSOR=batch
+--INI--
+;otel.log.level="trace"
+;otel.log.file="/dev/stdout"
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

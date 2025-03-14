@@ -91,32 +91,14 @@ pub fn get_module() -> Module {
             sys::zend_observer_fcall_register(Some(observer::observer_instrument));
         }
         logging::print_message("registered fcall handlers".to_string());
-
-        //TODO use this if multiple grpc exporters (eg logging, metrics)
-        // let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-        // RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
-
-        //global::set_text_map_propagator(TraceContextPropagator::new());
-        //let provider = get_tracer_provider().clone();
-        //let _ = TRACER_PROVIDER.set(provider.clone());
-        //global::set_tracer_provider((*provider).clone());
     });
     module.on_module_shutdown(|| {
         logging::print_message("OpenTelemetry::MSHUTDOWN".to_string());
-        // tracing::trace!("MSHUTDOWN");
-        tracer_provider::shutdown(); //TODO this already runs after MSHUTDOWN (at least in cli) ??
-        /*if let Some(provider) = TRACER_PROVIDER.get() {
-            let shutdown_result = provider.shutdown();
-            match shutdown_result {
-                Ok(_) => tracing::debug!("MSHUTDOWN::OpenTelemetry tracer provider shutdown success"),
-                Err(err) => tracing::warn!("MSHUTDOWN::Failed to shutdown OpenTelemetry tracer provider: {:?}", err),
-            }
-        }*/
+        tracer_provider::force_flush();
     });
     module.on_request_init(|| {
         logging::print_message("OpenTelemetry::RINIT".to_string());
         logging::init_once();
-        // tracing::trace!("RINIT");
         tracer_provider::init_once();
         global::set_text_map_propagator(TraceContextPropagator::new()); //TODO could this be lazy-loaded?
 
@@ -124,7 +106,6 @@ pub fn get_module() -> Module {
     });
     module.on_request_shutdown(|| {
         logging::print_message("OpenTelemetry::RSHUTDOWN".to_string());
-        // tracing::trace!("RSHUTDOWN");
         request::shutdown();
     });
 

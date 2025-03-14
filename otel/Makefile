@@ -22,10 +22,10 @@ clean:
 	cargo clean
 test: build-test
 	@echo "Running all tests..."
-	php ~/run-tests.php -q tests/
-test-func: build-test
-	@echo "Running functional tests..."
 	php ~/run-tests.php -q --show-diff tests/phpt/
+test-all: build-test
+	@echo "Running functional tests..."
+	php ~/run-tests.php -q tests/
 test-export: build-test
 	@echo "Running live export tests..."
 	php ~/run-tests.php -q --show-diff tests/otlp/

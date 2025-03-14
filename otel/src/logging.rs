@@ -95,7 +95,6 @@ pub fn print_message(message: String) {
         thread_id,
         message
     );
-    //log_message(log_entry.as_str());
     eprintln!("{}", log_entry);
 }
 

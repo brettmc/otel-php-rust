@@ -42,7 +42,6 @@ pub fn init_once() {
     let mut providers = TRACER_PROVIDERS.lock().unwrap();
     if providers.contains_key(&pid) {
         tracing::debug!("tracer provider already exists for pid {}", pid);
-        //return provider.clone();
         return;
     }
     tracing::debug!("creating tracer provider for pid {}", pid);
@@ -56,7 +55,6 @@ pub fn init_once() {
             .build();
         providers.insert(pid, Arc::new(provider.clone()));
         return;
-        //return Arc::new(provider);
     }
     let resource = Resource::builder()
         .with_service_name("my_service_name")
@@ -89,7 +87,6 @@ pub fn init_once() {
             }
         } else {
             tracing::debug!("Using gRPC trace exporter with tokio runtime");
-            //let runtime = Runtime::new().expect("Failed to create Tokio runtime");
             let runtime = get_runtime();
             let exporter = runtime.block_on(async {
                 OtlpSpanExporter::builder()
@@ -117,7 +114,6 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
     if let Some(provider) = providers.get(&pid) {
         return provider.clone();
     } else {
-        //panik!
         tracing::error!("no tracer provider initialized for pid {}, using no-op", pid);
         Arc::new(SdkTracerProvider::builder()
             .with_resource(Resource::builder_empty().build())
@@ -127,21 +123,21 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
     }
 }
 
-pub fn shutdown() {
+pub fn force_flush() {
     let pid = process::id();
     let mut providers = TRACER_PROVIDERS.lock().unwrap();
     if providers.contains_key(&pid) {
         if let Some(provider) = providers.get(&pid) {
-            tracing::info!("Shutting down TracerProvider for pid {}", pid);
-            match provider.shutdown() {
-                Ok(_) => tracing::debug!("OpenTelemetry tracer provider shutdown success"),
-                Err(err) => tracing::warn!("Failed to shutdown OpenTelemetry tracer provider: {:?}", err),
+            tracing::info!("Flushing TracerProvider for pid {}", pid);
+            match provider.force_flush() {
+                Ok(_) => tracing::debug!("OpenTelemetry tracer provider flush success"),
+                Err(err) => tracing::warn!("Failed to flush OpenTelemetry tracer provider: {:?}", err),
             }
             providers.remove(&pid);
             return;
         }
     }
-    tracing::info!("no tracer provider to shutdown for pid {}", pid);
+    tracing::info!("no tracer provider to flush for pid {}", pid);
 }
 
 pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Option<GlobalTracerProvider>> {
@@ -154,7 +150,6 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
 
     class.add_method("getTracer", Visibility::Public, move |_this, arguments| {
         let provider = get_tracer_provider();
-        //tracing::trace!("TracerProvider in PID {} has processor: {:?}", std::process::id(), provider);
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         //TODO implement (optional) version, schema_url, attributes
         // let version = arguments[1].expect_z_str()?.to_str()?.to_string();
