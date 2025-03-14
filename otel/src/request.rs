@@ -25,7 +25,7 @@ thread_local! {
 }
 
 pub fn init() {
-    tracing::debug!("RINIT::initializing");
+    tracing::debug!("RINIT::initializing request handler");
     unsafe {
         //ensure $_SERVER is populated
         let mut server = "_SERVER".to_string();
@@ -33,7 +33,6 @@ pub fn init() {
     }
     let sapi = get_sapi_module_name();
     tracing::debug!("RINIT::sapi module name is: {}", sapi.clone());
-    //TODO apache2handler (mod_php) doesn't run RINIT/RSHUTDOWN
     if sapi == "cli" {
         tracing::debug!("RINIT::not auto-creating root span...");
         return;

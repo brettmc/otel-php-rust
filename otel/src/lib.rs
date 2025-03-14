@@ -9,9 +9,9 @@ use crate::{
         span_builder::{make_span_builder_class},
         status_code::{make_status_code_class},
         tracer::{make_tracer_class},
+        tracer_provider,
         tracer_provider::{
             make_tracer_provider_class,
-            get_tracer_provider,
         },
         span_context::{make_span_context_class},
     },
@@ -23,18 +23,14 @@ use phper::{
     php_get_module,
     sys,
 };
-use std::sync::{
-    Arc,
-    OnceLock,
-};
 use opentelemetry::{
     global,
 };
 use opentelemetry_sdk::{
     propagation::TraceContextPropagator,
-    trace::SdkTracerProvider,
 };
 use tokio::runtime::Runtime;
+use once_cell::sync::OnceCell;
 
 pub mod context{
     pub mod context;
@@ -58,8 +54,7 @@ pub mod request;
 pub mod observer;
 pub mod logging;
 
-static TRACER_PROVIDER: OnceLock<Arc<SdkTracerProvider>> = OnceLock::new();
-static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -70,7 +65,7 @@ pub fn get_module() -> Module {
     );
     module.add_info("opentelemetry-rust", "0.28.0");
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
-    module.add_ini("otel.log.file", "/var/log/ext-otel.log".to_string(), Policy::All);
+    module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
 
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(make_scope_class());
@@ -84,37 +79,37 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
-        logging::init();
-
-        //TODO use this if multiple grpc exporters (eg logging, metrics)
-        // let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-        // RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
-
-        global::set_text_map_propagator(TraceContextPropagator::new());
-        let provider = get_tracer_provider().clone();
-        let _ = TRACER_PROVIDER.set(provider.clone());
-        global::set_tracer_provider((*provider).clone());
+        logging::print_message("OpenTelemetry::MINIT".to_string());
 
         observer::init(PluginManager::new());
-
         unsafe {
             sys::zend_observer_fcall_register(Some(observer::observer_instrument));
         }
+        logging::print_message("registered fcall handlers".to_string());
     });
     module.on_module_shutdown(|| {
-        tracing::debug!("MSHUTDOWN::Shutting down OpenTelemetry exporter...");
-        if let Some(provider) = TRACER_PROVIDER.get() {
-            let shutdown_result = provider.shutdown();
-            match shutdown_result {
-                Ok(_) => tracing::debug!("MSHUTDOWN::OpenTelemetry tracer provider shutdown success"),
-                Err(err) => tracing::warn!("MSHUTDOWN::Failed to shutdown OpenTelemetry tracer provider: {:?}", err),
-            }
-        }
+        logging::print_message("OpenTelemetry::MSHUTDOWN".to_string());
+        tracer_provider::force_flush();
     });
     module.on_request_init(|| {
+        logging::print_message("OpenTelemetry::RINIT".to_string());
+        logging::init_once();
+
+        if TOKIO_RUNTIME.get().is_none() {
+            logging::print_message("OpenTelemetry::RINIT::Creating tokio runtime".to_string());
+            //TODO don't create runtime unless using grpc
+            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
+            logging::print_message("OpenTelemetry::RINIT::tokio runtime initialized".to_string());
+        }
+
+        tracer_provider::init_once();
+        global::set_text_map_propagator(TraceContextPropagator::new()); //TODO could this be lazy-loaded?
+
         request::init();
     });
     module.on_request_shutdown(|| {
+        logging::print_message("OpenTelemetry::RSHUTDOWN".to_string());
         request::shutdown();
     });
 
@@ -122,5 +117,5 @@ pub fn get_module() -> Module {
 }
 
 pub fn get_runtime() -> &'static Runtime {
-    RUNTIME.get().expect("Tokio runtime not initialized")
+    TOKIO_RUNTIME.get().expect("Tokio runtime not initialized")
 }

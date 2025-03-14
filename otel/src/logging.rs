@@ -1,23 +1,29 @@
 use phper::ini::{ini_get};
 use tracing::{Event, Subscriber, field::{Visit, Field}};
 use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
+use std::collections::HashMap;
 use std::ffi::{CStr};
 use std::fmt::{self, Write};
 use std::fs::OpenOptions;
-use std::io::Write as _;
-use std::sync::OnceLock;
+use std::io::{Write as _};
+use std::sync::{LazyLock, Mutex, OnceLock};
 use std::process;
 use std::thread;
 use chrono::Utc;
 
 static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
+static LOGGER_PIDS: LazyLock<Mutex<HashMap<u32, ()>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub fn init() {
-    let log_file = ini_get::<Option<&CStr>>("otel.log.file")
-        .and_then(|cstr| cstr.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "/var/log/ext-otel.log".to_string());
-    LOG_FILE_PATH.set(log_file.clone()).expect("LOG_FILE_PATH already initialized");
+/// Initialize logging subscriber if it's not already running for this PID for SAPIs that
+/// spawn worker processes
+pub fn init_once() {
+    print_message("logging::init_once".to_string());
+    let pid = process::id();
+    let mut logger_pids = LOGGER_PIDS.lock().unwrap();
+    if logger_pids.contains_key(&pid) {
+        print_message(format!("logging already initialized for pid: {}", pid));
+        return;
+    }
 
     let log_level = ini_get::<Option<&CStr>>("otel.log.level")
         .and_then(|cstr| cstr.to_str().ok())
@@ -34,16 +40,62 @@ pub fn init() {
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
-    tracing::debug!("Logging::initialized level={} path={}", level_filter, log_file.clone());
+    print_message(format!("Logging::initialized level={}", level_filter));
+    logger_pids.insert(pid, ());
 }
 
-fn log_to_file(message: &str) {
-    //let log_file = "/var/log/ext-otel.log";
-    let log_file = LOG_FILE_PATH.get().map(|s| s.as_str()).unwrap_or("/var/log/ext-otel.log");
+fn log_message(message: &str) {
+    let log_file = LOG_FILE_PATH.get_or_init(|| {
+        ini_get::<Option<&CStr>>("otel.log.file")
+            .and_then(|cstr| cstr.to_str().ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "/dev/stderr".to_string())
+    });
 
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_file) {
-        let _ = writeln!(file, "{}", message); // Ignore errors to prevent panics
+    match log_file.as_str() {
+        "/dev/stdout" => {
+            println!("{}", message);
+        }
+        "/dev/stderr" => {
+            eprintln!("{}", message);
+        }
+        _ => {
+            match OpenOptions::new().create(true).append(true).open(log_file) {
+                Ok(mut file) => {
+                    if let Err(err) = writeln!(file, "{}", message) {
+                        eprintln!("[ERROR] Failed to write to log file '{}': {}", log_file, err);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("[ERROR] Failed to open log file '{}': {}", log_file, err);
+                }
+            }
+        }
     }
+}
+
+/// public message printer, for MINIT (before logging is initialized)
+/// TODO: honour log levels!
+pub fn print_message(message: String) {
+    let log_level = ini_get::<Option<&CStr>>("otel.log.level")
+        .and_then(|cstr| cstr.to_str().ok())
+        .unwrap_or("none");
+    match log_level {
+        "none" => {return;}
+        "error" => {return;}
+        "warn" => {return;}
+        _ => {}
+    }
+    let thread_id = thread::current().id();
+    let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    let log_entry = format!(
+        "[{}] [DEBUG] [pid={}] [{:?}] {}",
+        timestamp,
+        process::id(),
+        thread_id,
+        message
+    );
+    eprintln!("{}", log_entry);
 }
 
 /// A visitor that captures structured log fields into a string.
@@ -89,6 +141,6 @@ where
         event.record(&mut visitor);
         message.push_str(&visitor.message);
 
-        log_to_file(message.as_str());
+        log_message(message.as_str());
     }
 }

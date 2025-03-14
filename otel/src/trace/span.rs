@@ -65,8 +65,10 @@ pub fn make_span_class(
         .add_method("end", Visibility::Public, |this, _| -> phper::Result<()> {
             let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
             if let Some(span) = this.as_mut_state().as_mut() {
+                tracing::debug!("Span::Ending Span (SdkSpan)");
                 span.end();
             } else if let Some(ctx) = get_context_instance(instance_id as u64) {
+                tracing::debug!("Span::Ending Span (SpanRef)");
                 ctx.span().end();
             }
             

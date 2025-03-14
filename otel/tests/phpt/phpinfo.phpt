@@ -14,6 +14,6 @@ version => %s
 opentelemetry-rust => %s
 
 Directive => Local Value => Master Value
-otel.log.file => /var/log/ext-otel.log => /var/log/ext-otel.log
+otel.log.file => %s => %s
 otel.log.level => error => error
 %A

@@ -3,7 +3,7 @@ Test internal errors logged
 --EXTENSIONS--
 otel
 --INI--
-otel.log.level="debug"
+otel.log.level="trace"
 otel.log.file="/dev/stdout"
 --ENV--
 OTEL_TRACES_EXPORTER=console
@@ -18,6 +18,7 @@ Globals::tracerProvider()
     ->end();
 ?>
 --EXPECTF--
+%A
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::logging: event src/logging.rs:%d message=Logging::initialized level=debug path=/dev/stdout
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:38 message=span exporter=batch
 [%s] [INFO] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048

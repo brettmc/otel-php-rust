@@ -2,9 +2,11 @@ use phper::{
     classes::{ClassEntity, StateClass, Visibility},
 };
 use std::{
+    collections::HashMap,
     convert::Infallible,
     env,
-    sync::Arc,
+    process,
+    sync::{Arc, Mutex},
 };
 use opentelemetry::{
     InstrumentationScope,
@@ -27,21 +29,32 @@ use opentelemetry_sdk::{
 };
 use once_cell::sync::Lazy;
 use crate::trace::tracer::TracerClass;
-use tokio::runtime::Runtime;
+use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
 
 pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO dont need to wrap anything
 
-static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
+static TRACER_PROVIDERS: Lazy<Mutex<HashMap<u32, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub fn init_once() {
+    let pid = process::id();
+    let mut providers = TRACER_PROVIDERS.lock().unwrap();
+    if providers.contains_key(&pid) {
+        tracing::debug!("tracer provider already exists for pid {}", pid);
+        return;
+    }
+    tracing::debug!("creating tracer provider for pid {}", pid);
     let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
-    tracing::debug!("span exporter={}", if use_simple_exporter {"simple"} else {"batch"});
+    tracing::debug!("SpanProcessor={}", if use_simple_exporter {"simple"} else {"batch"});
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
+        tracing::debug!("Using no-op trace exporter");
         let provider = SdkTracerProvider::builder()
             .with_resource(Resource::builder_empty().build())
             .with_sampler(AlwaysOff)
             .build();
-        return Arc::new(provider);
+        providers.insert(pid, Arc::new(provider.clone()));
+        return;
     }
     let resource = Resource::builder()
         .with_service_name("my_service_name")
@@ -52,6 +65,7 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
 
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
+        tracing::debug!("Using Console trace exporter");
         let exporter = StdoutSpanExporter::default();
         if use_simple_exporter {
             builder = builder.with_simple_exporter(exporter);
@@ -60,6 +74,7 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
         }
     } else {
         if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
+            tracing::debug!("Using http/protobuf trace exporter");
             let exporter = OtlpSpanExporter::builder()
                 .with_http()
                 .with_protocol(Protocol::HttpBinary)
@@ -71,8 +86,8 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
                 builder = builder.with_batch_exporter(exporter);
             }
         } else {
-            tracing::debug!("Creating gRPC exporter with tokio runtime...");
-            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            tracing::debug!("Using gRPC trace exporter with tokio runtime");
+            let runtime = get_runtime();
             let exporter = runtime.block_on(async {
                 OtlpSpanExporter::builder()
                     .with_tonic()
@@ -86,14 +101,43 @@ static TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
             }
         }
     }
-    let provider = builder
+    let provider = Arc::new(builder
         .with_resource(resource)
-        .build();
-    Arc::new(provider)
-});
+        .build()
+    );
+    providers.insert(pid, provider.clone());
+}
 
-pub fn get_tracer_provider() -> &'static Arc<SdkTracerProvider> {
-    &TRACER_PROVIDER
+pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
+    let pid = process::id();
+    let providers = TRACER_PROVIDERS.lock().unwrap();
+    if let Some(provider) = providers.get(&pid) {
+        return provider.clone();
+    } else {
+        tracing::error!("no tracer provider initialized for pid {}, using no-op", pid);
+        Arc::new(SdkTracerProvider::builder()
+            .with_resource(Resource::builder_empty().build())
+            .with_sampler(AlwaysOff)
+            .build()
+        )
+    }
+}
+
+pub fn force_flush() {
+    let pid = process::id();
+    let mut providers = TRACER_PROVIDERS.lock().unwrap();
+    if providers.contains_key(&pid) {
+        if let Some(provider) = providers.get(&pid) {
+            tracing::info!("Flushing TracerProvider for pid {}", pid);
+            match provider.force_flush() {
+                Ok(_) => tracing::debug!("OpenTelemetry tracer provider flush success"),
+                Err(err) => tracing::warn!("Failed to flush OpenTelemetry tracer provider: {:?}", err),
+            }
+            providers.remove(&pid);
+            return;
+        }
+    }
+    tracing::info!("no tracer provider to flush for pid {}", pid);
 }
 
 pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Option<GlobalTracerProvider>> {
