@@ -51,8 +51,7 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc), but has only 
 http + grpc exporter works. Creates root span on RINIT.
 
 ### `apache2handler`
-http/protobuf exporter works.
-grpc from worker processes does not work (tokio vs child processes?)
+http/protobuf + grpc exporters work.
 
 ### `cgi-fcgi`
 Same as apache2handler
