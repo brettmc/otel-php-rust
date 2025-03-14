@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::ffi::{CStr};
 use std::fmt::{self, Write};
 use std::fs::OpenOptions;
-use std::io::{Write as _, stdout, stderr};
+use std::io::{Write as _};
 use std::sync::{LazyLock, Mutex, OnceLock};
 use std::process;
 use std::thread;
@@ -54,14 +54,10 @@ fn log_message(message: &str) {
 
     match log_file.as_str() {
         "/dev/stdout" => {
-            if let Err(err) = writeln!(stdout(), "{}", message) {
-                eprintln!("[ERROR] Failed to write to stdout: {}", err);
-            }
+            println!("{}", message);
         }
         "/dev/stderr" => {
-            if let Err(err) = writeln!(stderr(), "{}", message) {
-                eprintln!("[ERROR] Failed to write to stderr: {}", err);
-            }
+            eprintln!("{}", message);
         }
         _ => {
             match OpenOptions::new().create(true).append(true).open(log_file) {
