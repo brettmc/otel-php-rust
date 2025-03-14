@@ -23,8 +23,10 @@ use phper::{
     php_get_module,
     sys,
 };
-use std::sync::{
-    OnceLock,
+use std::{
+    sync::{
+        OnceLock,
+    },
 };
 use opentelemetry::{
     global,
@@ -81,9 +83,7 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
-        logging::init_once(); //ensure logging initialized for MINIT for parent process in fpm, apache2handler etc
-        tracing::trace!("MINIT");
-
+        logging::print_message(format!("OpenTelemetry::MINIT"));
         //TODO use this if multiple grpc exporters (eg logging, metrics)
         // let runtime = Runtime::new().expect("Failed to create Tokio runtime");
         // RUNTIME.set(runtime).expect("Failed to store Tokio runtime");

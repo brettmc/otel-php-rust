@@ -24,12 +24,6 @@ pub fn init_once() {
         return;
     }
 
-    let log_file = ini_get::<Option<&CStr>>("otel.log.file")
-        .and_then(|cstr| cstr.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "/var/log/ext-otel.log".to_string());
-    LOG_FILE_PATH.get_or_init(|| log_file.clone());
-
     let log_level = ini_get::<Option<&CStr>>("otel.log.level")
         .and_then(|cstr| cstr.to_str().ok())
         .unwrap_or("none");
@@ -45,17 +39,33 @@ pub fn init_once() {
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
-    tracing::debug!("Logging::initialized level={} path={}", level_filter, log_file.clone());
+    tracing::debug!("Logging::initialized level={}", level_filter);
     logger_pids.insert(pid, ());
 }
 
-fn log_to_file(message: &str) {
-    //let log_file = "/var/log/ext-otel.log";
-    let log_file = LOG_FILE_PATH.get().map(|s| s.as_str()).unwrap_or("/var/log/ext-otel.log");
+fn log_message(message: &str) {
+    let log_file = LOG_FILE_PATH.get_or_init(|| {
+        ini_get::<Option<&CStr>>("otel.log.file")
+            .and_then(|cstr| cstr.to_str().ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "/var/log/ext-otel.log".to_string())
+    });
 
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_file) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_file)
+    {
         let _ = writeln!(file, "{}", message); // Ignore errors to prevent panics
     }
+}
+
+/// public message printer, for MINIT (before logging is initialized)
+/// TODO: honour log levels!
+pub fn print_message(message: String) {
+    let thread_id = thread::current().id();
+    let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    log_message(format!("[{}] [DEBUG] [pid={}] [{:?}] {}", timestamp, process::id(), thread_id, message).as_str());
 }
 
 /// A visitor that captures structured log fields into a string.
@@ -101,6 +111,6 @@ where
         event.record(&mut visitor);
         message.push_str(&visitor.message);
 
-        log_to_file(message.as_str());
+        log_message(message.as_str());
     }
 }
