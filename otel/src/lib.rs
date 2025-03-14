@@ -83,7 +83,13 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
-        logging::print_message(format!("OpenTelemetry::MINIT"));
+        logging::print_message("OpenTelemetry::MINIT".to_string());
+        observer::init(PluginManager::new());
+        unsafe {
+            sys::zend_observer_fcall_register(Some(observer::observer_instrument));
+        }
+        logging::print_message("registered fcall handlers".to_string());
+
         //TODO use this if multiple grpc exporters (eg logging, metrics)
         // let runtime = Runtime::new().expect("Failed to create Tokio runtime");
         // RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
@@ -92,16 +98,11 @@ pub fn get_module() -> Module {
         //let provider = get_tracer_provider().clone();
         //let _ = TRACER_PROVIDER.set(provider.clone());
         //global::set_tracer_provider((*provider).clone());
-
-        observer::init(PluginManager::new());
-
-        unsafe {
-            sys::zend_observer_fcall_register(Some(observer::observer_instrument));
-        }
     });
     module.on_module_shutdown(|| {
-        tracing::trace!("MSHUTDOWN");
-        tracer_provider::shutdown();
+        logging::print_message("OpenTelemetry::MSHUTDOWN".to_string());
+        // tracing::trace!("MSHUTDOWN");
+        tracer_provider::shutdown(); //TODO this already runs after MSHUTDOWN (at least in cli) ??
         /*if let Some(provider) = TRACER_PROVIDER.get() {
             let shutdown_result = provider.shutdown();
             match shutdown_result {
@@ -111,14 +112,17 @@ pub fn get_module() -> Module {
         }*/
     });
     module.on_request_init(|| {
+        logging::print_message("OpenTelemetry::RINIT".to_string());
         logging::init_once();
-        tracing::trace!("RINIT");
+        // tracing::trace!("RINIT");
         tracer_provider::init_once();
         global::set_text_map_propagator(TraceContextPropagator::new()); //TODO could this be lazy-loaded?
+
         request::init();
     });
     module.on_request_shutdown(|| {
-        tracing::trace!("RSHUTDOWN");
+        logging::print_message("OpenTelemetry::RSHUTDOWN".to_string());
+        // tracing::trace!("RSHUTDOWN");
         request::shutdown();
     });
 

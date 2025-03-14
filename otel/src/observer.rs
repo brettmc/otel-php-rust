@@ -10,10 +10,12 @@ use std::{
 };
 use lazy_static::lazy_static;
 use crate::{
+    logging,
     trace::plugin::{
         FunctionObserver,
         SpanDetails,
     },
+    tracer_provider,
     PluginManager
 };
 use std::collections::HashMap;
@@ -23,10 +25,10 @@ use opentelemetry::{
     Context,
     ContextGuard,
     KeyValue,
-    global,
     trace::{
         Tracer,
         TraceContextExt,
+        TracerProvider,
     },
 };
 
@@ -53,15 +55,16 @@ fn take_guard(exec_ptr: *mut sys::zend_execute_data) -> Option<ContextGuard> {
 }
 
 pub fn init(plugin_manager: PluginManager) {
+    logging::print_message("PluginManager::init".to_string());
     let mut manager_lock = PLUGIN_MANAGER.lock().unwrap();
     *manager_lock = Some(plugin_manager);
     FUNCTION_OBSERVERS.get_or_init(|| RwLock::new(HashMap::new()));
 }
 
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
-    // println!("observer::observer_instrument");
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
         let fqn = get_fqn(exec_data);
+        tracing::trace!("observer::observer_instrument: {}", fqn);
         let manager_lock = PLUGIN_MANAGER.lock().unwrap();
         if let Some(plugin_manager) = manager_lock.as_ref() {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
@@ -97,10 +100,10 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&fqn) {
             if observer.has_hooks() {
-                let tracer = global::tracer("php-auto-instrumentation");
+                let tracer = tracer_provider::get_tracer_provider().tracer("php-auto-instrumentation");
                 let mut span_details = SpanDetails::new(fqn.clone(), get_default_attributes(exec_data));
                 for hook in observer.pre_hooks() {
-                    //println!("running pre hook: {}", fqn);
+                    tracing::trace!("running pre hook: {}", fqn);
                     unsafe { hook(&mut *execute_data, &mut span_details) };
                 }
                 let span_name = span_details.name().clone();
@@ -128,7 +131,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
                 let mut span_ref = context.span();
 
                 for hook in observer.post_hooks() {
-                    //println!("running post hook: {}", fqn);
+                    tracing::trace!("running post hook: {}", fqn);
                     unsafe { hook(&mut *execute_data, &mut span_ref) };
                 }
                 // Dropping the guard detaches the context and finishes the span.

@@ -47,8 +47,9 @@ pub fn init_once() {
     }
     tracing::debug!("creating tracer provider for pid {}", pid);
     let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
-    tracing::debug!("span exporter={}", if use_simple_exporter {"simple"} else {"batch"});
+    tracing::debug!("SpanProcessor={}", if use_simple_exporter {"simple"} else {"batch"});
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
+        tracing::debug!("Using no-op trace exporter");
         let provider = SdkTracerProvider::builder()
             .with_resource(Resource::builder_empty().build())
             .with_sampler(AlwaysOff)
@@ -66,6 +67,7 @@ pub fn init_once() {
 
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
+        tracing::debug!("Using Console trace exporter");
         let exporter = StdoutSpanExporter::default();
         if use_simple_exporter {
             builder = builder.with_simple_exporter(exporter);
@@ -74,6 +76,7 @@ pub fn init_once() {
         }
     } else {
         if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
+            tracing::debug!("Using http/protobuf trace exporter");
             let exporter = OtlpSpanExporter::builder()
                 .with_http()
                 .with_protocol(Protocol::HttpBinary)
@@ -85,7 +88,7 @@ pub fn init_once() {
                 builder = builder.with_batch_exporter(exporter);
             }
         } else {
-            tracing::debug!("Creating gRPC exporter with tokio runtime...");
+            tracing::debug!("Using gRPC trace exporter with tokio runtime");
             let runtime = Runtime::new().expect("Failed to create Tokio runtime");
             let exporter = runtime.block_on(async {
                 OtlpSpanExporter::builder()
@@ -150,7 +153,7 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
 
     class.add_method("getTracer", Visibility::Public, move |_this, arguments| {
         let provider = get_tracer_provider();
-        tracing::trace!("TracerProvider in PID {} has processor: {:?}", std::process::id(), provider);
+        //tracing::trace!("TracerProvider in PID {} has processor: {:?}", std::process::id(), provider);
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         //TODO implement (optional) version, schema_url, attributes
         // let version = arguments[1].expect_z_str()?.to_str()?.to_string();

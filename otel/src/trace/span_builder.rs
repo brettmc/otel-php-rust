@@ -18,7 +18,7 @@ use opentelemetry::{
 };
 use crate::trace::{
     span::SpanClass,
-    tracer_provider::get_tracer_provider,
+    tracer_provider,
 };
 
 const SPAN_BUILDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\SpanBuilder";
@@ -50,7 +50,7 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<Option<Span
     class
         .add_method("startSpan", Visibility::Public, move |this, _| {
             let span_builder = take(this.as_mut_state()).expect("SpanBuilder missing");
-            let provider = get_tracer_provider();
+            let provider = tracer_provider::get_tracer_provider();
             let scope = InstrumentationScope::builder("php_rust")
                 .build();
             let tracer = provider.tracer_with_scope(scope);
