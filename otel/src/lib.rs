@@ -99,6 +99,11 @@ pub fn get_module() -> Module {
     module.on_request_init(|| {
         logging::print_message("OpenTelemetry::RINIT".to_string());
         logging::init_once();
+
+        if TOKIO_RUNTIME.get().is_none() {
+            logging::print_message("OpenTelemetry::RINIT::tokio runtime is None".to_string());
+        }
+
         tracer_provider::init_once();
         global::set_text_map_propagator(TraceContextPropagator::new()); //TODO could this be lazy-loaded?
 
