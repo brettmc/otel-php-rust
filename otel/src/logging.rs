@@ -64,9 +64,26 @@ fn log_message(message: &str) {
 /// public message printer, for MINIT (before logging is initialized)
 /// TODO: honour log levels!
 pub fn print_message(message: String) {
+    let log_level = ini_get::<Option<&CStr>>("otel.log.level")
+        .and_then(|cstr| cstr.to_str().ok())
+        .unwrap_or("none");
+    match log_level {
+        "none" => {return;}
+        "error" => {return;}
+        "warn" => {return;}
+        _ => {}
+    }
     let thread_id = thread::current().id();
     let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
-    log_message(format!("[{}] [DEBUG] [pid={}] [{:?}] {}", timestamp, process::id(), thread_id, message).as_str());
+    let log_entry = format!(
+        "[{}] [DEBUG] [pid={}] [{:?}] {}",
+        timestamp,
+        process::id(),
+        thread_id,
+        message
+    );
+    //log_message(log_entry.as_str());
+    eprintln!("{}", log_entry);
 }
 
 /// A visitor that captures structured log fields into a string.
