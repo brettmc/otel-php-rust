@@ -28,7 +28,7 @@ pub fn init_once() {
         .and_then(|cstr| cstr.to_str().ok())
         .map(|s| s.to_string())
         .unwrap_or_else(|| "/var/log/ext-otel.log".to_string());
-    LOG_FILE_PATH.set(log_file.clone()).expect("LOG_FILE_PATH already initialized");
+    LOG_FILE_PATH.get_or_init(|| log_file.clone());
 
     let log_level = ini_get::<Option<&CStr>>("otel.log.level")
         .and_then(|cstr| cstr.to_str().ok())
