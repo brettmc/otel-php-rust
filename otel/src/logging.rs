@@ -17,6 +17,7 @@ static LOGGER_PIDS: LazyLock<Mutex<HashMap<u32, ()>>> = LazyLock::new(|| Mutex::
 /// Initialize logging subscriber if it's not already running for this PID for SAPIs that
 /// spawn worker processes
 pub fn init_once() {
+    print_message("logging::init_once".to_string());
     let pid = process::id();
     let mut logger_pids = LOGGER_PIDS.lock().unwrap();
     if logger_pids.contains_key(&pid) {

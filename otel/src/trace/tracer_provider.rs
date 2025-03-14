@@ -123,14 +123,12 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
     }
 }
 
-/// called on worker shutdown via PG(php_shutdown)
 pub fn shutdown() {
     let pid = process::id();
     let mut providers = TRACER_PROVIDERS.lock().unwrap();
     if providers.contains_key(&pid) {
         if let Some(provider) = providers.get(&pid) {
-            tracing::debug!("calling TracerProvider.shutdown for pid {}", pid);
-            // let shutdown_result = provider.shutdown();
+            tracing::info!("Shutting down TracerProvider for pid {}", pid);
             match provider.shutdown() {
                 Ok(_) => tracing::debug!("OpenTelemetry tracer provider shutdown success"),
                 Err(err) => tracing::warn!("Failed to shutdown OpenTelemetry tracer provider: {:?}", err),
@@ -139,7 +137,7 @@ pub fn shutdown() {
             return;
         }
     }
-    tracing::warn!("no tracer provider to shutdown for pid {}", pid);
+    tracing::info!("no tracer provider to shutdown for pid {}", pid);
 }
 
 pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Option<GlobalTracerProvider>> {
