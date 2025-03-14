@@ -9,9 +9,9 @@ use crate::{
         span_builder::{make_span_builder_class},
         status_code::{make_status_code_class},
         tracer::{make_tracer_class},
+        tracer_provider,
         tracer_provider::{
             make_tracer_provider_class,
-            get_tracer_provider,
         },
         span_context::{make_span_context_class},
     },
@@ -24,7 +24,6 @@ use phper::{
     sys,
 };
 use std::sync::{
-    Arc,
     OnceLock,
 };
 use opentelemetry::{
@@ -32,7 +31,6 @@ use opentelemetry::{
 };
 use opentelemetry_sdk::{
     propagation::TraceContextPropagator,
-    trace::SdkTracerProvider,
 };
 use tokio::runtime::Runtime;
 
@@ -58,8 +56,7 @@ pub mod request;
 pub mod observer;
 pub mod logging;
 
-static TRACER_PROVIDER: OnceLock<Arc<SdkTracerProvider>> = OnceLock::new();
-static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+static RUNTIME: OnceLock<Runtime> = OnceLock::new(); //TODO one runtime per PID?
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -84,14 +81,17 @@ pub fn get_module() -> Module {
     let _status_code_class = module.add_class(make_status_code_class());
 
     module.on_module_init(|| {
+        logging::init_once(); //ensure logging initialized for MINIT for parent process in fpm, apache2handler etc
+        tracing::trace!("MINIT");
+
         //TODO use this if multiple grpc exporters (eg logging, metrics)
         // let runtime = Runtime::new().expect("Failed to create Tokio runtime");
         // RUNTIME.set(runtime).expect("Failed to store Tokio runtime");
 
-        global::set_text_map_propagator(TraceContextPropagator::new());
-        let provider = get_tracer_provider().clone();
-        let _ = TRACER_PROVIDER.set(provider.clone());
-        global::set_tracer_provider((*provider).clone());
+        //global::set_text_map_propagator(TraceContextPropagator::new());
+        //let provider = get_tracer_provider().clone();
+        //let _ = TRACER_PROVIDER.set(provider.clone());
+        //global::set_tracer_provider((*provider).clone());
 
         observer::init(PluginManager::new());
 
@@ -100,20 +100,25 @@ pub fn get_module() -> Module {
         }
     });
     module.on_module_shutdown(|| {
-        tracing::debug!("MSHUTDOWN::Shutting down OpenTelemetry exporter...");
-        if let Some(provider) = TRACER_PROVIDER.get() {
+        tracing::trace!("MSHUTDOWN");
+        tracer_provider::shutdown();
+        /*if let Some(provider) = TRACER_PROVIDER.get() {
             let shutdown_result = provider.shutdown();
             match shutdown_result {
                 Ok(_) => tracing::debug!("MSHUTDOWN::OpenTelemetry tracer provider shutdown success"),
                 Err(err) => tracing::warn!("MSHUTDOWN::Failed to shutdown OpenTelemetry tracer provider: {:?}", err),
             }
-        }
+        }*/
     });
     module.on_request_init(|| {
         logging::init_once();
+        tracing::trace!("RINIT");
+        tracer_provider::init_once();
+        global::set_text_map_propagator(TraceContextPropagator::new()); //TODO could this be lazy-loaded?
         request::init();
     });
     module.on_request_shutdown(|| {
+        tracing::trace!("RSHUTDOWN");
         request::shutdown();
     });
 

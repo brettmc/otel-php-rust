@@ -35,14 +35,15 @@ const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvi
 
 pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO dont need to wrap anything
 
-static TRACER_PROVIDER: Lazy<Mutex<HashMap<u32, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static TRACER_PROVIDERS: Lazy<Mutex<HashMap<u32, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
+pub fn init_once() {
     let pid = process::id();
-    let mut providers = TRACER_PROVIDER.lock().unwrap();
-    if let Some(provider) = providers.get(&pid) {
+    let mut providers = TRACER_PROVIDERS.lock().unwrap();
+    if providers.contains_key(&pid) {
         tracing::debug!("tracer provider already exists for pid {}", pid);
-        return provider.clone();
+        //return provider.clone();
+        return;
     }
     tracing::debug!("creating tracer provider for pid {}", pid);
     let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
@@ -52,7 +53,9 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
             .with_resource(Resource::builder_empty().build())
             .with_sampler(AlwaysOff)
             .build();
-        return Arc::new(provider);
+        providers.insert(pid, Arc::new(provider.clone()));
+        return;
+        //return Arc::new(provider);
     }
     let resource = Resource::builder()
         .with_service_name("my_service_name")
@@ -102,7 +105,41 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
         .build()
     );
     providers.insert(pid, provider.clone());
-    provider
+}
+
+pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
+    let pid = process::id();
+    let providers = TRACER_PROVIDERS.lock().unwrap();
+    if let Some(provider) = providers.get(&pid) {
+        return provider.clone();
+    } else {
+        //panik!
+        tracing::error!("no tracer provider initialized for pid {}, using no-op", pid);
+        Arc::new(SdkTracerProvider::builder()
+            .with_resource(Resource::builder_empty().build())
+            .with_sampler(AlwaysOff)
+            .build()
+        )
+    }
+}
+
+/// called on worker shutdown via PG(php_shutdown)
+pub fn shutdown() {
+    let pid = process::id();
+    let mut providers = TRACER_PROVIDERS.lock().unwrap();
+    if providers.contains_key(&pid) {
+        if let Some(provider) = providers.get(&pid) {
+            tracing::debug!("calling TracerProvider.shutdown for pid {}", pid);
+            // let shutdown_result = provider.shutdown();
+            match provider.shutdown() {
+                Ok(_) => tracing::debug!("OpenTelemetry tracer provider shutdown success"),
+                Err(err) => tracing::warn!("Failed to shutdown OpenTelemetry tracer provider: {:?}", err),
+            }
+            providers.remove(&pid);
+            return;
+        }
+    }
+    tracing::warn!("no tracer provider to shutdown for pid {}", pid);
 }
 
 pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Option<GlobalTracerProvider>> {
