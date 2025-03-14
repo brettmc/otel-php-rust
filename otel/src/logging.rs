@@ -49,7 +49,7 @@ fn log_message(message: &str) {
         ini_get::<Option<&CStr>>("otel.log.file")
             .and_then(|cstr| cstr.to_str().ok())
             .map(|s| s.to_string())
-            .unwrap_or_else(|| "/var/log/ext-otel.log".to_string())
+            .unwrap_or_else(|| "/dev/stderr".to_string())
     });
 
     match log_file.as_str() {

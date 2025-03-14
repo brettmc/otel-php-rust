@@ -25,7 +25,7 @@ thread_local! {
 }
 
 pub fn init() {
-    tracing::debug!("RINIT::initializing");
+    tracing::debug!("RINIT::initializing request handler");
     unsafe {
         //ensure $_SERVER is populated
         let mut server = "_SERVER".to_string();

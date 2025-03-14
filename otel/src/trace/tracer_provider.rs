@@ -29,7 +29,7 @@ use opentelemetry_sdk::{
 };
 use once_cell::sync::Lazy;
 use crate::trace::tracer::TracerClass;
-use tokio::runtime::Runtime;
+use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
 
@@ -89,7 +89,8 @@ pub fn init_once() {
             }
         } else {
             tracing::debug!("Using gRPC trace exporter with tokio runtime");
-            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            //let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            let runtime = get_runtime();
             let exporter = runtime.block_on(async {
                 OtlpSpanExporter::builder()
                     .with_tonic()

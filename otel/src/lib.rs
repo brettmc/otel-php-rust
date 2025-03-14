@@ -23,11 +23,6 @@ use phper::{
     php_get_module,
     sys,
 };
-use std::{
-    sync::{
-        OnceLock,
-    },
-};
 use opentelemetry::{
     global,
 };
@@ -35,6 +30,7 @@ use opentelemetry_sdk::{
     propagation::TraceContextPropagator,
 };
 use tokio::runtime::Runtime;
+use once_cell::sync::OnceCell;
 
 pub mod context{
     pub mod context;
@@ -58,7 +54,7 @@ pub mod request;
 pub mod observer;
 pub mod logging;
 
-static RUNTIME: OnceLock<Runtime> = OnceLock::new(); //TODO one runtime per PID?
+static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -69,7 +65,7 @@ pub fn get_module() -> Module {
     );
     module.add_info("opentelemetry-rust", "0.28.0");
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
-    module.add_ini("otel.log.file", "/var/log/ext-otel.log".to_string(), Policy::All);
+    module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
 
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(make_scope_class());
@@ -84,6 +80,12 @@ pub fn get_module() -> Module {
 
     module.on_module_init(|| {
         logging::print_message("OpenTelemetry::MINIT".to_string());
+
+        //TODO don't create runtime unless using grpc
+        let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+        TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already initialized");
+        logging::print_message("OpenTelemetry::MINIT::tokio runtime initialized".to_string());
+
         observer::init(PluginManager::new());
         unsafe {
             sys::zend_observer_fcall_register(Some(observer::observer_instrument));
@@ -130,5 +132,5 @@ pub fn get_module() -> Module {
 }
 
 pub fn get_runtime() -> &'static Runtime {
-    RUNTIME.get().expect("Tokio runtime not initialized")
+    TOKIO_RUNTIME.get().expect("Tokio runtime not initialized")
 }
