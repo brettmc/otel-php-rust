@@ -21,7 +21,7 @@ pub fn init_once() {
     let pid = process::id();
     let mut logger_pids = LOGGER_PIDS.lock().unwrap();
     if logger_pids.contains_key(&pid) {
-        tracing::debug!("logging already initialized for pid: {}", pid);
+        print_message(format!("logging already initialized for pid: {}", pid));
         return;
     }
 
@@ -40,7 +40,7 @@ pub fn init_once() {
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
-    tracing::debug!("Logging::initialized level={}", level_filter);
+    print_message(format!("Logging::initialized level={}", level_filter));
     logger_pids.insert(pid, ());
 }
 
@@ -52,12 +52,27 @@ fn log_message(message: &str) {
             .unwrap_or_else(|| "/var/log/ext-otel.log".to_string())
     });
 
-    if let Ok(mut file) = OpenOptions::new()
+    match OpenOptions::new()
         .create(true)
         .append(true)
         .open(log_file)
     {
-        let _ = writeln!(file, "{}", message); // Ignore errors to prevent panics
+        Ok(mut file) => {
+            if let Err(err) = writeln!(file, "{}", message) {
+                eprintln!(
+                    "[ERROR] Failed to write to log file '{}': {}",
+                    log_file, err
+                );
+            } else {
+                eprintln!("[INFO] Wrote a log message to {}...did you get it?", log_file);
+            }
+        }
+        Err(err) => {
+            eprintln!(
+                "[ERROR] Failed to open log file '{}': {}",
+                log_file, err
+            );
+        }
     }
 }
 
