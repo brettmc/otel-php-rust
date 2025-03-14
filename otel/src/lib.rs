@@ -81,11 +81,6 @@ pub fn get_module() -> Module {
     module.on_module_init(|| {
         logging::print_message("OpenTelemetry::MINIT".to_string());
 
-        //TODO don't create runtime unless using grpc
-        let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-        TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already initialized");
-        logging::print_message("OpenTelemetry::MINIT::tokio runtime initialized".to_string());
-
         observer::init(PluginManager::new());
         unsafe {
             sys::zend_observer_fcall_register(Some(observer::observer_instrument));
@@ -101,7 +96,11 @@ pub fn get_module() -> Module {
         logging::init_once();
 
         if TOKIO_RUNTIME.get().is_none() {
-            logging::print_message("OpenTelemetry::RINIT::tokio runtime is None".to_string());
+            logging::print_message("OpenTelemetry::RINIT::Creating tokio runtime".to_string());
+            //TODO don't create runtime unless using grpc
+            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
+            logging::print_message("OpenTelemetry::RINIT::tokio runtime initialized".to_string());
         }
 
         tracer_provider::init_once();
