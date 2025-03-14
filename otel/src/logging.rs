@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::ffi::{CStr};
 use std::fmt::{self, Write};
 use std::fs::OpenOptions;
-use std::io::Write as _;
+use std::io::{Write as _, stdout, stderr};
 use std::sync::{LazyLock, Mutex, OnceLock};
 use std::process;
 use std::thread;
@@ -52,26 +52,28 @@ fn log_message(message: &str) {
             .unwrap_or_else(|| "/var/log/ext-otel.log".to_string())
     });
 
-    match OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_file)
-    {
-        Ok(mut file) => {
-            if let Err(err) = writeln!(file, "{}", message) {
-                eprintln!(
-                    "[ERROR] Failed to write to log file '{}': {}",
-                    log_file, err
-                );
-            } else {
-                eprintln!("[INFO] Wrote a log message to {}...did you get it?", log_file);
+    match log_file.as_str() {
+        "/dev/stdout" => {
+            if let Err(err) = writeln!(stdout(), "{}", message) {
+                eprintln!("[ERROR] Failed to write to stdout: {}", err);
             }
         }
-        Err(err) => {
-            eprintln!(
-                "[ERROR] Failed to open log file '{}': {}",
-                log_file, err
-            );
+        "/dev/stderr" => {
+            if let Err(err) = writeln!(stderr(), "{}", message) {
+                eprintln!("[ERROR] Failed to write to stderr: {}", err);
+            }
+        }
+        _ => {
+            match OpenOptions::new().create(true).append(true).open(log_file) {
+                Ok(mut file) => {
+                    if let Err(err) = writeln!(file, "{}", message) {
+                        eprintln!("[ERROR] Failed to write to log file '{}': {}", log_file, err);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("[ERROR] Failed to open log file '{}': {}", log_file, err);
+                }
+            }
         }
     }
 }
