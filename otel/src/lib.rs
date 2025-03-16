@@ -53,6 +53,7 @@ pub mod globals;
 pub mod request;
 pub mod observer;
 pub mod logging;
+pub mod util;
 
 static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
 
