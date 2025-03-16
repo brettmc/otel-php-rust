@@ -4,30 +4,44 @@ use phper::{
 };
 use std::{
     convert::Infallible,
-    mem::take,
 };
 use opentelemetry::{
     Context,
-    InstrumentationScope,
     KeyValue,
     trace::{
         SpanBuilder,
         Tracer,
-        TracerProvider,
     }
 };
+use opentelemetry_sdk::trace::SdkTracer;
 use crate::trace::{
     span::SpanClass,
-    tracer_provider,
 };
+
+pub struct MySpanBuilder {
+    span_builder: Option<SpanBuilder>,
+    tracer: Option<SdkTracer>,
+}
+impl MySpanBuilder {
+    pub fn new(span_builder: SpanBuilder, tracer: SdkTracer) -> Self {
+        Self { span_builder: Some(span_builder), tracer: Some(tracer)}
+    }
+    pub fn empty() -> Self {
+        Self{ span_builder: None, tracer: None}
+    }
+}
 
 const SPAN_BUILDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\SpanBuilder";
 
-pub type SpanBuilderClass = StateClass<Option<SpanBuilder>>;
+pub type SpanBuilderClass = StateClass<MySpanBuilder>;
 
-pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<Option<SpanBuilder>> {
-    let mut class =
-        ClassEntity::<Option<SpanBuilder>>::new_with_default_state_constructor(SPAN_BUILDER_CLASS_NAME);
+pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<MySpanBuilder> {
+    let mut class = ClassEntity::<MySpanBuilder>::new_with_state_constructor(
+        SPAN_BUILDER_CLASS_NAME,
+        || {
+            MySpanBuilder::empty()
+        },
+    );
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
@@ -36,25 +50,25 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<Option<Span
     //TODO setParent, addLink, setAttributes, setStartTimestamp, setSpanKind
 
     class.add_method("setAttribute", Visibility::Public, |this, arguments| {
-        let span_builder: &mut SpanBuilder = this.as_mut_state().as_mut().unwrap();
-        let mut builder = take(span_builder);
+        let state = this.as_mut_state();
+        let span_builder = state.span_builder.as_ref().expect("SpanBuilder not set in SpanBuilder");
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         let value = arguments[1].expect_z_str()?.to_str()?.to_string();
-        let mut attributes = builder.attributes.clone().unwrap_or_default();
+        let mut attributes = span_builder.attributes.clone().unwrap_or_default();
         attributes.push(KeyValue::new(name, value));
-        builder = builder.with_attributes(attributes);
-        *span_builder = builder;
+        let new_span_builder = span_builder.clone().with_attributes(attributes);
+        state.span_builder = Some(new_span_builder);
+
         Ok::<_, phper::Error>(this.to_ref_owned())
     });
 
     class
         .add_method("startSpan", Visibility::Public, move |this, _| {
-            let span_builder = take(this.as_mut_state()).expect("SpanBuilder missing");
-            let provider = tracer_provider::get_tracer_provider();
-            let scope = InstrumentationScope::builder("php_rust")
-                .build();
-            let tracer = provider.tracer_with_scope(scope);
-            let span = tracer.build_with_context(span_builder, &Context::current());
+            let state = this.as_state();
+            let span_builder = state.span_builder.as_ref().expect("SpanBuilder not set in SpanBuilder");
+            let tracer = state.tracer.as_ref().expect("Tracer not set in SpanBuilder");
+
+            let span = tracer.build_with_context(span_builder.clone(), &Context::current());
             tracing::debug!("SpanBuilder::Starting span");
             let mut object = span_class.init_object()?;
             *object.as_mut_state() = Some(span);

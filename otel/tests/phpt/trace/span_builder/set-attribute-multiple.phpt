@@ -21,7 +21,7 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "php_rust"
+		Name         : "my_tracer"
 
 	Name        : root
 	TraceId     : %s
