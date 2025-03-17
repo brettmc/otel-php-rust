@@ -28,7 +28,10 @@ use opentelemetry_sdk::{
     Resource,
 };
 use once_cell::sync::Lazy;
-use crate::trace::tracer::TracerClass;
+use crate::{
+    trace::tracer::TracerClass,
+    util,
+};
 use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
@@ -151,13 +154,33 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
     class.add_method("getTracer", Visibility::Public, move |_this, arguments| {
         let provider = get_tracer_provider();
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-        //TODO implement (optional) version, schema_url, attributes
-        // let version = arguments[1].expect_z_str()?.to_str()?.to_string();
-        // let schema_url = arguments[2].expect_z_str()?.to_str()?.to_string();
-        let scope = InstrumentationScope::builder(name)
-        //     .with_version(version)
-        //     .with_schema_url(schema_url)
-             .build();
+
+        let version = arguments.get(1)
+            .and_then(|arg| arg.as_z_str()) // Check if it's a string
+            .map(|s| s.to_str().ok().map(|s| s.to_string())) // Convert to Rust String
+            .flatten();
+
+        let schema_url = arguments.get(2)
+            .and_then(|arg| arg.as_z_str())
+            .map(|s| s.to_str().ok().map(|s| s.to_string()))
+            .flatten();
+
+        let attributes = arguments.get(3)
+            .and_then(|arg| arg.as_z_arr())
+            .map(|zarr| zarr.to_owned());
+
+        let mut scope_builder = InstrumentationScope::builder(name);
+        if let Some(version) = version {
+            scope_builder = scope_builder.with_version(version);
+        }
+        if let Some(schema_url) = schema_url {
+            scope_builder = scope_builder.with_schema_url(schema_url);
+        }
+        if let Some(attributes) = attributes {
+            scope_builder = scope_builder.with_attributes(util::zval_arr_to_key_value_vec(attributes));
+        }
+        let scope = scope_builder.build();
+
         let tracer = provider.tracer_with_scope(scope);
         let mut object = tracer_class.init_object()?;
         *object.as_mut_state() = Some(tracer);

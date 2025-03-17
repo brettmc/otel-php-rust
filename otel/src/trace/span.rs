@@ -5,7 +5,6 @@ use phper::{
     errors::ThrowObject,
     functions::Argument,
     objects::{ZObj, ZObject},
-    values::ZVal,
 };
 use std::{
     borrow::Cow,
@@ -15,11 +14,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 use opentelemetry::{
-    Array,
     Context,
-    KeyValue,
-    Value,
-    StringValue,
     trace::{
         Span,
         SpanContext,
@@ -28,9 +23,12 @@ use opentelemetry::{
     }
 };
 use opentelemetry_sdk::trace::Span as SdkSpan;
-use crate::trace::{
-    span_context::SpanContextClass,
-    scope::ScopeClass,
+use crate::{
+    trace::{
+        span_context::SpanContextClass,
+        scope::ScopeClass,
+    },
+    util,
 };
 
 const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
@@ -71,7 +69,7 @@ pub fn make_span_class(
                 tracing::debug!("Span::Ending Span (SpanRef)");
                 ctx.span().end();
             }
-            
+
             Ok(())
         });
 
@@ -115,7 +113,7 @@ pub fn make_span_class(
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
             let key = arguments[0].expect_z_str()?.to_str()?.to_string();
             let value = &arguments[1];
-            if let Some(kv) = zval_to_key_value(&key, &value) {
+            if let Some(kv) = util::zval_to_key_value(&key, &value) {
                 let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
                 if let Some(span) = this.as_mut_state().as_mut() {
                     span.set_attribute(kv.clone());
@@ -129,26 +127,17 @@ pub fn make_span_class(
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
-            let attributes = arguments[0].expect_z_arr()?;
-            let mut result = Vec::new();
-            for (key, value) in attributes.iter() {
-                match key {
-                    IterKey::Index(_) => {}, // Skip integer keys
-                    IterKey::ZStr(zstr) => {
-                        if let Some(key_str) = zstr.to_str().ok().map(|s| s.to_string()) {
-                            if let Some(kv) = zval_to_key_value(&key_str, value) {
-                                result.push(kv);
-                            }
-                        }
-                    },
-                };
-            }
+            let attrs = arguments[0]
+                .expect_z_arr()?
+                .to_owned();
+
+            let attributes = util::zval_arr_to_key_value_vec(attrs);
 
             let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
             if let Some(span) = this.as_mut_state().as_mut() {
-                span.set_attributes(result.clone());
+                span.set_attributes(attributes);
             } else if let Some(ctx) = get_context_instance(instance_id as u64) {
-                ctx.span().set_attributes(result.clone());
+                ctx.span().set_attributes(attributes);
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
@@ -157,14 +146,6 @@ pub fn make_span_class(
     class
         .add_method("updateName", Visibility::Public, |this, arguments| {
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-            // this.as_mut_state()
-            //     .as_mut()
-            //     .map(|span| span.update_name(name.clone()))
-            //     .or_else(|| {
-            //         CONTEXT_STORAGE.with(|storage| {
-            //             storage.borrow().as_ref().map(|ctx| ctx.span().update_name(name))
-            //         })
-            //     });
 
             let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
             if let Some(span) = this.as_mut_state().as_mut() {
@@ -220,7 +201,7 @@ pub fn make_span_class(
                         IterKey::Index(_) => {}, // Skip integer keys
                         IterKey::ZStr(zstr) => {
                             if let Some(key_str) = zstr.to_str().ok().map(|s| s.to_string()) {
-                                if let Some(kv) = zval_to_key_value(&key_str, value) {
+                                if let Some(kv) = util::zval_to_key_value(&key_str, value) {
                                     attributes.push(kv);
                                 }
                             }
@@ -254,7 +235,6 @@ pub fn make_span_class(
     class
         .add_static_method("getCurrent", Visibility::Public, move |_| {
             let ctx = Context::current();
-            //let instance_id = INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed); // Generate a unique ID for this instance
             let instance_id = new_instance_id();
             CONTEXT_STORAGE.with(|storage| {
                 storage.borrow_mut().insert(instance_id, ctx.clone());
@@ -294,71 +274,4 @@ pub fn get_context_instance(instance_id: u64) -> Option<Context> {
 
 pub fn new_instance_id() -> u64 {
     INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed)
-}
-
-fn zval_to_key_value(key: &str, value: &ZVal) -> Option<KeyValue> {
-    let type_info = value.get_type_info();
-    if type_info.is_string() {
-        return value.as_z_str().and_then(|z| z.to_str().ok()).map(|s| KeyValue::new(key.to_string(), s.to_string()));
-    }
-    if type_info.is_long() {
-        return value.as_long().map(|v| KeyValue::new(key.to_string(), v));
-    }
-    if type_info.is_double() {
-        return value.as_double().map(|v| KeyValue::new(key.to_string(), v));
-    }
-    if type_info.is_bool() {
-        return value.as_bool().map(|v| KeyValue::new(key.to_string(), v));
-    }
-    if type_info.is_array() {
-        return zval_to_vec(key, value);
-    }
-    None
-}
-
-fn zval_to_vec(key: &str, value: &ZVal) -> Option<KeyValue> {
-    let array = value.as_z_arr()?;
-
-    let mut string_values = Vec::new();
-    let mut int_values = Vec::new();
-    let mut float_values = Vec::new();
-    let mut bool_values = Vec::new();
-
-    for (_, v) in array.iter() {
-        if let Some(val) = v.as_z_str().and_then(|z| z.to_str().ok()) {
-            string_values.push(val.to_string());
-        } else if let Some(val) = v.as_long() {
-            int_values.push(val);
-        } else if let Some(val) = v.as_double() {
-            float_values.push(val);
-        } else if let Some(val) = v.as_bool() {
-            bool_values.push(val);
-        }
-    }
-
-    if !string_values.is_empty() {
-        return Some(KeyValue::new(
-            key.to_string(),
-            Value::Array(Array::from(
-                string_values.into_iter().map(StringValue::from).collect::<Vec<_>>(),
-            )),
-        ));
-    } else if !int_values.is_empty() {
-        return Some(KeyValue::new(
-            key.to_string(),
-            Value::Array(Array::from(int_values)),
-        ));
-    } else if !float_values.is_empty() {
-        return Some(KeyValue::new(
-            key.to_string(),
-            Value::Array(Array::from(float_values)),
-        ));
-    } else if !bool_values.is_empty() {
-        return Some(KeyValue::new(
-            key.to_string(),
-            Value::Array(Array::from(bool_values)),
-        ));
-    }
-
-    None
 }

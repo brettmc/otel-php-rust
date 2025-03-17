@@ -4,8 +4,6 @@ Get a tracer with instrumentation scope
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
---XFAIL--
-Tracer with instrumentation scope not implemented
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
@@ -23,7 +21,10 @@ Span #0
 		Name         : "test"
 		Version  : "1.0"
 		SchemaUrl: "https://schemas.opentelemetry.io/1.30.0"
-		Attributes   : ???
+		Scope Attributes:
+			 ->  a_string: foo
+			 ->  a_bool: true
+			 ->  a_int: 3
 
 	Name        : test
 	TraceId     : %s
