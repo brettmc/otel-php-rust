@@ -75,7 +75,6 @@ Span #0
 		 ->  code.function.name: String(Owned("MockHttpClient::sendRequest"))
 		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/psr18/psr18-inject.php"))
 		 ->  code.line.number: I64(%d)
-		 ->  my-attribute: String(Owned("my-value"))
 		 ->  http.response.status_code: I64(200)
 Span #1
 	Instrumentation Scope

@@ -59,7 +59,6 @@ pub fn init_once() {
         return;
     }
     let resource = Resource::builder()
-        .with_service_name("my_service_name")
         .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
         .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
         .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
