@@ -4,6 +4,7 @@ use opentelemetry::{
     trace::SpanRef,
 };
 use std::sync::Arc;
+use phper::values::ExecuteData;
 
 pub struct TestPlugin {
     handlers: Vec<Arc<dyn Handler + Send + Sync>>,
@@ -54,12 +55,12 @@ impl Handler for DemoHandler {
 }
 
 impl DemoHandler {
-    unsafe extern "C" fn pre_callback(_execute_data: *mut phper::sys::zend_execute_data, _span_details: &mut SpanDetails) {
+    unsafe extern "C" fn pre_callback(_exec_data: *mut ExecuteData, _span_details: &mut SpanDetails) {
         //println!("DemoHandler::pre_callback");
     }
 
     unsafe extern "C" fn post_callback(
-        _execute_data: *mut phper::sys::zend_execute_data,
+        _exec_data: *mut ExecuteData,
         _span_ref: &SpanRef,
         _retval: *mut phper::sys::zval,
     ) {
@@ -87,13 +88,13 @@ impl Handler for DemoFunctionHandler {
 }
 
 impl DemoFunctionHandler {
-    unsafe extern "C" fn pre_callback(_execute_data: *mut phper::sys::zend_execute_data, span_details: &mut SpanDetails) {
+    unsafe extern "C" fn pre_callback(_execute_data: *mut ExecuteData, span_details: &mut SpanDetails) {
         span_details.update_name("i-was-renamed");
         span_details.add_attribute("my-attribute".to_string(), "my-value".to_string());
     }
 
     unsafe extern "C" fn post_callback(
-        _execute_data: *mut phper::sys::zend_execute_data,
+        _execute_data: *mut ExecuteData,
         span_ref: &SpanRef,
         _retval: *mut phper::sys::zval,
     ) {

@@ -42,15 +42,15 @@ thread_local! {
     static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());
 }
 
-fn store_guard(exec_ptr: *mut sys::zend_execute_data, guard: ContextGuard) {
-    let key = exec_ptr as usize;
+fn store_guard(exec_data: *mut ExecuteData, guard: ContextGuard) {
+    let key = exec_data as *const ExecuteData as usize;
     CONTEXT_GUARD_MAP.with(|map| {
         map.borrow_mut().insert(key, guard);
     });
 }
 
-fn take_guard(exec_ptr: *mut sys::zend_execute_data) -> Option<ContextGuard> {
-    let key = exec_ptr as usize;
+fn take_guard(exec_data: *mut ExecuteData) -> Option<ContextGuard> {
+    let key = exec_data as *const ExecuteData as usize;
     CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
 }
 
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
                 let mut span_details = SpanDetails::new(fqn.clone(), get_default_attributes(exec_data));
                 for hook in observer.pre_hooks() {
                     tracing::trace!("running pre hook: {}", fqn);
-                    unsafe { hook(&mut *execute_data, &mut span_details) };
+                    hook(&mut *exec_data, &mut span_details);
                 }
                 let span_name = span_details.name().clone();
                 let span_builder = tracer.span_builder(span_name);
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
                 let span = tracer.build_with_context(span_builder, &Context::current());
                 let ctx = Context::current_with_span(span);
                 let guard = ctx.attach();
-                store_guard(execute_data, guard);
+                store_guard(exec_data, guard);
             }
         }
     }
@@ -126,18 +126,18 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&fqn) {
-            if let Some(guard) = take_guard(execute_data) {
+            if let Some(guard) = take_guard(exec_data) {
                 let context = Context::current();
                 let mut span_ref = context.span();
 
                 for hook in observer.post_hooks() {
                     tracing::trace!("running post hook: {}", fqn);
-                    unsafe { hook(&mut *execute_data, &mut span_ref) };
+                    hook(&mut *exec_data, &mut span_ref);
                 }
                 // Dropping the guard detaches the context and finishes the span.
                 drop(guard);
             } else {
-                tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
+                tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", exec_data);
             }
         }
 

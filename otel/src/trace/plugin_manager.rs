@@ -1,6 +1,7 @@
 use super::plugin::Plugin;
 use crate::trace::plugins::{
     test::TestPlugin,
+    psr18::Psr18Plugin,
 };
 use crate::trace::plugin::{FunctionObserver};
 use phper::values::ExecuteData;
@@ -20,6 +21,7 @@ impl PluginManager {
     }
 
     fn init(&mut self) {
+        self.plugins.push(Box::new(Psr18Plugin::new()));
         //#[cfg(feature="test")]
         self.plugins.push(Box::new(TestPlugin::new()));
     }

@@ -46,6 +46,7 @@ pub mod trace{
     pub mod plugin_manager;
     pub mod plugin;
     pub mod plugins{
+        pub mod psr18;
         pub mod test;
     }
 }
