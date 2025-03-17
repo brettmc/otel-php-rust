@@ -5,6 +5,7 @@ use opentelemetry::{
     global,
     trace::{SpanKind, SpanRef},
 };
+use opentelemetry_semantic_conventions as SemConv;
 use std::{
     sync::Arc,
     collections::HashMap,
@@ -122,6 +123,6 @@ impl Psr18Handler {
             }
         };
 
-        span_ref.set_attribute(KeyValue::new("http.response.status_code", status_code));
+        span_ref.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, status_code));
     }
 }
