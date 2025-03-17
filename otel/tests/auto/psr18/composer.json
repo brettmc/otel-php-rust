@@ -1,0 +1,6 @@
+{
+    "require": {
+        "psr/http-client": "^1.0",
+        "nyholm/psr7": "^1.8"
+    }
+}

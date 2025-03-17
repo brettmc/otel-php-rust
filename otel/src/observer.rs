@@ -3,6 +3,7 @@ use phper::{
     strings::{ZStr},
     values::{
         ExecuteData,
+        ZVal,
     }
 };
 use std::{
@@ -18,9 +19,11 @@ use crate::{
     tracer_provider,
     PluginManager
 };
-use std::collections::HashMap;
-use std::sync::{OnceLock, RwLock};
-use std::cell::RefCell;
+use std::{
+    collections::HashMap,
+    sync::{OnceLock, RwLock},
+    cell::RefCell,
+};
 use opentelemetry::{
     Context,
     ContextGuard,
@@ -64,7 +67,7 @@ pub fn init(plugin_manager: PluginManager) {
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
         let fqn = get_fqn(exec_data);
-        tracing::trace!("observer::observer_instrument: {}", fqn);
+        tracing::trace!("observer::observer_instrument checking: {}", fqn);
         let manager_lock = PLUGIN_MANAGER.lock().unwrap();
         if let Some(plugin_manager) = manager_lock.as_ref() {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
@@ -107,8 +110,10 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
                     hook(&mut *exec_data, &mut span_details);
                 }
                 let span_name = span_details.name().clone();
+                let span_kind = span_details.kind().clone(); //TODO use Some instead of clobbering with default?
                 let span_builder = tracer.span_builder(span_name);
                 let span_builder = span_builder.with_attributes(span_details.attributes());
+                let span_builder = span_builder.with_kind(span_kind);
                 let span = tracer.build_with_context(span_builder, &Context::current());
                 let ctx = Context::current_with_span(span);
                 let guard = ctx.attach();
@@ -119,7 +124,7 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, _retval: *mut sys::zval) {
+pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, retval: *mut sys::zval) {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
         let fqn = get_fqn(exec_data);
 
@@ -130,9 +135,19 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
                 let context = Context::current();
                 let mut span_ref = context.span();
 
+                let retval = if retval.is_null() {
+                    &mut ZVal::from(())
+                } else {
+                    (retval as *mut ZVal).as_mut().unwrap()
+                };
+                //let Some(retval) = (retval as *mut ZVal).as_mut() else {
+                //    tracing::warn!("post_observe_c_function: retval is NULL for function {}", fqn);
+                //    return;
+                //};
+
                 for hook in observer.post_hooks() {
                     tracing::trace!("running post hook: {}", fqn);
-                    hook(&mut *exec_data, &mut span_ref);
+                    hook(&mut *exec_data, &mut span_ref, retval);
                 }
                 // Dropping the guard detaches the context and finishes the span.
                 drop(guard);
@@ -140,7 +155,6 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
                 tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", exec_data);
             }
         }
-
     }
 }
 
@@ -186,6 +200,7 @@ fn get_default_attributes(execute_data: &mut ExecuteData) -> Vec<KeyValue> {
     attributes
 }
 
+//TODO get these through ExecuteData?
 unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     let zend_execute_data = execute_data.as_ptr();
 

@@ -4,7 +4,7 @@ use opentelemetry::{
     trace::SpanRef,
 };
 use std::sync::Arc;
-use phper::values::ExecuteData;
+use phper::values::{ExecuteData, ZVal};
 
 pub struct TestPlugin {
     handlers: Vec<Arc<dyn Handler + Send + Sync>>,
@@ -27,6 +27,9 @@ impl Plugin for TestPlugin {
     }
     fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>> {
         self.handlers.clone()
+    }
+    fn get_name(&self) -> &str {
+        "test"
     }
 }
 
@@ -62,7 +65,7 @@ impl DemoHandler {
     unsafe extern "C" fn post_callback(
         _exec_data: *mut ExecuteData,
         _span_ref: &SpanRef,
-        _retval: *mut phper::sys::zval,
+        _retval: &mut ZVal,
     ) {
         //println!("DemoHandler::post_callback");
     }
@@ -96,7 +99,7 @@ impl DemoFunctionHandler {
     unsafe extern "C" fn post_callback(
         _execute_data: *mut ExecuteData,
         span_ref: &SpanRef,
-        _retval: *mut phper::sys::zval,
+        _retval: &mut ZVal,
     ) {
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
     }

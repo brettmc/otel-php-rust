@@ -6,12 +6,13 @@ use opentelemetry::{
         SpanRef,
     },
 };
-use phper::values::ExecuteData;
+use phper::values::{ExecuteData, ZVal};
 
 pub trait Plugin: Send + Sync {
     /// Determines whether this plugin is enabled. Could be based on .ini config, or custom logic.
     fn is_enabled(&self) -> bool;
     fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>>;
+    fn get_name(&self) -> &str;
 }
 
 pub trait Handler: Send + Sync {
@@ -23,11 +24,11 @@ pub trait Handler: Send + Sync {
 
 pub struct HandlerCallbacks {
     pub pre_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &mut SpanDetails)>,
-    pub post_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &SpanRef, *mut phper::sys::zval)>,
+    pub post_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &SpanRef, &mut ZVal)>,
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData, &mut SpanDetails) + Send + Sync>;
-pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &SpanRef) + Send + Sync>;
+pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &SpanRef, &mut ZVal) + Send + Sync>;
 
 pub struct FunctionObserver {
     pre_hooks: Vec<ObserverPreHook>,

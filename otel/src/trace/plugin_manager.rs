@@ -4,10 +4,12 @@ use crate::trace::plugins::{
     psr18::Psr18Plugin,
 };
 use crate::trace::plugin::{FunctionObserver};
-use phper::values::ExecuteData;
-use phper::classes::ClassEntry;
-use phper::strings::{ZString};
-use phper::functions::ZFunc;
+use phper::{
+    classes::ClassEntry,
+    functions::ZFunc,
+    strings::{ZString},
+    values::ExecuteData,
+};
 
 pub struct PluginManager {
     plugins: Vec<Box<dyn Plugin + Send + Sync>>,
@@ -34,8 +36,9 @@ impl PluginManager {
         let mut observer = FunctionObserver::new();
 
         for plugin in &self.plugins {
+            //tracing::trace!("plugin: {}", plugin.get_name());
             for handler in plugin.get_handlers() {
-                if should_trace(execute_data.func(), &handler.get_functions(), &handler.get_interfaces()) {
+                if should_trace(execute_data.func(), &handler.get_functions(), &handler.get_interfaces(), plugin.get_name()) {
                     let callbacks = handler.get_callbacks();
 
                     if let Some(pre) = callbacks.pre_observe {
@@ -45,8 +48,8 @@ impl PluginManager {
                     }
 
                     if let Some(post) = callbacks.post_observe {
-                        observer.add_post_hook(Box::new(move |execute_data, span_ref| unsafe {
-                            post(execute_data, span_ref, std::ptr::null_mut());
+                        observer.add_post_hook(Box::new(move |execute_data, span_ref, retval| unsafe {
+                            post(execute_data, span_ref, retval);
                         }));
                     }
                 }
@@ -61,18 +64,29 @@ impl PluginManager {
     }
 }
 
-fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String]) -> bool {
+fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String], plugin_name: &str) -> bool {
     let function_name: ZString = func.get_function_or_method_name();
     let function_name_str = match function_name.to_str() {
         Ok(name) => name,
         Err(_) => return false, // If the function name is not valid UTF-8, return false
     };
-    // println!("function_name: {:?}", function_name);
+    tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
     if functions.iter().any(|name| function_name_str == name) {
+        //tracing::trace!("should_trace:: {:?} matches on function name", function_name_str);
         return true;
+    } else {
+        //tracing::trace!("should_trace:: {:?} does not match on function name", function_name_str);
     }
 
     //check for interfaces
+    let parts: Vec<&str> = function_name_str.split("::").collect();
+    if parts.len() != 2 {
+        tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
+        return false;
+    }
+    let _observed_class_name = parts[0];
+    let observed_method_name = parts[1];
+
     let ce = match func.get_class() {
         Some(class_entry) => class_entry,
         None => return false,
@@ -80,20 +94,25 @@ fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String]) -> bo
     for iface_entry in interfaces {
         let parts: Vec<&str> = iface_entry.split("::").collect();
         if parts.len() != 2 {
-            println!("Skipping malformed interface entry: {}", iface_entry);
+            tracing::warn!("[plugin={}] Skipping malformed interface entry: {}", plugin_name, iface_entry);
             continue;
         }
         let interface_name = parts[0];
         let method_name = parts[1];
+        tracing::trace!("[plugin={}] interface={} method={}", plugin_name, interface_name, method_name);
 
         match ClassEntry::from_globals(interface_name) {
             Ok(iface_ce) => {
-                // println!("interface CE found: {}", interface_name);
+                //tracing::trace!("interface CE found: {}", interface_name);
                 if ce.is_instance_of(&iface_ce) {
-                    if iface_ce.has_method(method_name) {
-                        // println!("match on interface + method");
+                    //tracing::trace!("{} is an instance of {}", observed_class_name, interface_name);
+                    if observed_method_name == method_name {
+                        //tracing::trace!("methods match: {}", method_name);
                         return true;
                     }
+                    //tracing::trace!("methods do not match: {}", method_name);
+                } else {
+                    //tracing::trace!{"{} is not an instance of {}", function_name_str, interface_name};
                 }
             }
             Err(_) => {}
