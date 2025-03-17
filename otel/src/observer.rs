@@ -109,11 +109,9 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
                     tracing::trace!("running pre hook: {}", fqn);
                     hook(&mut *exec_data, &mut span_details);
                 }
-                let span_name = span_details.name().clone();
-                let span_kind = span_details.kind().clone(); //TODO use Some instead of clobbering with default?
-                let span_builder = tracer.span_builder(span_name);
+                let span_builder = tracer.span_builder(span_details.name());
                 let span_builder = span_builder.with_attributes(span_details.attributes());
-                let span_builder = span_builder.with_kind(span_kind);
+                let span_builder = span_builder.with_kind(span_details.kind());
                 let span = tracer.build_with_context(span_builder, &Context::current());
                 let ctx = Context::current_with_span(span);
                 let guard = ctx.attach();
@@ -140,10 +138,6 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
                 } else {
                     (retval as *mut ZVal).as_mut().unwrap()
                 };
-                //let Some(retval) = (retval as *mut ZVal).as_mut() else {
-                //    tracing::warn!("post_observe_c_function: retval is NULL for function {}", fqn);
-                //    return;
-                //};
 
                 for hook in observer.post_hooks() {
                     tracing::trace!("running post hook: {}", fqn);
