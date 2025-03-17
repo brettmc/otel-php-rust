@@ -31,7 +31,7 @@ use crate::{
     util,
 };
 
-const SPAN_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Span";
+const SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Span";
 
 // The span related to a class instance is either stored as a class entity (SdkSpan) if the span has been
 // started but not activated. Once it has been activated, the class entity is set to None, and the context

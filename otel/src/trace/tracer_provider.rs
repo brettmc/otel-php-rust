@@ -33,7 +33,7 @@ use crate::{
 };
 use crate::get_runtime;
 
-const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
+const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";
 
 pub type TracerProviderClass = StateClass<()>;
 

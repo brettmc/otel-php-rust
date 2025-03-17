@@ -31,7 +31,7 @@ impl MySpanBuilder {
     }
 }
 
-const SPAN_BUILDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\SpanBuilder";
+const SPAN_BUILDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\SpanBuilder";
 
 pub type SpanBuilderClass = StateClass<MySpanBuilder>;
 

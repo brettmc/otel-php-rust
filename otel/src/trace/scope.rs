@@ -10,7 +10,7 @@ use std::{
 };
 use opentelemetry::ContextGuard;
 
-const SCOPE_CLASS_NAME: &str = "OpenTelemetry\\API\\Context\\Scope";
+const SCOPE_CLASS_NAME: &str = r"OpenTelemetry\API\Context\Scope";
 pub type ScopeClass = StateClass<Option<ContextGuard>>;
 
 pub fn make_scope_class() -> ClassEntity<Option<ContextGuard>> {

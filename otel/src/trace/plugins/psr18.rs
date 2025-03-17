@@ -70,7 +70,6 @@ impl Psr18Handler {
         let request_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         span_details.update_name("GET");
         span_details.set_kind(SpanKind::Client);
-        span_details.add_attribute("my-attribute".to_string(), "my-value".to_string());
 
         let mut carrier = HashMap::new();
         global::get_text_map_propagator(|prop| prop.inject_context(&Context::current(), &mut carrier));

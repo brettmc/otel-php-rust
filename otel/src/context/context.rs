@@ -12,7 +12,7 @@ use opentelemetry::{
     Context,
 };
 
-const CONTEXT_CLASS_NAME: &str = "OpenTelemetry\\Context\\Context";
+const CONTEXT_CLASS_NAME: &str = r"OpenTelemetry\Context\Context";
 pub type ContextClass = StateClass<Option<Context>>;
 
 #[derive(Debug)]
