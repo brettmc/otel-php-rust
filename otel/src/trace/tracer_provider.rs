@@ -169,11 +169,7 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Opti
             .and_then(|arg| arg.as_z_arr())
             .map(|zarr| zarr.to_owned());
 
-        //TODO implement (optional) version, schema_url, attributes
-        // let version = arguments[1].expect_z_str()?.to_str()?.to_string();
-        // let schema_url = arguments[2].expect_z_str()?.to_str()?.to_string();
         let mut scope_builder = InstrumentationScope::builder(name);
-
         if let Some(version) = version {
             scope_builder = scope_builder.with_version(version);
         }
