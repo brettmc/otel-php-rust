@@ -1,5 +1,7 @@
 use phper::{
     classes::{ClassEntity, StateClass, Visibility},
+    functions::ReturnType,
+    types::TypeInfo,
 };
 use std::{
     collections::HashMap,
@@ -196,7 +198,7 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<()> 
             },
         };
         Ok::<_, phper::Error>(result)
-    });
+    }).return_type(ReturnType::by_val(TypeInfo::BOOL));
 
     class
 }

@@ -11,13 +11,14 @@ OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\StatusCode;
 
 Globals::tracerProvider()
     ->getTracer('my_tracer')
     ->spanBuilder('root')
     ->setAttribute('exporter', 'grpc')
     ->startSpan()
-    ->setStatus('Error', 'kaboom')
+    ->setStatus(StatusCode::ERROR, 'kaboom')
     ->end();
 var_dump('done');
 ?>

@@ -7,7 +7,7 @@ use crate::{
         scope::{make_scope_class},
         span::{make_span_class},
         span_builder::{make_span_builder_class},
-        status_code::{make_status_code_class},
+        status_code::{make_status_code_interface},
         tracer::{make_tracer_class},
         tracer_provider,
         tracer_provider::{
@@ -82,7 +82,7 @@ pub fn get_module() -> Module {
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone()));
     let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone()));
     let _globals_class = module.add_class(make_globals_class(tracer_provider_class.clone()));
-    let _status_code_class = module.add_class(make_status_code_class());
+    let _status_code_interface = module.add_interface(make_status_code_interface());
 
     module.on_module_init(|| {
         logging::print_message("OpenTelemetry::MINIT".to_string());
