@@ -4,8 +4,10 @@ use opentelemetry::{
     trace::SpanRef,
 };
 use std::sync::Arc;
-use phper::values::{ExecuteData, ZVal};
-use phper::objects::ZObj;
+use phper::{
+    values::{ExecuteData, ZVal},
+    objects::ZObj,
+};
 
 pub struct TestPlugin {
     handlers: Vec<Arc<dyn Handler + Send + Sync>>,

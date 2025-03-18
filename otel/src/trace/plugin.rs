@@ -6,8 +6,10 @@ use opentelemetry::{
         SpanRef,
     },
 };
-use phper::values::{ExecuteData, ZVal};
-use phper::objects::ZObj;
+use phper::{
+    values::{ExecuteData, ZVal},
+    objects::ZObj,
+};
 
 pub trait Plugin: Send + Sync {
     /// Determines whether this plugin is enabled. Could be based on .ini config, or custom logic.

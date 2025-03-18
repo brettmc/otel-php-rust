@@ -18,7 +18,6 @@ $tracer->spanBuilder('test')->startSpan()->end();
 --EXPECTF--
 Spans
 Resource%A
-	 ->  service.name=String(Owned("service_one"))
-%A
+	 ->  service.name=String(Owned("service_one"))%A
 Span #0
 %A
