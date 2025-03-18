@@ -7,6 +7,7 @@ use opentelemetry::{
     },
 };
 use phper::values::{ExecuteData, ZVal};
+use phper::objects::ZObj;
 
 pub trait Plugin: Send + Sync {
     /// Determines whether this plugin is enabled. Could be based on .ini config, or custom logic.
@@ -24,11 +25,11 @@ pub trait Handler: Send + Sync {
 
 pub struct HandlerCallbacks {
     pub pre_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &mut SpanDetails)>,
-    pub post_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &SpanRef, &mut ZVal)>,
+    pub post_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &SpanRef, &mut ZVal, Option<&mut ZObj>)>,
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData, &mut SpanDetails) + Send + Sync>;
-pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &SpanRef, &mut ZVal) + Send + Sync>;
+pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &SpanRef, &mut ZVal, Option<&mut ZObj>) + Send + Sync>;
 
 pub struct FunctionObserver {
     pre_hooks: Vec<ObserverPreHook>,

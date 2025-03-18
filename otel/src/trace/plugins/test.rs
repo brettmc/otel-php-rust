@@ -5,6 +5,7 @@ use opentelemetry::{
 };
 use std::sync::Arc;
 use phper::values::{ExecuteData, ZVal};
+use phper::objects::ZObj;
 
 pub struct TestPlugin {
     handlers: Vec<Arc<dyn Handler + Send + Sync>>,
@@ -66,6 +67,7 @@ impl DemoHandler {
         _exec_data: *mut ExecuteData,
         _span_ref: &SpanRef,
         _retval: &mut ZVal,
+        _exception: Option<&mut ZObj>
     ) {
         //println!("DemoHandler::post_callback");
     }
@@ -100,6 +102,7 @@ impl DemoFunctionHandler {
         _execute_data: *mut ExecuteData,
         span_ref: &SpanRef,
         _retval: &mut ZVal,
+        _exception: Option<&mut ZObj>
     ) {
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
     }

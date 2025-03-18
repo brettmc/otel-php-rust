@@ -1,4 +1,5 @@
 use phper::{
+    eg,
     sys,
     strings::{ZStr},
     values::{
@@ -6,6 +7,7 @@ use phper::{
         ZVal,
     }
 };
+use phper::objects::ZObj;
 use std::{
     sync::Mutex,
 };
@@ -133,6 +135,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
                 let context = Context::current();
                 let mut span_ref = context.span();
 
+                //TODO use Option<ZVal> ??
                 let retval = if retval.is_null() {
                     &mut ZVal::from(())
                 } else {
@@ -141,7 +144,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
 
                 for hook in observer.post_hooks() {
                     tracing::trace!("running post hook: {}", fqn);
-                    hook(&mut *exec_data, &mut span_ref, retval);
+                    hook(&mut *exec_data, &mut span_ref, retval, get_global_exception());
                 }
                 // Dropping the guard detaches the context and finishes the span.
                 drop(guard);
@@ -231,4 +234,8 @@ unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)>
     };
 
     Some((file_name, line_number))
+}
+
+fn get_global_exception() -> Option<&'static mut ZObj> {
+    unsafe { ZObj::try_from_mut_ptr(eg!(exception)) }
 }

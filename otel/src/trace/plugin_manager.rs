@@ -48,8 +48,8 @@ impl PluginManager {
                     }
 
                     if let Some(post) = callbacks.post_observe {
-                        observer.add_post_hook(Box::new(move |execute_data, span_ref, retval| unsafe {
-                            post(execute_data, span_ref, retval);
+                        observer.add_post_hook(Box::new(move |execute_data, span_ref, retval, exception| unsafe {
+                            post(execute_data, span_ref, retval, exception);
                         }));
                     }
                 }

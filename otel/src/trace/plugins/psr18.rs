@@ -11,6 +11,8 @@ use std::{
     collections::HashMap,
 };
 use phper::{
+    alloc::ToRefOwned,
+    errors::ThrowObject,
     objects::ZObj,
     values::{
         ExecuteData,
@@ -93,9 +95,16 @@ impl Psr18Handler {
         _exec_data: *mut ExecuteData,
         span_ref: &SpanRef,
         retval: &mut ZVal,
+        exception: Option<&mut ZObj>
     ) {
+        if let Some(exception) = exception {
+            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
+                span_ref.record_error(&throwable);
+            }
+        }
+
         if !retval.get_type_info().is_object() {
-            tracing::warn!("Psr18Handler: return value is not an object");
+            // no return value, nothing else to do
             return;
         }
 
