@@ -71,8 +71,26 @@ impl Psr18Handler {
         //     active yet. Should this handler create its own span??
         let exec_data_ref = &mut *exec_data;
         let request_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
-        span_details.update_name("GET");
         span_details.set_kind(SpanKind::Client);
+
+        //TODO add more SemConv attributes...
+        if let Some(request_obj) = request_zval.as_mut_z_obj() {
+            if let Ok(mut uri_zval) = request_obj.call("getUri", []) {
+                if let Some(uri_obj) = uri_zval.as_mut_z_obj() {
+                    if let Ok(uri_str_zval) = uri_obj.call("__toString", []) {
+                        if let Some(uri_str) = uri_str_zval.as_z_str().and_then(|s| s.to_str().ok()) {
+                            span_details.add_attribute(String::from(SemConv::trace::URL_FULL), uri_str.to_owned());
+                        }
+                    }
+                }
+            }
+            if let Ok(method_zval) = request_obj.call("getMethod", []) {
+                if let Some(method_str) = method_zval.as_z_str().and_then(|s| s.to_str().ok()) {
+                    span_details.add_attribute(String::from(SemConv::trace::HTTP_REQUEST_METHOD), method_str.to_owned());
+                    span_details.update_name(method_str);
+                }
+            }
+        }
 
         let mut carrier = HashMap::new();
         global::get_text_map_propagator(|prop| prop.inject_context(&Context::current(), &mut carrier));

@@ -67,6 +67,7 @@ impl FunctionObserver {
     }
 }
 
+#[derive(Debug)]
 pub struct SpanDetails {
     name: String,
     attributes: Vec<KeyValue>,

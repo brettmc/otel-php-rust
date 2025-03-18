@@ -37,7 +37,7 @@ class MockHttpClient implements ClientInterface
     }
 }
 
-$request = new Request('GET', 'http://example.com', ['x-foo' => 'bar']);
+$request = new Request('OPTIONS', 'http://example.com/resource/100', ['x-foo' => 'bar']);
 $client = new MockHttpClient();
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
@@ -62,7 +62,7 @@ Span #0
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
 
-	Name        : GET
+	Name        : OPTIONS
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
@@ -75,6 +75,8 @@ Span #0
 		 ->  code.function.name: String(Owned("MockHttpClient::sendRequest"))
 		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/psr18/psr18-inject.php"))
 		 ->  code.line.number: I64(%d)
+		 ->  url.full: String(Owned("http://example.com/resource/100"))
+		 ->  http.request.method: String(Owned("OPTIONS"))
 		 ->  http.response.status_code: I64(200)
 Span #1
 	Instrumentation Scope
