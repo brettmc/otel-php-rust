@@ -70,7 +70,7 @@ fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String], plugi
         Ok(name) => name,
         Err(_) => return false, // If the function name is not valid UTF-8, return false
     };
-    tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
+    //tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
     if functions.iter().any(|name| function_name_str == name) {
         //tracing::trace!("should_trace:: {:?} matches on function name", function_name_str);
         return true;
@@ -81,7 +81,7 @@ fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String], plugi
     //check for interfaces
     let parts: Vec<&str> = function_name_str.split("::").collect();
     if parts.len() != 2 {
-        tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
+        //tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
         return false;
     }
     let _observed_class_name = parts[0];
@@ -99,7 +99,7 @@ fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String], plugi
         }
         let interface_name = parts[0];
         let method_name = parts[1];
-        tracing::trace!("[plugin={}] interface={} method={}", plugin_name, interface_name, method_name);
+        //tracing::trace!("[plugin={}] interface={} method={}", plugin_name, interface_name, method_name);
 
         match ClassEntry::from_globals(interface_name) {
             Ok(iface_ce) => {
