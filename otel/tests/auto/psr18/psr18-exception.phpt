@@ -67,8 +67,11 @@ Span #0
 	Attributes:
 		 ->  code.function.name: String(Owned("MockHttpClient::sendRequest"))
 		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/psr18/psr18-exception.php"))
-		 ->  code.line.number: I64(%d)
+		 ->  code.line.number: I64(18)
 		 ->  url.full: String(Owned("http://example.com"))
+		 ->  url.scheme: String(Owned("http"))
+		 ->  url.path: String(Owned(""))
+		 ->  server.address: String(Owned("example.com"))
 		 ->  http.request.method: String(Owned("GET"))
 	Events:
 	Event #0

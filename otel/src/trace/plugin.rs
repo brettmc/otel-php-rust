@@ -78,8 +78,8 @@ impl SpanDetails {
     pub fn new(name: String, attributes: Vec<KeyValue>) -> Self {
         Self {name: name.clone(), attributes, kind: SpanKind::Internal }
     }
-    pub fn add_attribute(&mut self, key: String, value: String) {
-        self.attributes.push(KeyValue::new(key.clone(), value.clone()));
+    pub fn add_attribute(&mut self, kv: KeyValue) {
+        self.attributes.push(kv);
     }
     pub fn update_name(&mut self, name: &str) {
         self.name = name.to_string();

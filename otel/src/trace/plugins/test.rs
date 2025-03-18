@@ -95,7 +95,7 @@ impl Handler for DemoFunctionHandler {
 impl DemoFunctionHandler {
     unsafe extern "C" fn pre_callback(_execute_data: *mut ExecuteData, span_details: &mut SpanDetails) {
         span_details.update_name("i-was-renamed");
-        span_details.add_attribute("my-attribute".to_string(), "my-value".to_string());
+        span_details.add_attribute(KeyValue::new("my-attribute", "my-value"));
     }
 
     unsafe extern "C" fn post_callback(

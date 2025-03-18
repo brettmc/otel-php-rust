@@ -79,14 +79,30 @@ impl Psr18Handler {
                 if let Some(uri_obj) = uri_zval.as_mut_z_obj() {
                     if let Ok(uri_str_zval) = uri_obj.call("__toString", []) {
                         if let Some(uri_str) = uri_str_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                            span_details.add_attribute(String::from(SemConv::trace::URL_FULL), uri_str.to_owned());
+                            span_details.add_attribute(KeyValue::new(SemConv::trace::URL_FULL, uri_str.to_owned()));
                         }
                     }
+                    uri_obj.call("getScheme", [])
+                        .ok()
+                        .and_then(|scheme_zval| scheme_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
+                        .map(|scheme| span_details.add_attribute(KeyValue::new(SemConv::trace::URL_SCHEME, scheme)));
+                    uri_obj.call("getPath", [])
+                        .ok()
+                        .and_then(|path_zval| path_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
+                        .map(|path| span_details.add_attribute(KeyValue::new(SemConv::trace::URL_PATH, path)));
+                    uri_obj.call("getHost", [])
+                        .ok()
+                        .and_then(|host_zval| host_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
+                        .map(|host| span_details.add_attribute(KeyValue::new(SemConv::trace::SERVER_ADDRESS, host)));
+                    uri_obj.call("getPort", [])
+                        .ok()
+                        .and_then(|port_zval| port_zval.as_long())
+                        .map(|port| span_details.add_attribute(KeyValue::new(SemConv::trace::SERVER_PORT, port)));
                 }
             }
             if let Ok(method_zval) = request_obj.call("getMethod", []) {
                 if let Some(method_str) = method_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                    span_details.add_attribute(String::from(SemConv::trace::HTTP_REQUEST_METHOD), method_str.to_owned());
+                    span_details.add_attribute(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, method_str.to_owned()));
                     span_details.update_name(method_str);
                 }
             }

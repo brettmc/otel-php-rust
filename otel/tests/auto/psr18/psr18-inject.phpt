@@ -37,7 +37,7 @@ class MockHttpClient implements ClientInterface
     }
 }
 
-$request = new Request('OPTIONS', 'http://example.com/resource/100', ['x-foo' => 'bar']);
+$request = new Request('OPTIONS', 'http://example.com:8000/resource/100', ['x-foo' => 'bar']);
 $client = new MockHttpClient();
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
@@ -74,8 +74,12 @@ Span #0
 	Attributes:
 		 ->  code.function.name: String(Owned("MockHttpClient::sendRequest"))
 		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/psr18/psr18-inject.php"))
-		 ->  code.line.number: I64(%d)
-		 ->  url.full: String(Owned("http://example.com/resource/100"))
+		 ->  code.line.number: I64(15)
+		 ->  url.full: String(Owned("http://example.com:8000/resource/100"))
+		 ->  url.scheme: String(Owned("http"))
+		 ->  url.path: String(Owned("/resource/100"))
+		 ->  server.address: String(Owned("example.com"))
+		 ->  server.port: I64(8000)
 		 ->  http.request.method: String(Owned("OPTIONS"))
 		 ->  http.response.status_code: I64(200)
 Span #1
