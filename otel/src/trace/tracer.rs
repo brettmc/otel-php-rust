@@ -19,7 +19,7 @@ use crate::trace::span_builder::{
 
 pub type TracerClass = StateClass<Option<SdkTracer>>;
 
-const TRACER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\Tracer";
+const TRACER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Tracer";
 
 pub fn make_tracer_class(span_builder_class: SpanBuilderClass) -> ClassEntity<Option<SdkTracer>> {
     let mut class =

@@ -1,10 +1,13 @@
 use phper::{
+    eg,
     sys,
     strings::{ZStr},
     values::{
         ExecuteData,
+        ZVal,
     }
 };
+use phper::objects::ZObj;
 use std::{
     sync::Mutex,
 };
@@ -18,9 +21,11 @@ use crate::{
     tracer_provider,
     PluginManager
 };
-use std::collections::HashMap;
-use std::sync::{OnceLock, RwLock};
-use std::cell::RefCell;
+use std::{
+    collections::HashMap,
+    sync::{OnceLock, RwLock},
+    cell::RefCell,
+};
 use opentelemetry::{
     Context,
     ContextGuard,
@@ -42,15 +47,15 @@ thread_local! {
     static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new());
 }
 
-fn store_guard(exec_ptr: *mut sys::zend_execute_data, guard: ContextGuard) {
-    let key = exec_ptr as usize;
+fn store_guard(exec_data: *mut ExecuteData, guard: ContextGuard) {
+    let key = exec_data as *const ExecuteData as usize;
     CONTEXT_GUARD_MAP.with(|map| {
         map.borrow_mut().insert(key, guard);
     });
 }
 
-fn take_guard(exec_ptr: *mut sys::zend_execute_data) -> Option<ContextGuard> {
-    let key = exec_ptr as usize;
+fn take_guard(exec_data: *mut ExecuteData) -> Option<ContextGuard> {
+    let key = exec_data as *const ExecuteData as usize;
     CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
 }
 
@@ -64,7 +69,7 @@ pub fn init(plugin_manager: PluginManager) {
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
         let fqn = get_fqn(exec_data);
-        tracing::trace!("observer::observer_instrument: {}", fqn);
+        //tracing::trace!("observer::observer_instrument checking: {}", fqn);
         let manager_lock = PLUGIN_MANAGER.lock().unwrap();
         if let Some(plugin_manager) = manager_lock.as_ref() {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
@@ -104,43 +109,49 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
                 let mut span_details = SpanDetails::new(fqn.clone(), get_default_attributes(exec_data));
                 for hook in observer.pre_hooks() {
                     tracing::trace!("running pre hook: {}", fqn);
-                    unsafe { hook(&mut *execute_data, &mut span_details) };
+                    hook(&mut *exec_data, &mut span_details);
                 }
-                let span_name = span_details.name().clone();
-                let span_builder = tracer.span_builder(span_name);
+                let span_builder = tracer.span_builder(span_details.name());
                 let span_builder = span_builder.with_attributes(span_details.attributes());
+                let span_builder = span_builder.with_kind(span_details.kind());
                 let span = tracer.build_with_context(span_builder, &Context::current());
                 let ctx = Context::current_with_span(span);
                 let guard = ctx.attach();
-                store_guard(execute_data, guard);
+                store_guard(exec_data, guard);
             }
         }
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, _retval: *mut sys::zval) {
+pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, retval: *mut sys::zval) {
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
         let fqn = get_fqn(exec_data);
 
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&fqn) {
-            if let Some(guard) = take_guard(execute_data) {
+            if let Some(guard) = take_guard(exec_data) {
                 let context = Context::current();
                 let mut span_ref = context.span();
 
+                //TODO use Option<ZVal> ??
+                let retval = if retval.is_null() {
+                    &mut ZVal::from(())
+                } else {
+                    (retval as *mut ZVal).as_mut().unwrap()
+                };
+
                 for hook in observer.post_hooks() {
                     tracing::trace!("running post hook: {}", fqn);
-                    unsafe { hook(&mut *execute_data, &mut span_ref) };
+                    hook(&mut *exec_data, &mut span_ref, retval, get_global_exception());
                 }
                 // Dropping the guard detaches the context and finishes the span.
                 drop(guard);
             } else {
-                tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", execute_data);
+                tracing::debug!("No active opentelemetry span guard found for execute_data at: {:p}", exec_data);
             }
         }
-
     }
 }
 
@@ -186,6 +197,7 @@ fn get_default_attributes(execute_data: &mut ExecuteData) -> Vec<KeyValue> {
     attributes
 }
 
+//TODO get these through ExecuteData?
 unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     let zend_execute_data = execute_data.as_ptr();
 
@@ -222,4 +234,8 @@ unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)>
     };
 
     Some((file_name, line_number))
+}
+
+fn get_global_exception() -> Option<&'static mut ZObj> {
+    unsafe { ZObj::try_from_mut_ptr(eg!(exception)) }
 }

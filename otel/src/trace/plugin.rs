@@ -6,11 +6,16 @@ use opentelemetry::{
         SpanRef,
     },
 };
+use phper::{
+    values::{ExecuteData, ZVal},
+    objects::ZObj,
+};
 
 pub trait Plugin: Send + Sync {
     /// Determines whether this plugin is enabled. Could be based on .ini config, or custom logic.
     fn is_enabled(&self) -> bool;
     fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>>;
+    fn get_name(&self) -> &str;
 }
 
 pub trait Handler: Send + Sync {
@@ -21,12 +26,12 @@ pub trait Handler: Send + Sync {
 }
 
 pub struct HandlerCallbacks {
-    pub pre_observe: Option<unsafe extern "C" fn(*mut phper::sys::zend_execute_data, &mut SpanDetails)>,
-    pub post_observe: Option<unsafe extern "C" fn(*mut phper::sys::zend_execute_data, &SpanRef, *mut phper::sys::zval)>,
+    pub pre_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &mut SpanDetails)>,
+    pub post_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &SpanRef, &mut ZVal, Option<&mut ZObj>)>,
 }
 
-pub type ObserverPreHook = Box<dyn Fn(&mut phper::sys::zend_execute_data, &mut SpanDetails) + Send + Sync>;
-pub type ObserverPostHook = Box<dyn Fn(&mut phper::sys::zend_execute_data, &SpanRef) + Send + Sync>;
+pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData, &mut SpanDetails) + Send + Sync>;
+pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &SpanRef, &mut ZVal, Option<&mut ZObj>) + Send + Sync>;
 
 pub struct FunctionObserver {
     pre_hooks: Vec<ObserverPreHook>,
@@ -64,6 +69,7 @@ impl FunctionObserver {
     }
 }
 
+#[derive(Debug)]
 pub struct SpanDetails {
     name: String,
     attributes: Vec<KeyValue>,
@@ -74,8 +80,8 @@ impl SpanDetails {
     pub fn new(name: String, attributes: Vec<KeyValue>) -> Self {
         Self {name: name.clone(), attributes, kind: SpanKind::Internal }
     }
-    pub fn add_attribute(&mut self, key: String, value: String) {
-        self.attributes.push(KeyValue::new(key.clone(), value.clone()));
+    pub fn add_attribute(&mut self, kv: KeyValue) {
+        self.attributes.push(kv);
     }
     pub fn update_name(&mut self, name: &str) {
         self.name = name.to_string();

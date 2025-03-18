@@ -10,7 +10,6 @@ use std::{
 };
 use opentelemetry::{
     InstrumentationScope,
-    global::GlobalTracerProvider,
     KeyValue,
     trace::TracerProvider,
 };
@@ -34,9 +33,9 @@ use crate::{
 };
 use crate::get_runtime;
 
-const TRACER_PROVIDER_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\TracerProvider";
+const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";
 
-pub type TracerProviderClass = StateClass<Option<GlobalTracerProvider>>; //TODO dont need to wrap anything
+pub type TracerProviderClass = StateClass<()>;
 
 static TRACER_PROVIDERS: Lazy<Mutex<HashMap<u32, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -60,7 +59,6 @@ pub fn init_once() {
         return;
     }
     let resource = Resource::builder()
-        .with_service_name("my_service_name")
         .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
         .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
         .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
@@ -143,9 +141,9 @@ pub fn force_flush() {
     tracing::info!("no tracer provider to flush for pid {}", pid);
 }
 
-pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<Option<GlobalTracerProvider>> {
+pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<()> {
     let mut class =
-        ClassEntity::<Option<GlobalTracerProvider>>::new_with_default_state_constructor(TRACER_PROVIDER_CLASS_NAME);
+        ClassEntity::<()>::new_with_default_state_constructor(TRACER_PROVIDER_CLASS_NAME);
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())

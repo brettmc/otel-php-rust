@@ -11,7 +11,7 @@ phpinfo();
 otel
 
 version => %s
-opentelemetry-rust => %s
+%A
 
 Directive => Local Value => Master Value
 otel.log.file => %s => %s

@@ -46,6 +46,7 @@ pub mod trace{
     pub mod plugin_manager;
     pub mod plugin;
     pub mod plugins{
+        pub mod psr18;
         pub mod test;
     }
 }
@@ -54,6 +55,8 @@ pub mod request;
 pub mod observer;
 pub mod logging;
 pub mod util;
+
+include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
 static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
 
@@ -64,7 +67,9 @@ pub fn get_module() -> Module {
         env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_AUTHORS"),
     );
-    module.add_info("opentelemetry-rust", "0.28.0");
+    module.add_info("opentelemetry-rust", OPENTELEMETRY_VERSION);
+    module.add_info("phper", PHPER_VERSION);
+    module.add_info("tokio", TOKIO_VERSION);
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
 

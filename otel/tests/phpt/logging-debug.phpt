@@ -19,21 +19,23 @@ Globals::tracerProvider()
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::logging: event src/logging.rs:%d message=Logging::initialized level=debug path=/dev/stdout
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:38 message=span exporter=batch
-[%s] [INFO] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RINIT::initializing
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RINIT::sapi module name is: cli
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RINIT::not auto-creating root span...
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::trace::span_builder: event src/trace/span_builder.rs:%d message=SpanBuilder::Starting span
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::maybe closing root span...
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=MSHUTDOWN::Shutting down OpenTelemetry exporter...
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToShutdown message= name=BatchSpanProcessor.ExportingDueToShutdown
+[%s] [DEBUG] [%s] [ThreadId(%d)] PluginManager::init
+[%s] [DEBUG] [%s] [ThreadId(%d)] registered fcall handlers
+[%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::RINIT
+%A
+[%s] [INFO] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048
+%A
+[%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::RSHUTDOWN
+[%s] [DEBUG] [%s] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::maybe closing root span...
+[%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::MSHUTDOWN
+[%s] [INFO] [%s] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=Flushing TracerProvider for pid %d
+[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToForceFlush message= name=BatchSpanProcessor.ExportingDueToForceFlush
 Spans
 Resource
 %A
 Span #0
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadExiting message= name=BatchSpanProcessor.ThreadExiting reason=ShutdownRequested
-[%s] [INFO] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStopped message= name=BatchSpanProcessor.ThreadStopped
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=MSHUTDOWN::OpenTelemetry tracer provider shutdown success
+[%s] [DEBUG] [%s] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=OpenTelemetry tracer provider flush success
+[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToShutdown message= name=BatchSpanProcessor.ExportingDueToShutdown
+[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadExiting message= name=BatchSpanProcessor.ThreadExiting reason=ShutdownRequested
+[%s] [INFO] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStopped message= name=BatchSpanProcessor.ThreadStopped

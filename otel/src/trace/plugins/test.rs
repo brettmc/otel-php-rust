@@ -4,6 +4,10 @@ use opentelemetry::{
     trace::SpanRef,
 };
 use std::sync::Arc;
+use phper::{
+    values::{ExecuteData, ZVal},
+    objects::ZObj,
+};
 
 pub struct TestPlugin {
     handlers: Vec<Arc<dyn Handler + Send + Sync>>,
@@ -26,6 +30,9 @@ impl Plugin for TestPlugin {
     }
     fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>> {
         self.handlers.clone()
+    }
+    fn get_name(&self) -> &str {
+        "test"
     }
 }
 
@@ -54,14 +61,15 @@ impl Handler for DemoHandler {
 }
 
 impl DemoHandler {
-    unsafe extern "C" fn pre_callback(_execute_data: *mut phper::sys::zend_execute_data, _span_details: &mut SpanDetails) {
+    unsafe extern "C" fn pre_callback(_exec_data: *mut ExecuteData, _span_details: &mut SpanDetails) {
         //println!("DemoHandler::pre_callback");
     }
 
     unsafe extern "C" fn post_callback(
-        _execute_data: *mut phper::sys::zend_execute_data,
+        _exec_data: *mut ExecuteData,
         _span_ref: &SpanRef,
-        _retval: *mut phper::sys::zval,
+        _retval: &mut ZVal,
+        _exception: Option<&mut ZObj>
     ) {
         //println!("DemoHandler::post_callback");
     }
@@ -87,15 +95,16 @@ impl Handler for DemoFunctionHandler {
 }
 
 impl DemoFunctionHandler {
-    unsafe extern "C" fn pre_callback(_execute_data: *mut phper::sys::zend_execute_data, span_details: &mut SpanDetails) {
+    unsafe extern "C" fn pre_callback(_execute_data: *mut ExecuteData, span_details: &mut SpanDetails) {
         span_details.update_name("i-was-renamed");
-        span_details.add_attribute("my-attribute".to_string(), "my-value".to_string());
+        span_details.add_attribute(KeyValue::new("my-attribute", "my-value"));
     }
 
     unsafe extern "C" fn post_callback(
-        _execute_data: *mut phper::sys::zend_execute_data,
+        _execute_data: *mut ExecuteData,
         span_ref: &SpanRef,
-        _retval: *mut phper::sys::zval,
+        _retval: &mut ZVal,
+        _exception: Option<&mut ZObj>
     ) {
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
     }

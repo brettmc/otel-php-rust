@@ -37,18 +37,26 @@ pub fn init() {
         tracing::debug!("RINIT::not auto-creating root span...");
         return;
     }
-    let span_name = match get_request_method() {
-        Some(method) => format!("HTTP {}", method),
-        None => "HTTP".to_string(),
+    let request_details = get_request_details();
+    let span_name = match &request_details.method {
+        Some(method) => format!("{}", method),
+        None => "<unknown>".to_string(),
     };
     tracing::debug!("RINIT::otel request is being traced, name={}", span_name.clone());
     let tracer_provider = tracer_provider::get_tracer_provider();
     let scope = InstrumentationScope::builder("php_request").build();
     let tracer = tracer_provider.tracer_with_scope(scope);
-    let mut span_builder = tracer.span_builder(span_name);
+    let span_builder = tracer.span_builder(span_name);
+    let mut attributes = span_builder.attributes.clone().unwrap_or_default();
+    attributes.push(KeyValue::new("php.sapi.name", get_sapi_module_name()));
+    attributes.push(KeyValue::new(SemConv::trace::URL_FULL, request_details.uri.unwrap_or_default()));
+    attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, request_details.method.unwrap_or_default()));
+    //attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_BODY_SIZE, request_details.body_length.unwrap_or_default()));
+    // TODO set other span attributes from request
+
+    let mut span_builder = span_builder.clone().with_attributes(attributes);
     span_builder.span_kind = Some(SpanKind::Server);
     let parent_context = get_propagated_context();
-    // TODO set other span attributes from request
     let span = tracer.build_with_context(span_builder, &parent_context);
     let ctx = Context::current_with_span(span);
     let guard = ctx.attach();
@@ -76,17 +84,30 @@ fn get_sapi_module_name() -> String {
     unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
 }
 
-fn get_request_method() -> Option<String> {
+fn get_request_details() -> RequestDetails {
     unsafe {
         let request_info = sg!(request_info);
-        let method_ptr = request_info.request_method;
-
-        if !method_ptr.is_null() {
-            Some(std::ffi::CStr::from_ptr(method_ptr).to_string_lossy().into_owned())
-        } else {
-            None
+        RequestDetails {
+            method: Some(request_info.request_method)
+                .filter(|ptr| !ptr.is_null())
+                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
+            uri: Some(request_info.request_uri)
+                .filter(|ptr| !ptr.is_null())
+                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
+            body_length: request_info.content_length as u64,
+            content_type: Some(request_info.content_type)
+                .filter(|ptr| !ptr.is_null())
+                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
         }
     }
+}
+
+#[allow(dead_code)]
+struct RequestDetails {
+    method: Option<String>,
+    uri: Option<String>,
+    body_length: u64,
+    content_type: Option<String>,
 }
 
 // @see https://github.com/apache/skywalking-php/blob/v0.8.0/src/request.rs#L152

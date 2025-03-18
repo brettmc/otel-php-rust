@@ -35,7 +35,7 @@ Resource
 Span #0
 	Instrumentation Scope
 %A
-	Name        : HTTP GET
+	Name        : GET
 	TraceId     : e77388f01a826e2de7afdcd1eefc034e
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
@@ -44,4 +44,8 @@ Span #0
 	Start time: %s
 	End time: %s
 	Status: Unset
+	Attributes:
+		 ->  php.sapi.name: String(Owned("cli-server"))
+		 ->  url.full: String(Owned("/"))
+		 ->  http.request.method: String(Owned("GET"))
 [%s] %s Closing

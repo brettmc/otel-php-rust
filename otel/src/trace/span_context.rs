@@ -12,7 +12,7 @@ use opentelemetry::trace::{
     TraceId,
 };
 
-const SPAN_CONTEXT_CLASS_NAME: &str = "OpenTelemetry\\API\\Trace\\SpanContext";
+const SPAN_CONTEXT_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\SpanContext";
 
 pub type SpanContextClass = StateClass<Option<SpanContext>>;
 
