@@ -23,7 +23,7 @@ pub struct MySpanBuilder {
     span_builder: Option<SpanBuilder>,
     tracer: Option<SdkTracer>,
 }
-/// @see https://github.com/open-telemetry/opentelemetry-rust/issues/2742
+// @see https://github.com/open-telemetry/opentelemetry-rust/issues/2742
 impl MySpanBuilder {
     pub fn new(span_builder: SpanBuilder, tracer: SdkTracer) -> Self {
         Self { span_builder: Some(span_builder), tracer: Some(tracer)}

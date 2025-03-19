@@ -10,7 +10,7 @@ use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
-$span->setStatus(StatusCode::ERROR, 'kaboom')->end();
+$span->setStatus(StatusCode::STATUS_ERROR, 'kaboom')->end();
 ?>
 --EXPECTF--
 Spans

@@ -1,15 +1,12 @@
 use phper::{
     eg,
+    objects::ZObj,
     sys,
     strings::{ZStr},
     values::{
         ExecuteData,
         ZVal,
     }
-};
-use phper::objects::ZObj;
-use std::{
-    sync::Mutex,
 };
 use lazy_static::lazy_static;
 use crate::{
@@ -23,7 +20,7 @@ use crate::{
 };
 use std::{
     collections::HashMap,
-    sync::{OnceLock, RwLock},
+    sync::{OnceLock, RwLock, Mutex},
     cell::RefCell,
 };
 use opentelemetry::{

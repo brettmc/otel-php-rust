@@ -14,8 +14,8 @@ use chrono::Utc;
 static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
 static LOGGER_PIDS: LazyLock<Mutex<HashMap<u32, ()>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Initialize logging subscriber if it's not already running for this PID for SAPIs that
-/// spawn worker processes
+/// Initialize logging subscriber if it's not already running for this PID (for SAPIs that
+/// spawn worker processes)
 pub fn init_once() {
     print_message("logging::init_once".to_string());
     let pid = process::id();

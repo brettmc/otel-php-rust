@@ -1,6 +1,7 @@
-use phper::values::ZVal;
-use phper::arrays::IterKey;
-use phper::arrays::ZArray;
+use phper::{
+    arrays::{IterKey, ZArray},
+    values::ZVal,
+};
 use opentelemetry::{
     Array,
     KeyValue,

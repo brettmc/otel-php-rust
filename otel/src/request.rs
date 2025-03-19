@@ -7,8 +7,11 @@ use phper::{
     arrays::{IterKey, ZArr},
     values::ZVal,
 };
-use std::cell::RefCell;
-use std::ffi::CStr;
+use std::{
+    cell::RefCell,
+    ffi::CStr,
+    collections::HashMap,
+};
 use opentelemetry::{
     Context,
     InstrumentationScope,
@@ -17,7 +20,6 @@ use opentelemetry::{
     trace::{SpanKind, Tracer, TraceContextExt, TracerProvider},
 };
 use opentelemetry_semantic_conventions as SemConv;
-use std::collections::HashMap;
 use crate::trace::tracer_provider;
 
 thread_local! {

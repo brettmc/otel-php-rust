@@ -154,8 +154,8 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<()> 
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
 
         let version = arguments.get(1)
-            .and_then(|arg| arg.as_z_str()) // Check if it's a string
-            .map(|s| s.to_str().ok().map(|s| s.to_string())) // Convert to Rust String
+            .and_then(|arg| arg.as_z_str())
+            .map(|s| s.to_str().ok().map(|s| s.to_string()))
             .flatten();
 
         let schema_url = arguments.get(2)
