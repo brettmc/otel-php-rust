@@ -11,7 +11,7 @@ function run_server(string $file, array $options): void {
     $cmd = sprintf(
         '%s php %s -S %s:%d -t %s %s > %s 2>&1 & echo $!',
         'OTEL_TRACES_EXPORTER=console OTEL_SPAN_PROCESSOR=simple',
-        '-d extension=otel.so',
+        '-d extension=otel.so', //-d otel.log.level=debug
         $host,
         $port,
         escapeshellarg($docRoot),
