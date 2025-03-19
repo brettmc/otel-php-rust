@@ -33,11 +33,11 @@ use crate::{
 
 const SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Span";
 
-// The span related to a class instance is either stored as a class entity (SdkSpan) if the span has been
+// The span related to a class instance is stored as a class entity (SdkSpan) if the span has been
 // started but not activated. Once it has been activated, the class entity is set to None, and the context
 // is stored in CONTEXT_STORAGE, and a reference to the context created and stored as a class property.
 // Each method that operates on the span needs to check for SdkSpan then stored context, and then operate on
-// either the SdkSpan or context.span()
+// the appropriate one.
 thread_local! {
     static CONTEXT_STORAGE: RefCell<HashMap<u64, Context>> = RefCell::new(HashMap::new());
 }

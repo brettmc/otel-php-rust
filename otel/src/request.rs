@@ -67,7 +67,12 @@ pub fn init() {
 }
 
 pub fn shutdown() {
-    tracing::debug!("RSHUTDOWN::maybe closing root span...");
+    let sapi = get_sapi_module_name();
+    if sapi == "cli" {
+        tracing::debug!("RSHUTDOWN::not auto-closing root span...");
+        return;
+    }
+    tracing::debug!("RSHUTDOWN::auto-closing root span...");
     let response_code = get_response_status_code();
     let ctx = Context::current();
     let span = ctx.span();

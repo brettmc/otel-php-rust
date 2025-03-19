@@ -185,18 +185,5 @@ pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<()> 
         Ok::<_, phper::Error>(object)
     });
 
-    class.add_method("forceFlush", Visibility::Public, move |_, _| {
-        let provider = get_tracer_provider();
-        tracing::debug!("tracer_provider::force_flush");
-        let result = match provider.force_flush() {
-            Ok(_) => true,
-            Err(err) => {
-                tracing::warn!("force_flush failed: {}", err);
-                false
-            },
-        };
-        Ok::<_, phper::Error>(result)
-    });
-
     class
 }

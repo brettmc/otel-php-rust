@@ -26,7 +26,7 @@ Globals::tracerProvider()
 [%s] [INFO] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048
 %A
 [%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::RSHUTDOWN
-[%s] [DEBUG] [%s] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::maybe closing root span...
+[%s] [DEBUG] [%s] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::not auto-closing root span...
 [%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::MSHUTDOWN
 [%s] [INFO] [%s] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=Flushing TracerProvider for pid %d
 [%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToForceFlush message= name=BatchSpanProcessor.ExportingDueToForceFlush

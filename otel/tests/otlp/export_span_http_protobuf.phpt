@@ -9,13 +9,14 @@ OTEL_EXPORTER_OTLP_TIMEOUT=1500
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\StatusCode;
 
 Globals::tracerProvider()
     ->getTracer('my_tracer')
     ->spanBuilder('root')
     ->setAttribute('exporter', 'http/protobuf')
     ->startSpan()
-    ->setStatus('Error', 'kaboom')
+    ->setStatus(StatusCode::ERROR, 'kaboom')
     ->end();
 var_dump('done');
 ?>

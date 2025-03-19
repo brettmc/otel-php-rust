@@ -7,9 +7,10 @@ OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\StatusCode;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
-$span->setStatus('Error', 'kaboom')->end();
+$span->setStatus(StatusCode::ERROR, 'kaboom')->end();
 ?>
 --EXPECTF--
 Spans

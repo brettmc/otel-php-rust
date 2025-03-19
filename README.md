@@ -51,10 +51,10 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc), but has only 
 http + grpc exporter works. Creates root span on RINIT.
 
 ### `apache2handler`
-http/protobuf + grpc exporters work.
+As above
 
 ### `cgi-fcgi`
-Same as apache2handler
+As above
 
 ## What works?
 
@@ -82,23 +82,16 @@ $span
 
 ## What doesn't work or isn't implemented? (todo list)
 
-### Tracers
-
-Tracers are re-fetched all over the shop from tracer_provider.rs
-
-### SpanBuilder
-* doesn't keep a reference to the tracer, and instead fetches a new tracer each time (losing any InstrumentationScope)
-
-### StatusCode
-* not implemented. PR accepted in `phper` to allow adding consts to classes & interfaces to enable this.
+### Type-hints
+* phper only supports basic type-hints (`int`, `object`, etc), not class entries or unions. TODO: add to upstream
 
 ## The future
 
 Depending on what we can get to work, or not, this extension could go in a number of directions.
 
 1. An implementation of the opentelemetry-php API, backed by opentelemetry-rust API+SDK
-2. Do not expose any classes, and use opentelemetry-rust to support only auto-instrumentation
-a-la [SkyWalking](https://github.com/apache/skywalking-php/), [Compass](https://github.com/skpr/compass/).
+2. Use opentelemetry-rust to support only auto-instrumentation a-la [SkyWalking](https://github.com/apache/skywalking-php/),
+[Compass](https://github.com/skpr/compass/).
 3. Implement an entirely new API, closer to opentelemetry-rust's (ie, don't try to match opentelemetry-php)
 4. Some combination of the above (probably 1+2 or 2+3)
 5. Abandon ship, chalk it up to experience
