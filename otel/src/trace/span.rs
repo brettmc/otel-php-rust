@@ -248,6 +248,7 @@ pub fn make_span_class(
             Ok::<_, phper::Error>(object)
         });
     
+    //TODO move this to LocalRootSpan::current() to match opentelemetry-php ?
     class
         .add_static_method("getLocalRoot", Visibility::Public, move |_| {
             if let Some(ctx) = get_local_root_span() {
