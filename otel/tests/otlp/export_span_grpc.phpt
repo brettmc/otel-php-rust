@@ -18,7 +18,7 @@ Globals::tracerProvider()
     ->spanBuilder('root')
     ->setAttribute('exporter', 'grpc')
     ->startSpan()
-    ->setStatus(StatusCode::ERROR, 'kaboom')
+    ->setStatus(StatusCode::STATUS_ERROR, 'kaboom')
     ->end();
 var_dump('done');
 ?>

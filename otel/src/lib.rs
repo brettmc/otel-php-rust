@@ -110,7 +110,7 @@ pub fn get_module() -> Module {
         }
 
         tracer_provider::init_once();
-        global::set_text_map_propagator(TraceContextPropagator::new()); //TODO could this be lazy-loaded?
+        global::set_text_map_propagator(TraceContextPropagator::new());
 
         request::init();
     });
