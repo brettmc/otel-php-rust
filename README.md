@@ -90,8 +90,8 @@ $span
 Depending on what we can get to work, or not, this extension could go in a number of directions.
 
 1. An implementation of the opentelemetry-php API, backed by opentelemetry-rust API+SDK
-2. Do not expose any classes, and use opentelemetry-rust to support only auto-instrumentation
-a-la [SkyWalking](https://github.com/apache/skywalking-php/), [Compass](https://github.com/skpr/compass/).
+2. Use opentelemetry-rust to support only auto-instrumentation a-la [SkyWalking](https://github.com/apache/skywalking-php/),
+[Compass](https://github.com/skpr/compass/).
 3. Implement an entirely new API, closer to opentelemetry-rust's (ie, don't try to match opentelemetry-php)
 4. Some combination of the above (probably 1+2 or 2+3)
 5. Abandon ship, chalk it up to experience
