@@ -1,6 +1,7 @@
 use phper::{
     classes::{ClassEntity, StateClass, Visibility},
     alloc::ToRefOwned,
+    functions::Argument,
 };
 use std::{
     convert::Infallible,
@@ -22,6 +23,7 @@ pub struct MySpanBuilder {
     span_builder: Option<SpanBuilder>,
     tracer: Option<SdkTracer>,
 }
+/// @see https://github.com/open-telemetry/opentelemetry-rust/issues/2742
 impl MySpanBuilder {
     pub fn new(span_builder: SpanBuilder, tracer: SdkTracer) -> Self {
         Self { span_builder: Some(span_builder), tracer: Some(tracer)}
@@ -60,7 +62,9 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<MySpanBuild
         state.span_builder = Some(new_span_builder);
 
         Ok::<_, phper::Error>(this.to_ref_owned())
-    });
+    })
+    .argument(Argument::by_val("key"))
+    .argument(Argument::by_val_optional("value"));
 
     class
         .add_method("startSpan", Visibility::Public, move |this, _| {

@@ -51,10 +51,10 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc), but has only 
 http + grpc exporter works. Creates root span on RINIT.
 
 ### `apache2handler`
-http/protobuf + grpc exporters work.
+As above
 
 ### `cgi-fcgi`
-Same as apache2handler
+As above
 
 ## What works?
 
@@ -82,15 +82,8 @@ $span
 
 ## What doesn't work or isn't implemented? (todo list)
 
-### Tracers
-
-Tracers are re-fetched all over the shop from tracer_provider.rs
-
-### SpanBuilder
-* doesn't keep a reference to the tracer, and instead fetches a new tracer each time (losing any InstrumentationScope)
-
-### StatusCode
-* not implemented. PR accepted in `phper` to allow adding consts to classes & interfaces to enable this.
+### Type-hints
+* phper only supports basic type-hints (`int`, `object`, etc), not class entries or unions. TODO: add to upstream
 
 ## The future
 
