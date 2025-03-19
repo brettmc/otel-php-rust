@@ -20,7 +20,7 @@ use opentelemetry::{
     trace::{SpanKind, Tracer, TraceContextExt, TracerProvider},
 };
 use opentelemetry_semantic_conventions as SemConv;
-use crate::trace::tracer_provider;
+use crate::trace::{span, tracer_provider};
 
 thread_local! {
     static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = RefCell::new(None);
@@ -59,8 +59,12 @@ pub fn init() {
     let mut span_builder = span_builder.clone().with_attributes(attributes);
     span_builder.span_kind = Some(SpanKind::Server);
     let parent_context = get_propagated_context();
+    let is_local_root = !Context::current().span().span_context().is_valid();
     let span = tracer.build_with_context(span_builder, &parent_context);
     let ctx = Context::current_with_span(span);
+    if is_local_root {
+        span::store_local_root_span(ctx.clone());
+    }
     let guard = ctx.attach();
 
     OTEL_REQUEST_GUARD.with(|slot| {
@@ -80,6 +84,7 @@ pub fn shutdown() {
     let span = ctx.span();
     if span.span_context().is_valid() {
         span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
+        span.end();
     }
 
     OTEL_REQUEST_GUARD.with(|slot| {

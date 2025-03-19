@@ -40,6 +40,7 @@ const SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Span";
 // the appropriate one.
 thread_local! {
     static CONTEXT_STORAGE: RefCell<HashMap<u64, Context>> = RefCell::new(HashMap::new());
+    static LOCAL_ROOT_SPAN: RefCell<Option<Context>> = RefCell::new(None);
 }
 static INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -52,6 +53,7 @@ pub fn make_span_class(
     let mut class =
         ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
     let span_class = class.bind_class();
+    let span_class_clone = span_class.clone();
 
     class.add_property("context_id", Visibility::Private, 0i64);
 
@@ -245,11 +247,33 @@ pub fn make_span_class(
 
             Ok::<_, phper::Error>(object)
         });
+    
+        class
+        .add_static_method("getLocalRoot", Visibility::Public, move |_| {
+            if let Some(ctx) = get_local_root_span() {
+                let instance_id = new_instance_id();
+                CONTEXT_STORAGE.with(|storage| {
+                    storage.borrow_mut().insert(instance_id, ctx.clone());
+                });
+                let mut object = span_class_clone.clone().init_object()?;
+                *object.as_mut_state() = None;
+                object.set_property("context_id", instance_id as i64);
+                Ok::<_, phper::Error>(object)
+            } else {
+                return Err(phper::Error::boxed("No local root span"))
+            }
+
+        });
 
     class
         .add_method("activate", Visibility::Public, move |this, _arguments| {
             let span = this.as_mut_state().take().expect("No span stored!");
+            let is_local_root = !Context::current().span().span_context().is_valid();
             let ctx = Context::current_with_span(span);
+            if is_local_root {
+                store_local_root_span(ctx.clone());
+            }
+            
             let instance_id = new_instance_id();
             CONTEXT_STORAGE.with(|storage| storage.borrow_mut().insert(instance_id, ctx.clone()));
             this.set_property("context_id", instance_id as i64);
@@ -262,6 +286,14 @@ pub fn make_span_class(
         });
 
     class
+}
+
+pub fn store_local_root_span(context: Context) {
+    LOCAL_ROOT_SPAN.with(|storage| *storage.borrow_mut() = Some(context.clone()));
+}
+
+pub fn get_local_root_span() -> Option<Context> {
+    LOCAL_ROOT_SPAN.with(|storage| storage.borrow().clone())
 }
 
 pub fn get_context_instance(instance_id: u64) -> Option<Context> {

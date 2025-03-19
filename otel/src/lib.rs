@@ -3,6 +3,7 @@ use crate::{
         context::{make_context_class},
     },
     trace::{
+        local_root_span::{make_local_root_span_class},
         plugin_manager::PluginManager,
         scope::{make_scope_class},
         span::{make_span_class},
@@ -36,6 +37,7 @@ pub mod context{
     pub mod context;
 }
 pub mod trace{
+    pub mod local_root_span;
     pub mod scope;
     pub mod span;
     pub mod span_builder;
@@ -78,6 +80,7 @@ pub fn get_module() -> Module {
     let _context_class = module.add_class(make_context_class());
     let span_class = module.add_class(make_span_class(scope_class.clone(), span_context_class.clone()));
     let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
+    let _local_root_span_class = module.add_class(make_local_root_span_class(span_class.clone()));
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone()));
     let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone()));
