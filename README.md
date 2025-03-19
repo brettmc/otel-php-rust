@@ -40,6 +40,15 @@ Tests are organised as:
 
 For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
+### Debugging
+
+There's a bunch of logging from the extension and the underlying opentelemetry-rust and dependencies. It's configurable via `.ini`:
+
+`otel.log.level` -> `error` (default), `warn`, `info`, `debug` or `trace`
+`otel.log.file` -> `/dev/stderr` (default), or another file/location of your choosing
+
+If you really want to see what's going on, set the log level to `trace` and you'll get a lot of logs.
+
 ## SAPI support
 
 ### `cli`
@@ -66,7 +75,9 @@ As above
 * Spans export to stdout, otlp (grpc + http/protobuf)
 * Batch and Simple span processors
 * Get SpanContext from a Span
+* Access "local root span"
 
+Basic usage:
 ```php
 $provider = \OpenTelemetry\API\Globals::tracerProvider();
 $tracer = $provider->getTracer('name', '0.1' /*other params*/);
@@ -78,6 +89,19 @@ var_dump($span->getContext()->getTraceId());
 $span
     ->setStatus('Ok')
     ->end();
+```
+
+Some more advanced stuff:
+```php
+$tracer = \OpenTelemetry\API\Globals::tracerProvider()->getTracer('my-tracer');
+$root = $tracer->spanBuilder('root')->startSpan();
+$scope = $root->activate();
+
+//somewhere else in code
+\OpenTelemetry\API\Trace\Span::getLocalRoot()->updateName('updated');
+
+$root->end();
+$scope->detach();
 ```
 
 ## What doesn't work or isn't implemented? (todo list)
