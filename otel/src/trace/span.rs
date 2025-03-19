@@ -248,7 +248,7 @@ pub fn make_span_class(
             Ok::<_, phper::Error>(object)
         });
     
-        class
+    class
         .add_static_method("getLocalRoot", Visibility::Public, move |_| {
             if let Some(ctx) = get_local_root_span() {
                 let instance_id = new_instance_id();
