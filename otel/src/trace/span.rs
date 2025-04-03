@@ -9,9 +9,7 @@ use phper::{
 use std::{
     borrow::Cow,
     cell::RefCell,
-    collections::HashMap,
     convert::Infallible,
-    sync::atomic::{AtomicU64, Ordering},
 };
 use opentelemetry::{
     Context,
@@ -24,9 +22,12 @@ use opentelemetry::{
 };
 use opentelemetry_sdk::trace::Span as SdkSpan;
 use crate::{
+    context::{
+        scope::ScopeClass,
+        context::{get_context_instance, store_context_instance},
+    },
     trace::{
         span_context::SpanContextClass,
-        scope::ScopeClass,
     },
     util,
 };
@@ -39,11 +40,8 @@ const SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Span";
 // Each method that operates on the span needs to check for SdkSpan then stored context, and then operate on
 // the appropriate one.
 thread_local! {
-    static CONTEXT_STORAGE: RefCell<HashMap<u64, Context>> = RefCell::new(HashMap::new());
     static LOCAL_ROOT_SPAN: RefCell<Option<Context>> = RefCell::new(None);
 }
-static INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
-
 pub type SpanClass = StateClass<Option<SdkSpan>>;
 
 pub fn make_span_class(
@@ -237,10 +235,7 @@ pub fn make_span_class(
     class
         .add_static_method("getCurrent", Visibility::Public, move |_| {
             let ctx = Context::current();
-            let instance_id = new_instance_id();
-            CONTEXT_STORAGE.with(|storage| {
-                storage.borrow_mut().insert(instance_id, ctx.clone());
-            });
+            let instance_id = store_context_instance(ctx.clone());
             let mut object = span_class.clone().init_object()?;
             *object.as_mut_state() = None;
             object.set_property("context_id", instance_id as i64);
@@ -252,10 +247,7 @@ pub fn make_span_class(
     class
         .add_static_method("getLocalRoot", Visibility::Public, move |_| {
             if let Some(ctx) = get_local_root_span() {
-                let instance_id = new_instance_id();
-                CONTEXT_STORAGE.with(|storage| {
-                    storage.borrow_mut().insert(instance_id, ctx.clone());
-                });
+                let instance_id = store_context_instance(ctx.clone());
                 let mut object = span_class_clone.clone().init_object()?;
                 *object.as_mut_state() = None;
                 object.set_property("context_id", instance_id as i64);
@@ -274,9 +266,8 @@ pub fn make_span_class(
             if is_local_root {
                 store_local_root_span(ctx.clone());
             }
-            
-            let instance_id = new_instance_id();
-            CONTEXT_STORAGE.with(|storage| storage.borrow_mut().insert(instance_id, ctx.clone()));
+
+            let instance_id = store_context_instance(ctx.clone());
             this.set_property("context_id", instance_id as i64);
 
             let guard = ctx.attach();
@@ -295,16 +286,4 @@ pub fn store_local_root_span(context: Context) {
 
 pub fn get_local_root_span() -> Option<Context> {
     LOCAL_ROOT_SPAN.with(|storage| storage.borrow().clone())
-}
-
-pub fn get_context_instance(instance_id: u64) -> Option<Context> {
-    if instance_id == 0 {
-        None
-    } else {
-        CONTEXT_STORAGE.with(|storage| storage.borrow().get(&instance_id).cloned())
-    }
-}
-
-pub fn new_instance_id() -> u64 {
-    INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
