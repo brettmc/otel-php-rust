@@ -57,6 +57,8 @@ pub fn make_context_class(
         ClassEntity::<Option<Context>>::new_with_default_state_constructor(CONTEXT_CLASS_NAME);
     let context_class = class.bind_class();
 
+    class.add_property("context_id", Visibility::Private, 0i64);
+
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });
