@@ -25,7 +25,7 @@ use crate::{
     context::{
         context::ContextClass,
         scope::ScopeClass,
-        storage::{attach_context, get_context_instance, store_context_instance, StorageClass},
+        storage::{attach_context, get_context_instance, store_context_instance},
     },
     trace::{
         span_context::SpanContextClass,
@@ -49,7 +49,6 @@ pub fn make_span_class(
     scope_class: ScopeClass,
     span_context_class: SpanContextClass,
     context_class: ContextClass,
-    storage_class: StorageClass,
 ) -> ClassEntity<Option<SdkSpan>> {
     let mut class =
         ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
@@ -266,7 +265,6 @@ pub fn make_span_class(
 
     class
         .add_method("activate", Visibility::Public, {
-            let _storage_ce = storage_class.clone();
             let scope_ce = scope_class.clone();
             move |this, _arguments| {
                 let span = this.as_mut_state().take().expect("No span stored!");

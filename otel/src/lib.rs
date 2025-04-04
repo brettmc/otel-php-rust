@@ -86,9 +86,9 @@ pub fn get_module() -> Module {
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(scope_class_entity);
     let context_class = module.add_class(context_class_entity);
-    let storage_class = module.add_class(storage_class_entity);
+    let _storage_class = module.add_class(storage_class_entity);
 
-    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone(), context_class.clone(), storage_class.clone()));
+    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone(), context_class.clone()));
     let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone()));

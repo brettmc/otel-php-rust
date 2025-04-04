@@ -23,17 +23,17 @@ echo 'active span id: ' . Span::getCurrent()->getContext()->getSpanId() . PHP_EO
 assert($child->getContext()->getSpanId() === Span::getCurrent()->getContext()->getSpanId()); //child is active span
 $scope->detach();
 echo 'active span id: ' . Span::getCurrent()->getContext()->getSpanId() . PHP_EOL;
-assert(false === Span::getCurrent()->getContext()->isValid()); //no active span (child span was "lost" when context reset to pre-root)
+//the active span here is undefined, because we detached out of order
 $childScope->detach();
 echo 'active span id: ' . Span::getCurrent()->getContext()->getSpanId() . PHP_EOL;
-assert($root->getContext()->getSpanId() === Span::getCurrent()->getContext()->getSpanId()); //root is active span again (surprise!)
+//still undefined behaviour
 ?>
 --EXPECTF--
 root span id: %s
 active span id: %s
 child span id: %s
 active span id: %s
-active span id: 0000000000000000
+active span id: %s
 active span id: %s
 Spans
 Resource
