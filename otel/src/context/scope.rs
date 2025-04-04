@@ -1,6 +1,7 @@
 use crate::context::{
     context::ContextClassEntity,
     storage::{
+        detach_context,
         get_context_instance,
     }
 };
@@ -40,8 +41,8 @@ pub fn build_scope_class(
     });
 
     class
-        .add_method("detach", Visibility::Public, |this, _| -> phper::Result<()> {
-            let _ = this.as_mut_state().take();
+        .add_method("detach", Visibility::Public, |_, _| -> phper::Result<()> {
+            detach_context();
             Ok(())
         });
 
