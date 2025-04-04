@@ -1,4 +1,4 @@
-use crate::context::scope::ScopeClass;
+use crate::context::scope::ScopeClassEntity;
 use phper::{
     alloc::ToRefOwned,
     classes::{ClassEntity, StateClass, Visibility},
@@ -18,6 +18,7 @@ use opentelemetry::{
 
 const CONTEXT_CLASS_NAME: &str = r"OpenTelemetry\Context\Context";
 pub type ContextClass = StateClass<Option<Context>>;
+pub type ContextClassEntity = ClassEntity<Option<Context>>;
 
 // When a Context is activated, it is stored in CONTEXT_STORAGE, and a reference to the
 // context created and stored as a class property.
@@ -50,12 +51,16 @@ fn new_instance_id() -> u64 {
 #[derive(Debug)]
 struct Test(String);
 
-pub fn make_context_class(
-    scope_class: ScopeClass,
-) -> ClassEntity<Option<Context>> {
-    let mut class =
-        ClassEntity::<Option<Context>>::new_with_default_state_constructor(CONTEXT_CLASS_NAME);
-    let context_class = class.bind_class();
+pub fn new_context_class() -> ContextClassEntity {
+    ClassEntity::<Option<Context>>::new_with_default_state_constructor(CONTEXT_CLASS_NAME)
+}
+
+pub fn build_context_class(
+    class: &mut ContextClassEntity,
+    scope_class: &ScopeClassEntity,
+) {
+    let context_class = class.bound_class();
+    let scope_ce = scope_class.bound_class();
 
     class.add_property("context_id", Visibility::Private, 0i64);
 
@@ -81,8 +86,8 @@ pub fn make_context_class(
         *context = new;
         Ok::<_, phper::Error>(this.to_ref_owned())
     })
-        .argument(Argument::by_val("key"))
-        .argument(Argument::by_val("value"));
+        .argument(Argument::new("key"))
+        .argument(Argument::new("value"));
 
     class.add_method("get", Visibility::Public, |this, _arguments| -> phper::Result<ZVal> {
         let context: &mut Context = this.as_mut_state().as_mut().unwrap();
@@ -92,7 +97,7 @@ pub fn make_context_class(
             None => Ok(ZVal::default()),
         }
     })
-        .argument(Argument::by_val("key"));
+        .argument(Argument::new("key"));
 
     class.add_method("activate", Visibility::Public, move |this, _arguments| {
         let ctx = this.as_mut_state().take().expect("No context stored!");
@@ -103,10 +108,9 @@ pub fn make_context_class(
 
         let guard = ctx.attach();
 
-        let mut object = scope_class.init_object()?;
+        let mut object = scope_ce.init_object()?;
         *object.as_mut_state() = Some(guard);
+        object.set_property("context_id", instance_id as i64);
         Ok::<_, phper::Error>(object)
     });
-
-    class
 }

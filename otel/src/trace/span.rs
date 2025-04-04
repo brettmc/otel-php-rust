@@ -50,7 +50,7 @@ pub fn make_span_class(
 ) -> ClassEntity<Option<SdkSpan>> {
     let mut class =
         ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
-    let span_class = class.bind_class();
+    let span_class = class.bound_class();
     let span_class_clone = span_class.clone();
 
     class.add_property("context_id", Visibility::Private, 0i64);
@@ -106,8 +106,8 @@ pub fn make_span_class(
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::by_val("code"))
-        .argument(Argument::by_val_optional("description"));
+        .argument(Argument::new("code"))
+        .argument(Argument::new("description").optional());
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {

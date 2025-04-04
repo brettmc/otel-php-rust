@@ -11,14 +11,20 @@ use OpenTelemetry\Context\Context;
 $context = Context::getCurrent();
 $context = $context->with('some_key', 'A');
 $scope = $context->activate();
+var_dump($scope);
 
 $ctx = $scope->context();
-assert(Context::current() === $ctx);
+var_dump($ctx);
 assert($ctx->get('some_key') === 'A');
-assert(Context::current()->get('some_key') === 'A');
+assert(Context::getCurrent()->get('some_key') === 'A');
 $scope->detach();
-
 ?>
---EXPECT--
-object(OpenTelemetry\Context\Context)#1 (0) {
+--EXPECTF--
+object(OpenTelemetry\Context\Scope)#2 (1) {
+  ["context_id":"OpenTelemetry\Context\Scope":private]=>
+  int(1)
+}
+object(OpenTelemetry\Context\Context)#3 (1) {
+  ["context_id":"OpenTelemetry\Context\Context":private]=>
+  int(1)
 }

@@ -1,7 +1,7 @@
 use crate::{
     context::{
-        context::{make_context_class},
-        scope::{make_scope_class},
+        context::{build_context_class, new_context_class},
+        scope::{build_scope_class, new_scope_class},
     },
     trace::{
         plugin_manager::PluginManager,
@@ -73,10 +73,17 @@ pub fn get_module() -> Module {
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
 
+    //co-dependent classes
+    let mut scope_class_entity = new_scope_class();
+    let mut context_class_entity = new_context_class();
+
     let span_context_class = module.add_class(make_span_context_class());
-    let scope_class = module.add_class(make_scope_class());
-    let _context_class = module.add_class(make_context_class(scope_class.clone()));
-    let span_class = module.add_class(make_span_class(scope_class.clone(), span_context_class.clone()));
+    build_scope_class(&mut scope_class_entity, &context_class_entity);
+    build_context_class(&mut context_class_entity, &scope_class_entity);
+    let scope_class = module.add_class(scope_class_entity);
+    let _context_class = module.add_class(context_class_entity);
+
+    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone()));
     let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone()));

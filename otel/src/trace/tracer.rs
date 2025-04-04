@@ -39,7 +39,7 @@ pub fn make_tracer_class(span_builder_class: SpanBuilderClass) -> ClassEntity<Op
             *object.as_mut_state() = my_span_builder;
             Ok::<_, phper::Error>(object)
         })
-        .argument(Argument::by_val("name"));
+        .argument(Argument::new("name"));
 
     class
 }

@@ -63,8 +63,8 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<MySpanBuild
 
         Ok::<_, phper::Error>(this.to_ref_owned())
     })
-    .argument(Argument::by_val("key"))
-    .argument(Argument::by_val_optional("value"));
+    .argument(Argument::new("key"))
+    .argument(Argument::new("value").optional());
 
     class
         .add_method("startSpan", Visibility::Public, move |this, _| {
