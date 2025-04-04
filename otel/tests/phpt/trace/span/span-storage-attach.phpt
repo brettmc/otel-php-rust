@@ -5,7 +5,7 @@ otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
 --INI--
-otel.log.level="trace"
+otel.log.level="error"
 otel.log.file="/dev/stdout"
 --FILE--
 <?php
@@ -33,9 +33,8 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "%s"
-
-	Name        : root
+%A
+	Name        : foo
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)

@@ -1,6 +1,12 @@
 use crate::context::{
     scope::ScopeClassEntity,
-    storage::{store_context_instance},
+    storage::{
+        attach_context,
+        current_context_instance_id,
+        get_context_instance,
+        store_context_instance,
+        StorageClassEntity,
+    },
 };
 use phper::{
     alloc::ToRefOwned,
@@ -30,9 +36,11 @@ pub fn new_context_class() -> ContextClassEntity {
 pub fn build_context_class(
     class: &mut ContextClassEntity,
     scope_class: &ScopeClassEntity,
+    storage_class: &StorageClassEntity,
 ) {
     let context_class = class.bound_class();
     let scope_ce = scope_class.bound_class();
+    let storage_ce = storage_class.bound_class();
 
     class.add_property("context_id", Visibility::Private, 0i64);
 
@@ -42,12 +50,22 @@ pub fn build_context_class(
         });
 
     class
-        .add_static_method("getCurrent", Visibility::Public, move |_| {
-            let context = Context::current();
-            let mut object = context_class.clone().init_object()?;
+        .add_static_method("getCurrent", Visibility::Public, {
+        let context_ce = context_class.clone();
+        move |_| {
+            let context = match current_context_instance_id()
+                .and_then(|id| get_context_instance(id))
+            {
+                Some(ctx) => ctx,
+                None => Context::current(), // fallback to OpenTelemetry's global context
+            };
+
+            let mut object = context_ce.init_object()?;
             *object.as_mut_state() = Some(context);
             Ok::<_, phper::Error>(object)
-        });
+        }
+    });
+
 
     //TODO: this doesn't usefully work, since the "key" is the type of the struct,
     // which needs to be created ahead of time. And it can only store scalar values.
@@ -75,28 +93,33 @@ pub fn build_context_class(
         })
         .argument(Argument::new("key"));
 
-    class.add_method("activate", Visibility::Public, move |this, _arguments| {
-        // Step 1: Clone the context and drop the mutable borrow ASAP
-        let instance_id = {
-            let context: &mut Context = this.as_mut_state().as_mut().unwrap();
-            let instance_id = store_context_instance(context.clone());
-            instance_id
-        };
+    class.add_method("activate", Visibility::Public, {
+        let scope_ce = scope_ce.clone();
+        move |this, _arguments| {
+            // Clone the context and drop the mutable borrow ASAP
+            let instance_id = {
+                let context: &mut Context = this.as_mut_state().as_mut().unwrap();
+                store_context_instance(context.clone())
+            };
 
-        // Step 2: Now we can safely mutate `this` again
-        this.set_property("context_id", instance_id as i64);
+            // Store the ID on the PHP object
+            this.set_property("context_id", instance_id as i64);
 
-        // Step 3: Retrieve the context again (non-mutable is fine) and attach
-        let guard = {
-            let context: &Context = this.as_state().as_ref().unwrap();
-            context.clone().attach()
-        };
+            // Attach the context via storage (push guard to stack)
+            attach_context(instance_id).map_err(phper::Error::boxed)?;
 
-        let mut object = scope_ce.init_object()?;
-        *object.as_mut_state() = Some(guard);
-        object.set_property("context_id", instance_id as i64);
+            let mut object = scope_ce.init_object()?;
+            *object.as_mut_state() = None;
+            object.set_property("context_id", instance_id as i64);
 
-        Ok::<_, phper::Error>(object)
+            Ok::<_, phper::Error>(object)
+        }
     });
+
+    class
+        .add_static_method("storage", Visibility::Public, move |_| {
+            let object = storage_ce.init_object()?;
+            Ok::<_, phper::Error>(object)
+        });
 
 }

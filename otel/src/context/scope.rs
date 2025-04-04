@@ -22,6 +22,7 @@ const SCOPE_CLASS_NAME: &str = r"OpenTelemetry\Context\Scope";
 pub type ScopeClass = StateClass<Option<ContextGuard>>;
 pub type ScopeClassEntity = ClassEntity<Option<ContextGuard>>;
 
+//TODO no longer directly wraps ContextGuard
 pub fn new_scope_class() -> ScopeClassEntity {
     ClassEntity::<Option<ContextGuard>>::new_with_default_state_constructor(SCOPE_CLASS_NAME)
 }

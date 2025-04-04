@@ -2,6 +2,7 @@ use crate::{
     context::{
         context::{build_context_class, new_context_class},
         scope::{build_scope_class, new_scope_class},
+        storage::{build_storage_class, new_storage_class},
     },
     trace::{
         plugin_manager::PluginManager,
@@ -77,14 +78,17 @@ pub fn get_module() -> Module {
     //co-dependent classes
     let mut scope_class_entity = new_scope_class();
     let mut context_class_entity = new_context_class();
+    let mut storage_class_entity = new_storage_class();
+    build_scope_class(&mut scope_class_entity, &context_class_entity);
+    build_context_class(&mut context_class_entity, &scope_class_entity, &storage_class_entity);
+    build_storage_class(&mut storage_class_entity, &scope_class_entity, &context_class_entity);
 
     let span_context_class = module.add_class(make_span_context_class());
-    build_scope_class(&mut scope_class_entity, &context_class_entity);
-    build_context_class(&mut context_class_entity, &scope_class_entity);
     let scope_class = module.add_class(scope_class_entity);
     let context_class = module.add_class(context_class_entity);
+    let storage_class = module.add_class(storage_class_entity);
 
-    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone(), context_class.clone()));
+    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone(), context_class.clone(), storage_class.clone()));
     let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone()));

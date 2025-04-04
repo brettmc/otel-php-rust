@@ -25,7 +25,7 @@ use crate::{
     context::{
         context::ContextClass,
         scope::ScopeClass,
-        storage::{get_context_instance, store_context_instance},
+        storage::{attach_context, get_context_instance, store_context_instance, StorageClass},
     },
     trace::{
         span_context::SpanContextClass,
@@ -49,6 +49,7 @@ pub fn make_span_class(
     scope_class: ScopeClass,
     span_context_class: SpanContextClass,
     context_class: ContextClass,
+    storage_class: StorageClass,
 ) -> ClassEntity<Option<SdkSpan>> {
     let mut class =
         ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
@@ -264,22 +265,28 @@ pub fn make_span_class(
         });
 
     class
-        .add_method("activate", Visibility::Public, move |this, _arguments| {
-            let span = this.as_mut_state().take().expect("No span stored!");
-            let is_local_root = !Context::current().span().span_context().is_valid();
-            let ctx = Context::current_with_span(span);
-            if is_local_root {
-                store_local_root_span(ctx.clone());
+        .add_method("activate", Visibility::Public, {
+            let _storage_ce = storage_class.clone();
+            let scope_ce = scope_class.clone();
+            move |this, _arguments| {
+                let span = this.as_mut_state().take().expect("No span stored!");
+                let is_local_root = !Context::current().span().span_context().is_valid();
+
+                let ctx = Context::current_with_span(span);
+                if is_local_root {
+                    store_local_root_span(ctx.clone());
+                }
+
+                let instance_id = store_context_instance(ctx.clone());
+                this.set_property("context_id", instance_id as i64);
+
+                attach_context(instance_id).map_err(phper::Error::boxed)?;
+
+                let mut object = scope_ce.init_object()?;
+                object.set_property("context_id", instance_id as i64);
+                *object.as_mut_state() = None;
+                Ok::<_, phper::Error>(object)
             }
-
-            let instance_id = store_context_instance(ctx.clone());
-            this.set_property("context_id", instance_id as i64);
-
-            let guard = ctx.attach();
-
-            let mut object = scope_class.init_object()?;
-            *object.as_mut_state() = Some(guard);
-            Ok::<_, phper::Error>(object)
         });
 
     class
