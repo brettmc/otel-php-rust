@@ -35,6 +35,7 @@ use once_cell::sync::OnceCell;
 pub mod context{
     pub mod context;
     pub mod scope;
+    pub mod storage;
 }
 pub mod trace{
     pub mod span;
@@ -81,9 +82,9 @@ pub fn get_module() -> Module {
     build_scope_class(&mut scope_class_entity, &context_class_entity);
     build_context_class(&mut context_class_entity, &scope_class_entity);
     let scope_class = module.add_class(scope_class_entity);
-    let _context_class = module.add_class(context_class_entity);
+    let context_class = module.add_class(context_class_entity);
 
-    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone()));
+    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone(), context_class.clone()));
     let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone()));

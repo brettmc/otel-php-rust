@@ -1,9 +1,12 @@
 --TEST--
-Store span in context (contrib auto-instrumentation method)
+Store span in context then attach to storage
 --EXTENSIONS--
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+--INI--
+otel.log.level="trace"
+otel.log.file="/dev/stdout"
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
@@ -12,13 +15,17 @@ use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\Scope;
 
 $tracer = Globals::tracerProvider()->getTracer('my_tracer');
-
 $span = $tracer->spanBuilder('root')->startSpan();
 $ctx = $span->storeInContext(Context::getCurrent());
-//get span back from context, mutate and end
-$s = Span::fromContext($ctx);
-$s->updateName("updated");
-$s->end();
+Context::storage()->attach($ctx);
+unset($span);
+
+$scope = Context::storage()->scope();
+assert($scope instanceof Scope);
+$span = Span::fromContext($scope->context());
+$span->updateName('foo');
+$span->end();
+$scope->detach();
 ?>
 --EXPECTF--
 Spans
@@ -26,12 +33,13 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-%A
-	Name        : updated
+		Name         : "%s"
+
+	Name        : root
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
+	ParentSpanId: %s
 	Kind        : Internal
 	Start time: %s
 	End time: %s

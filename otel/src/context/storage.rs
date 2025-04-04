@@ -16,8 +16,8 @@ use opentelemetry::{
     Context,
 };
 
-const CONTEXT_CLASS_NAME: &str = r"OpenTelemetry\Context\Storage";
-pub type ContextClass = StateClass<()>;
+const CONTEXT_STORAGE_CLASS_NAME: &str = r"OpenTelemetry\Context\Storage";
+pub type ContextStorageClass = StateClass<()>;
 
 // When a Context is activated, it is stored in CONTEXT_STORAGE, and a reference to the
 // context created and stored as a class property.
@@ -48,7 +48,7 @@ fn new_instance_id() -> u64 {
     INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-pub fn make_context_class(
+/*pub fn make_storage_class(
     scope_class: ScopeClass,
 ) -> ClassEntity<Option<Context>> {
     let mut class =
@@ -90,4 +90,4 @@ pub fn make_context_class(
     }); //return ScopeInterface
 
     class
-}
+}*/

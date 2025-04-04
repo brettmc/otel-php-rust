@@ -1,6 +1,8 @@
-use crate::context::context::{
-    get_context_instance,
-    ContextClassEntity,
+use crate::context::{
+    context::ContextClassEntity,
+    storage::{
+        get_context_instance,
+    }
 };
 use phper::{
     classes::{

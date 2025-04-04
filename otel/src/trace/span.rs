@@ -23,8 +23,9 @@ use opentelemetry::{
 use opentelemetry_sdk::trace::Span as SdkSpan;
 use crate::{
     context::{
+        context::ContextClass,
         scope::ScopeClass,
-        context::{get_context_instance, store_context_instance},
+        storage::{get_context_instance, store_context_instance},
     },
     trace::{
         span_context::SpanContextClass,
@@ -47,6 +48,7 @@ pub type SpanClass = StateClass<Option<SdkSpan>>;
 pub fn make_span_class(
     scope_class: ScopeClass,
     span_context_class: SpanContextClass,
+    context_class: ContextClass,
 ) -> ClassEntity<Option<SdkSpan>> {
     let mut class =
         ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
@@ -145,12 +147,15 @@ pub fn make_span_class(
 
     class
         .add_method("updateName", Visibility::Public, |this, arguments| {
+            tracing::debug!("Span::updateName");
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
 
             let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
             if let Some(span) = this.as_mut_state().as_mut() {
+                tracing::debug!("Span::updateName (SdkSpan)");
                 span.update_name(name.clone());
             } else if let Some(ctx) = get_context_instance(instance_id as u64) {
+                tracing::debug!("Span::updateName (SpanRef)");
                 ctx.span().update_name(name);
             }
             Ok::<_, phper::Error>(this.to_ref_owned())
@@ -274,6 +279,37 @@ pub fn make_span_class(
 
             let mut object = scope_class.init_object()?;
             *object.as_mut_state() = Some(guard);
+            Ok::<_, phper::Error>(object)
+        });
+
+    class
+        .add_method("storeInContext", Visibility::Public, move |this, arguments| {
+            let span = this.as_mut_state().take().expect("No span stored!");
+
+            let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
+            let state_obj = unsafe { context_obj.as_state_obj::<Option<Context>>() };
+            let context = match state_obj.as_state() {
+                Some(v) => v.clone(),
+                None => return Err(phper::Error::boxed("Invalid Context object")),
+            };
+
+            let new_ctx = context.clone().with_span(span);
+            let instance_id = store_context_instance(new_ctx.clone());
+            let mut object = context_class.init_object()?;
+            *object.as_mut_state() = Some(new_ctx);
+            object.set_property("context_id", instance_id as i64);
+            Ok::<_, phper::Error>(object)
+        }); //argument ContextInterface, return ContextInterface
+
+    let span_class_clone = class.bound_class();
+    class
+        .add_static_method("fromContext", Visibility::Public, move |arguments| {
+            //todo could this become a macro?? better, a generic macro?
+            let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
+            let instance_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
+            let mut object = span_class_clone.init_object()?;
+            *object.as_mut_state() = None;
+            object.set_property("context_id", instance_id as i64);
             Ok::<_, phper::Error>(object)
         });
 
