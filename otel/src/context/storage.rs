@@ -3,7 +3,7 @@ use crate::context::{
     scope::ScopeClassEntity,
 };
 use phper::{
-    classes::{ClassEntity, StateClass, Visibility},
+    classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
     objects::ZObj,
     types::{ArgumentTypeHint, ReturnTypeHint},
@@ -83,10 +83,13 @@ pub fn build_storage_class(
     class: &mut StorageClassEntity,
     scope_class_entity: &ScopeClassEntity,
     context_class_entity: &ContextClassEntity,
+    context_storage_interface: &Interface,
 ) {
     let _storage_ce = class.bound_class();
     let scope_ce = scope_class_entity.bound_class();
     let context_ce = context_class_entity.bound_class();
+
+    class.implements(context_storage_interface.clone());
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
@@ -100,7 +103,7 @@ pub fn build_storage_class(
             *object.as_mut_state() = Some(context);
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\Context"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))));
 
     let scope_ce_attach = scope_ce.clone();
     class
@@ -115,8 +118,8 @@ pub fn build_storage_class(
             object.set_property("context_id", instance_id as i64);
             Ok::<_, phper::Error>(object)
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\Context"))))
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\Scope"))));
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))));
 
     let scope_ce_scope = scope_ce.clone();
     class
@@ -136,5 +139,5 @@ pub fn build_storage_class(
                 }
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\Scope"))).allow_null());
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))).allow_null());
 }

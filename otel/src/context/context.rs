@@ -10,8 +10,9 @@ use crate::context::{
 };
 use phper::{
     alloc::ToRefOwned,
-    classes::{ClassEntity, StateClass, Visibility},
-    functions::Argument,
+    classes::{ClassEntity, Interface, StateClass, Visibility},
+    functions::{Argument, ReturnType},
+    types::ReturnTypeHint,
     values::ZVal,
 };
 use std::{
@@ -37,13 +38,16 @@ pub fn build_context_class(
     class: &mut ContextClassEntity,
     scope_class: &ScopeClassEntity,
     storage_class: &StorageClassEntity,
+    context_interface: Interface,
 ) {
     let context_class = class.bound_class();
     let scope_ce = scope_class.bound_class();
     let storage_ce = storage_class.bound_class();
 
+    class.implements(context_interface);
     class.add_property("context_id", Visibility::Private, 0i64);
 
+    //TODO: on context destruct, delete from storage (iff not stored by scope)
     class
         .add_method("__construct", Visibility::Private, |_, _| {
             Ok::<_, Infallible>(())
@@ -51,20 +55,21 @@ pub fn build_context_class(
 
     class
         .add_static_method("getCurrent", Visibility::Public, {
-        let context_ce = context_class.clone();
-        move |_| {
-            let context = match current_context_instance_id()
-                .and_then(|id| get_context_instance(id))
-            {
-                Some(ctx) => ctx,
-                None => Context::current(), // fallback to OpenTelemetry's global context
-            };
+            let context_ce = context_class.clone();
+            move |_| {
+                let context = match current_context_instance_id()
+                    .and_then(|id| get_context_instance(id))
+                {
+                    Some(ctx) => ctx,
+                    None => Context::current(), // fallback to OpenTelemetry's global context
+                };
 
-            let mut object = context_ce.init_object()?;
-            *object.as_mut_state() = Some(context);
-            Ok::<_, phper::Error>(object)
-        }
-    });
+                let mut object = context_ce.init_object()?;
+                *object.as_mut_state() = Some(context);
+                Ok::<_, phper::Error>(object)
+            }
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))));
 
 
     //TODO: this doesn't usefully work, since the "key" is the type of the struct,
@@ -93,28 +98,30 @@ pub fn build_context_class(
         })
         .argument(Argument::new("key"));
 
-    class.add_method("activate", Visibility::Public, {
-        let scope_ce = scope_ce.clone();
-        move |this, _arguments| {
-            // Clone the context and drop the mutable borrow ASAP
-            let instance_id = {
-                let context: &mut Context = this.as_mut_state().as_mut().unwrap();
-                store_context_instance(context.clone())
-            };
+    class
+        .add_method("activate", Visibility::Public, {
+            let scope_ce = scope_ce.clone();
+            move |this, _arguments| {
+                // Clone the context and drop the mutable borrow ASAP
+                let instance_id = {
+                    let context: &mut Context = this.as_mut_state().as_mut().unwrap();
+                    store_context_instance(context.clone())
+                };
 
-            // Store the ID on the PHP object
-            this.set_property("context_id", instance_id as i64);
+                // Store the ID on the PHP object
+                this.set_property("context_id", instance_id as i64);
 
-            // Attach the context via storage (push guard to stack)
-            attach_context(instance_id).map_err(phper::Error::boxed)?;
+                // Attach the context via storage (push guard to stack)
+                attach_context(instance_id).map_err(phper::Error::boxed)?;
 
-            let mut object = scope_ce.init_object()?;
-            *object.as_mut_state() = None;
-            object.set_property("context_id", instance_id as i64);
+                let mut object = scope_ce.init_object()?;
+                *object.as_mut_state() = None;
+                object.set_property("context_id", instance_id as i64);
 
-            Ok::<_, phper::Error>(object)
-        }
-    });
+                Ok::<_, phper::Error>(object)
+            }
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))));
 
     class
         .add_static_method("storage", Visibility::Public, move |_| {

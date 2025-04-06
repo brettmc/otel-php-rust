@@ -1,7 +1,10 @@
 use crate::{
     context::{
         context::{build_context_class, new_context_class},
+        context_interface::{make_context_interface},
+        context_storage_interface::{make_context_storage_interface},
         scope::{build_scope_class, new_scope_class},
+        scope_interface::make_scope_interface,
         storage::{build_storage_class, new_storage_class},
     },
     trace::{
@@ -35,7 +38,10 @@ use once_cell::sync::OnceCell;
 
 pub mod context{
     pub mod context;
+    pub mod context_interface;
+    pub mod context_storage_interface;
     pub mod scope;
+    pub mod scope_interface;
     pub mod storage;
 }
 pub mod trace{
@@ -75,13 +81,18 @@ pub fn get_module() -> Module {
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
 
+    //interfaces
+    let scope_interface = module.add_interface(make_scope_interface());
+    let context_interface = module.add_interface(make_context_interface());
+    let context_storage_interface = module.add_interface(make_context_storage_interface());
+
     //co-dependent classes
     let mut scope_class_entity = new_scope_class();
     let mut context_class_entity = new_context_class();
     let mut storage_class_entity = new_storage_class();
-    build_scope_class(&mut scope_class_entity, &context_class_entity);
-    build_context_class(&mut context_class_entity, &scope_class_entity, &storage_class_entity);
-    build_storage_class(&mut storage_class_entity, &scope_class_entity, &context_class_entity);
+    build_scope_class(&mut scope_class_entity, &context_class_entity, &scope_interface);
+    build_context_class(&mut context_class_entity, &scope_class_entity, &storage_class_entity, context_interface);
+    build_storage_class(&mut storage_class_entity, &scope_class_entity, &context_class_entity, &context_storage_interface);
 
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(scope_class_entity);
