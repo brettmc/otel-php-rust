@@ -10,7 +10,7 @@ OTEL_RESOURCE_ATTRIBUTES=service.name=foo-service,host.name=my-host
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
-$tracer = Globals::tracerProvider()->getTracer('test');
+$tracer = Globals::tracerProvider()->getTracer('test', '0.1', 'schema.url');
 $tracer->spanBuilder('test')->startSpan()->end();
 ?>
 --EXPECTF--

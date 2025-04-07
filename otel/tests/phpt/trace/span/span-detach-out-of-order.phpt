@@ -9,7 +9,7 @@ OTEL_TRACES_EXPORTER=console
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\Span;
 
-$tracer = Globals::tracerProvider()->getTracer('my_tracer');
+$tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 
 $root = $tracer->spanBuilder('root')->startSpan();
 echo 'root span id: ' . $root->getContext()->getSpanId() . PHP_EOL;
@@ -41,7 +41,7 @@ Resource
 Span #0
 	Instrumentation Scope
 		Name         : "%s"
-
+%A
 	Name        : child
 	TraceId     : %s
 	SpanId      : %s
@@ -54,7 +54,7 @@ Span #0
 Span #1
 	Instrumentation Scope
 		Name         : "%s"
-
+%A
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s

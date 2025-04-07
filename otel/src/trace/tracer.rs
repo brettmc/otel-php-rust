@@ -1,5 +1,5 @@
 use phper::{
-    classes::{ClassEntity, StateClass, Visibility},
+    classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::Argument,
 };
 use std::{
@@ -21,10 +21,14 @@ pub type TracerClass = StateClass<Option<SdkTracer>>;
 
 const TRACER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Tracer";
 
-pub fn make_tracer_class(span_builder_class: SpanBuilderClass) -> ClassEntity<Option<SdkTracer>> {
+pub fn make_tracer_class(
+    span_builder_class: SpanBuilderClass,
+    tracer_interface: Interface,
+) -> ClassEntity<Option<SdkTracer>> {
     let mut class =
         ClassEntity::<Option<SdkTracer>>::new_with_default_state_constructor(TRACER_CLASS_NAME);
 
+    class.implements(tracer_interface);
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });

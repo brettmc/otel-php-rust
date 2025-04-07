@@ -9,7 +9,7 @@ OTEL_TRACES_EXPORTER=console
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
-$span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
+$span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('root')->startSpan();
 $span->setStatus(StatusCode::STATUS_ERROR, 'kaboom')->end();
 ?>
 --EXPECTF--

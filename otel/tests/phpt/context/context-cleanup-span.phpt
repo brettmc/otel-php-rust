@@ -13,7 +13,7 @@ use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\Span;
 use OpenTelemetry\Context\Context;
 
-$tracer = Globals::tracerProvider()->getTracer('my_tracer');
+$tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 
 var_dump('pre: start span');
 $span = $tracer->spanBuilder('root')->startSpan();

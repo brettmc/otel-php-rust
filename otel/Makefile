@@ -11,6 +11,8 @@ build:
 build-test:
 	@echo "Building for test..."
 	cargo build --features test
+re: build-test
+	php -d extension=target/debug/libotel.so --re otel
 check:
 	cargo check
 install: build

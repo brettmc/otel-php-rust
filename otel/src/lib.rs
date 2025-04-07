@@ -13,10 +13,12 @@ use crate::{
         span_builder::{make_span_builder_class},
         status_code::{make_status_code_interface},
         tracer::{make_tracer_class},
+        tracer_interface::{make_tracer_interface},
         tracer_provider,
         tracer_provider::{
             make_tracer_provider_class,
         },
+        tracer_provider_interface::{make_tracer_provider_interface},
         span_context::{make_span_context_class},
     },
     globals::{make_globals_class},
@@ -50,7 +52,9 @@ pub mod trace{
     pub mod span_context;
     pub mod status_code;
     pub mod tracer;
+    pub mod tracer_interface;
     pub mod tracer_provider;
+    pub mod tracer_provider_interface;
     pub mod plugin_manager;
     pub mod plugin;
     pub mod plugins{
@@ -85,6 +89,8 @@ pub fn get_module() -> Module {
     let scope_interface = module.add_interface(make_scope_interface());
     let context_interface = module.add_interface(make_context_interface());
     let context_storage_interface = module.add_interface(make_context_storage_interface());
+    let tracer_interface = module.add_interface(make_tracer_interface());
+    let tracer_provider_interface = module.add_interface(make_tracer_provider_interface());
 
     //co-dependent classes
     let mut scope_class_entity = new_scope_class();
@@ -102,8 +108,8 @@ pub fn get_module() -> Module {
     let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone(), context_class.clone()));
     let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
 
-    let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone()));
-    let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone()));
+    let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone(), tracer_interface));
+    let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone(), tracer_provider_interface));
     let _globals_class = module.add_class(make_globals_class(tracer_provider_class.clone()));
     let _status_code_interface = module.add_interface(make_status_code_interface());
 

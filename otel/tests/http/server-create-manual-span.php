@@ -4,7 +4,7 @@ header('Content-Type: text/plain');
 http_response_code(201);
 $provider = Globals::tracerProvider();
 $span = $provider
-    ->getTracer('my_tracer')
+    ->getTracer('my_tracer', '0.1', 'schema.url')
     ->spanBuilder('manual')
     ->startSpan();
 var_dump($span->getContext()->getTraceId());

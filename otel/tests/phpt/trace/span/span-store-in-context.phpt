@@ -11,7 +11,7 @@ use OpenTelemetry\API\Trace\Span;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\Scope;
 
-$tracer = Globals::tracerProvider()->getTracer('my_tracer');
+$tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 
 $span = $tracer->spanBuilder('root')->startSpan();
 $ctx = $span->storeInContext(Context::getCurrent());

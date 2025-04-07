@@ -14,7 +14,7 @@ use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
 Globals::tracerProvider()
-    ->getTracer('my_tracer')
+    ->getTracer('my_tracer', '0.1', 'schema.url')
     ->spanBuilder('root')
     ->setAttribute('exporter', 'grpc')
     ->startSpan()

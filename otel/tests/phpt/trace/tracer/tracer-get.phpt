@@ -6,7 +6,7 @@ otel
 <?php
 use OpenTelemetry\API\Globals;
 
-$tracer = Globals::tracerProvider()->getTracer("my_tracer");
+$tracer = Globals::tracerProvider()->getTracer("my_tracer", '0.1', 'schema.url');
 var_dump($tracer);
 ?>
 --EXPECTF--

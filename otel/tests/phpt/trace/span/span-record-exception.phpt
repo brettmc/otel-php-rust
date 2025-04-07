@@ -8,7 +8,7 @@ OTEL_TRACES_EXPORTER=console
 <?php
 use OpenTelemetry\API\Globals;
 
-$span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
+$span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('root')->startSpan();
 $span->recordException(new \Exception('kaboom'))
      ->end();
 ?>

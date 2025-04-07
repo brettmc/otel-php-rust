@@ -13,7 +13,7 @@ OTEL_SPAN_PROCESSOR=batch
 use OpenTelemetry\API\Globals;
 
 function demoFunction() {
-    Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('manual-span')->startSpan()->end();
+    Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('manual-span')->startSpan()->end();
 }
 
 demoFunction();
@@ -25,7 +25,7 @@ Resource
 Span #0
 	Instrumentation Scope
 		Name         : "%s"
-
+%A
 	Name        : manual-span
 	TraceId     : %s
 	SpanId      : %s
@@ -38,7 +38,7 @@ Span #0
 Span #1
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
-
+%A
 	Name        : i-was-renamed
 	TraceId     : %s
 	SpanId      : %s
