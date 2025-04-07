@@ -2,6 +2,7 @@ use phper::{
     classes::{ClassEntity, StateClass, Visibility},
     alloc::ToRefOwned,
     functions::Argument,
+    types::ArgumentTypeHint,
 };
 use std::{
     convert::Infallible,
@@ -11,6 +12,7 @@ use opentelemetry::{
     KeyValue,
     trace::{
         SpanBuilder,
+        SpanKind,
         Tracer,
     }
 };
@@ -65,6 +67,29 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<MySpanBuild
     })
     .argument(Argument::new("key"))
     .argument(Argument::new("value").optional());
+
+    class
+        .add_method("setSpanKind", Visibility::Public, |this, arguments| {
+            let state = this.as_mut_state();
+            let span_builder = state.span_builder.as_ref().expect("SpanBuilder not set");
+            let span_kind_int = arguments[0].expect_long()?;
+            let span_kind = match span_kind_int {
+                0 => SpanKind::Internal,
+                1 => SpanKind::Server,
+                2 => SpanKind::Client,
+                3 => SpanKind::Producer,
+                4 => SpanKind::Consumer,
+                _ => {
+                    //log a warning
+                    SpanKind::Internal
+                },
+            };
+            let new_span_builder = span_builder.clone().with_kind(span_kind);
+            state.span_builder = Some(new_span_builder);
+
+            Ok::<_, phper::Error>(this.to_ref_owned())
+        })
+        .argument(Argument::new("spanKind").with_type_hint(ArgumentTypeHint::Int));
 
     class
         .add_method("startSpan", Visibility::Public, move |this, _| {
