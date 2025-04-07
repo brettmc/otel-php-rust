@@ -13,12 +13,16 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     convert::Infallible,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 use opentelemetry::{
     Context,
     ContextGuard,
 };
+use tracing::debug;
 
 const CONTEXT_STORAGE_CLASS_NAME: &str = r"OpenTelemetry\Context\Storage";
 pub type StorageClass = StateClass<()>;
@@ -27,22 +31,39 @@ pub type StorageClassEntity = ClassEntity<()>;
 // When a Context is activated, it is stored in CONTEXT_STORAGE, and a reference to the
 // context created and stored as a class property.
 thread_local! {
-    static CONTEXT_STORAGE: RefCell<HashMap<u64, Context>> = RefCell::new(HashMap::new());
+    static CONTEXT_STORAGE: RefCell<HashMap<u64, Arc<Context>>> = RefCell::new(HashMap::new());
     static GUARD_STACK: RefCell<Vec<(ContextGuard, u64)>> = RefCell::new(Vec::new());
-
 }
 static INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-pub fn get_context_instance(instance_id: u64) -> Option<Context> {
-    if instance_id == 0 {
-        None
-    } else {
-        CONTEXT_STORAGE.with(|storage| storage.borrow().get(&instance_id).cloned())
-    }
+pub fn current_context() -> Arc<Context> {
+    current_context_instance_id()
+        .and_then(get_context_instance)
+        .unwrap_or_else(|| Arc::new(Context::current()))
 }
 
-pub fn store_context_instance(context: Context) -> u64 {
+pub fn get_context_instance(instance_id: u64) -> Option<Arc<Context>> {
+    debug!("Getting context instance {}", instance_id);
+    CONTEXT_STORAGE.with(|storage| {
+        let maybe_context = storage.borrow().get(&instance_id).cloned();
+        if let Some(ref ctx) = maybe_context {
+            debug!(
+                "Cloned context instance {} (ref count after clone = {})",
+                instance_id,
+                Arc::strong_count(ctx)
+            );
+        }
+        maybe_context
+    })
+}
+
+pub fn store_context_instance(context: Arc<Context>) -> u64 {
     let instance_id = new_instance_id();
+    let count = Arc::strong_count(&context);
+    debug!(
+        "Storing context instance {} (ref count after clone = {})",
+        instance_id, count
+    );
     CONTEXT_STORAGE.with(|storage| {
         storage.borrow_mut().insert(instance_id, context)
     });
@@ -50,19 +71,70 @@ pub fn store_context_instance(context: Context) -> u64 {
     instance_id
 }
 
+/// remove context instance if it's not stored in GUARD_STACK
+pub fn maybe_remove_context_instance(instance_id: u64) {
+    debug!("Maybe remove context for instance {}", instance_id);
+    CONTEXT_STORAGE.with(|storage| {
+        let mut map = storage.borrow_mut();
+        match map.get(&instance_id) {
+            Some(context) => {
+                let count = Arc::strong_count(context);
+                if count == 1 { //the only reference is in CONTEXT_STORAGE
+                    debug!(
+                        "Removing context instance {} (ref count = 1, no external holders)",
+                        instance_id
+                    );
+                    map.remove(&instance_id);
+                } else {
+                    debug!(
+                        "Cannot remove context instance {} (ref count = {}, still in use)",
+                        instance_id, count
+                    );
+                }
+            }
+            None => {
+                debug!(
+                    "Context instance {} not found in CONTEXT_STORAGE, already removed?",
+                    instance_id
+                );
+            }
+        }
+    });
+}
+
+pub fn remove_context_instance(instance_id: u64) {
+    debug!("Removing context instance {}", instance_id);
+    CONTEXT_STORAGE.with(|storage| storage.borrow_mut().remove(&instance_id));
+}
+
 pub fn attach_context(instance_id: u64) -> Result<(), &'static str> {
+    debug!("Attaching context instance {}", instance_id);
     let context = get_context_instance(instance_id).ok_or("Context not found")?;
-    let guard = context.attach();
+    let context_guard = Arc::clone(&context);
+    debug!(
+        "Before attach: context instance {} has ref count = {}",
+        instance_id,
+        Arc::strong_count(&context)
+    );
+    let guard = (*context_guard).clone().attach();
     GUARD_STACK.with(|stack| {
         stack.borrow_mut().push((guard, instance_id));
     });
     Ok(())
 }
 
-pub fn detach_context() -> Option<u64> {
+pub fn detach_context(instance_id: u64) {
+    debug!("Detaching context instance {}", instance_id);
     GUARD_STACK.with(|stack| {
-        stack.borrow_mut().pop().map(|(_guard, id)| id)
-    })
+        stack.borrow_mut().pop().map(|(_guard, id)| {
+            if id == instance_id {
+                maybe_remove_context_instance(id);
+            } else {
+                //context detach out of order = is an error
+                debug!("Not detaching context instance {}, is not top-most", instance_id);
+            }
+        });
+    });
 }
 
 pub fn current_context_instance_id() -> Option<u64> {
@@ -71,6 +143,7 @@ pub fn current_context_instance_id() -> Option<u64> {
     })
 }
 
+//TODO use Option<u64> instead of 0 having special meaning
 fn new_instance_id() -> u64 {
     INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
@@ -97,8 +170,8 @@ pub fn build_storage_class(
 
     class
         .add_static_method("current", Visibility::Public, move |_| {
-            //todo store our own stack of (guard, context) ?
-            let context = Context::current();
+            //TODO current from storage's perspective of opentelemetry-rust's?
+            let context = Arc::new(Context::current());
             let mut object = context_ce.clone().init_object()?;
             *object.as_mut_state() = Some(context);
             Ok::<_, phper::Error>(object)

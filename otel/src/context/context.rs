@@ -1,12 +1,6 @@
 use crate::context::{
     scope::ScopeClassEntity,
-    storage::{
-        attach_context,
-        current_context_instance_id,
-        get_context_instance,
-        store_context_instance,
-        StorageClassEntity,
-    },
+    storage::{self, StorageClassEntity},
 };
 use phper::{
     alloc::ToRefOwned,
@@ -17,21 +11,22 @@ use phper::{
 };
 use std::{
     convert::Infallible,
-    mem::take,
+    sync::Arc,
 };
 use opentelemetry::{
     Context,
 };
+use tracing::debug;
 
 const CONTEXT_CLASS_NAME: &str = r"OpenTelemetry\Context\Context";
-pub type ContextClass = StateClass<Option<Context>>;
-pub type ContextClassEntity = ClassEntity<Option<Context>>;
+pub type ContextClass = StateClass<Option<Arc<Context>>>;
+pub type ContextClassEntity = ClassEntity<Option<Arc<Context>>>;
 
 #[derive(Debug)]
 struct Test(String);
 
 pub fn new_context_class() -> ContextClassEntity {
-    ClassEntity::<Option<Context>>::new_with_default_state_constructor(CONTEXT_CLASS_NAME)
+    ClassEntity::<Option<Arc<Context>>>::new_with_default_state_constructor(CONTEXT_CLASS_NAME)
 }
 
 pub fn build_context_class(
@@ -47,9 +42,19 @@ pub fn build_context_class(
     class.implements(context_interface);
     class.add_property("context_id", Visibility::Private, 0i64);
 
-    //TODO: on context destruct, delete from storage (iff not stored by scope)
     class
         .add_method("__construct", Visibility::Private, |_, _| {
+            Ok::<_, Infallible>(())
+        });
+
+    //TODO: on context destruct, delete from storage (iff not stored by scope)
+    class
+        .add_method("__destruct", Visibility::Public, |this, _| {
+            let context_id = this.get_property("context_id").as_long().expect("invalid context_id stored");
+            debug!("Context::__destruct for context_id = {}", context_id);
+            if context_id > 0 {
+                storage::maybe_remove_context_instance(context_id as u64);
+            }
             Ok::<_, Infallible>(())
         });
 
@@ -57,12 +62,7 @@ pub fn build_context_class(
         .add_static_method("getCurrent", Visibility::Public, {
             let context_ce = context_class.clone();
             move |_| {
-                let context = match current_context_instance_id()
-                    .and_then(|id| get_context_instance(id))
-                {
-                    Some(ctx) => ctx,
-                    None => Context::current(), // fallback to OpenTelemetry's global context
-                };
+                let context = storage::current_context();
 
                 let mut object = context_ce.init_object()?;
                 *object.as_mut_state() = Some(context);
@@ -77,11 +77,11 @@ pub fn build_context_class(
     // see https://github.com/open-telemetry/opentelemetry-rust/blob/opentelemetry-0.28.0/opentelemetry/src/context.rs#L391
     class
         .add_method("with", Visibility::Public, |this, arguments| {
-            let context: &mut Context = this.as_mut_state().as_mut().unwrap();
-            let mut new = take(context);
+            let arc = this.as_mut_state().as_mut().unwrap();
+            let mut new_ctx = (**arc).clone();
             let php_value = arguments[1].expect_z_str()?.to_str()?.to_string();
-            new = new.with_value(Test(php_value));
-            *context = new;
+            new_ctx = new_ctx.with_value(Test(php_value));
+            *arc = Arc::new(new_ctx);
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
         .argument(Argument::new("key"))
@@ -89,7 +89,8 @@ pub fn build_context_class(
 
     class
         .add_method("get", Visibility::Public, |this, _arguments| -> phper::Result<ZVal> {
-            let context: &mut Context = this.as_mut_state().as_mut().unwrap();
+            let arc = this.as_state().as_ref().unwrap();
+            let context = &**arc; // deref Arc<Context>
             let value = context.get::<Test>();
             match value {
                 Some(value) => Ok::<_, phper::Error>(ZVal::from(value.0.as_str())),
@@ -102,17 +103,12 @@ pub fn build_context_class(
         .add_method("activate", Visibility::Public, {
             let scope_ce = scope_ce.clone();
             move |this, _arguments| {
-                // Clone the context and drop the mutable borrow ASAP
-                let instance_id = {
-                    let context: &mut Context = this.as_mut_state().as_mut().unwrap();
-                    store_context_instance(context.clone())
-                };
+                let arc = this.as_state().as_ref().unwrap().clone(); // Arc<Context>
+                let instance_id = storage::store_context_instance(arc.clone());
+                debug!("Storing context: {}", instance_id);
 
-                // Store the ID on the PHP object
                 this.set_property("context_id", instance_id as i64);
-
-                // Attach the context via storage (push guard to stack)
-                attach_context(instance_id).map_err(phper::Error::boxed)?;
+                storage::attach_context(instance_id).map_err(phper::Error::boxed)?;
 
                 let mut object = scope_ce.init_object()?;
                 *object.as_mut_state() = None;

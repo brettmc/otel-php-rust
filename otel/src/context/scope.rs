@@ -1,9 +1,6 @@
 use crate::context::{
     context::ContextClassEntity,
-    storage::{
-        detach_context,
-        get_context_instance,
-    }
+    storage,
 };
 use phper::{
     classes::{
@@ -46,8 +43,11 @@ pub fn build_scope_class(
     });
 
     class
-        .add_method("detach", Visibility::Public, |_, _| -> phper::Result<()> {
-            detach_context();
+        .add_method("detach", Visibility::Public, |this, _| -> phper::Result<()> {
+            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            if instance_id > 0 {
+                storage::detach_context(instance_id as u64);
+            }
             Ok(())
         })
         .return_type(ReturnType::new(ReturnTypeHint::Int));
@@ -55,7 +55,7 @@ pub fn build_scope_class(
     class
         .add_method("context", Visibility::Public, move |this,_| {
             let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
-            let ctx = get_context_instance(instance_id as u64);
+            let ctx = storage::get_context_instance(instance_id as u64);
             let mut object = context_ce.init_object()?;
             *object.as_mut_state() = ctx;
             object.set_property("context_id", instance_id as i64);

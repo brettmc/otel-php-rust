@@ -1,7 +1,7 @@
 use phper::{
     classes::{InterfaceEntity},
-    functions::{ReturnType},
-    types::{ReturnTypeHint},
+    functions::{Argument, ReturnType},
+    types::{ArgumentTypeHint, ReturnTypeHint},
 };
 
 pub fn make_context_storage_interface() -> InterfaceEntity {
@@ -16,6 +16,7 @@ pub fn make_context_storage_interface() -> InterfaceEntity {
 
     interface
         .add_method("attach")
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface")))); //ContextStorageScopeInterface
 
     interface
