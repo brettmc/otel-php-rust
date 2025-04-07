@@ -13,7 +13,7 @@ use opentelemetry::{
 };
 use opentelemetry_sdk::trace::SdkTracer;
 use crate::trace::span_builder::{
-    MySpanBuilder,
+    SpanBuilderState,
     SpanBuilderClass,
 };
 
@@ -38,7 +38,7 @@ pub fn make_tracer_class(
             let tracer: &SdkTracer = this.as_state().as_ref().unwrap();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let span_builder: SpanBuilder = tracer.span_builder(name);
-            let my_span_builder = MySpanBuilder::new(span_builder, tracer.clone());
+            let my_span_builder = SpanBuilderState::new(span_builder, tracer.clone());
             let mut object = span_builder_class.init_object()?;
             *object.as_mut_state() = my_span_builder;
             Ok::<_, phper::Error>(object)

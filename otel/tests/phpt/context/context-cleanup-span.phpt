@@ -47,6 +47,7 @@ var_dump('post: span end');
 --EXPECTF--
 %A
 string(15) "pre: start span"
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::trace::span_builder: event src/trace/span_builder.rs:%d message=SpanBuilder::No parent context, using Context::current()
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::trace::span_builder: event src/trace/span_builder.rs:%d message=SpanBuilder::Starting span
 string(16) "post: start span"
 string(24) "pre: get current context"

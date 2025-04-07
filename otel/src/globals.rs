@@ -19,5 +19,10 @@ pub fn make_globals_class(tracer_provider_class: TracerProviderClass) -> ClassEn
         })
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Trace\TracerProviderInterface"))));
 
+    /*class
+        .add_static_method("propagator", Visibility::Public, move |_| {
+            todo!("OpenTelemetry propagator");
+        });*/
+
     class
 }
