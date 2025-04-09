@@ -12,5 +12,7 @@ $context = Context::getCurrent();
 var_dump($context);
 ?>
 --EXPECT--
-object(OpenTelemetry\Context\Context)#1 (0) {
+object(OpenTelemetry\Context\Context)#1 (1) {
+  ["context_id":"OpenTelemetry\Context\Context":private]=>
+  int(0)
 }

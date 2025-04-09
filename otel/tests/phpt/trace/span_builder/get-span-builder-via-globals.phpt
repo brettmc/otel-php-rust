@@ -9,7 +9,7 @@ use OpenTelemetry\API\Trace\StatusCode;
 
 $provider = Globals::tracerProvider();
 var_dump($provider);
-$tracer = $provider->getTracer("my_tracer");
+$tracer = $provider->getTracer("my_tracer", '0.1', 'schema.url');
 var_dump($tracer);
 $builder = $tracer->spanBuilder('root');
 var_dump($builder);

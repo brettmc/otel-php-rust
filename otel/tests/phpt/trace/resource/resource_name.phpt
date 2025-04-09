@@ -10,7 +10,7 @@ OTEL_SERVICE_NAME=service_one
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
-$tracer = Globals::tracerProvider()->getTracer('test');
+$tracer = Globals::tracerProvider()->getTracer('test', '0.1', 'schema.url');
 $tracer->spanBuilder('test')->startSpan()->end();
 /* NB that resource attributes are displayed in undefined order, so
    only assert on service.name */

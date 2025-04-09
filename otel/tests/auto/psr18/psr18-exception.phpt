@@ -35,7 +35,7 @@ class MockHttpClient implements ClientInterface
 $request = new Request('GET', 'http://example.com');
 $client = new MockHttpClient();
 
-$span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
+$span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('root')->startSpan();
 $scope = $span->activate();
 
 try {
@@ -54,7 +54,7 @@ Resource
 Span #0
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
-
+%A
 	Name        : GET
 	TraceId     : %s
 	SpanId      : %s
@@ -82,7 +82,7 @@ Span #0
 Span #1
 	Instrumentation Scope
 		Name         : "my_tracer"
-
+%A
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s

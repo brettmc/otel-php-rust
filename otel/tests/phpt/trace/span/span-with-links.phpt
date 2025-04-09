@@ -9,7 +9,7 @@ OTEL_TRACES_EXPORTER=console
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\SpanContext;
 
-$span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
+$span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('root')->startSpan();
 $ctx_one = SpanContext::create('2b4ef3412d587ce6e7880fb27a316b8c', '7480a670201f6340');
 $span->addLink($ctx_one);
 $scope = $span->activate();

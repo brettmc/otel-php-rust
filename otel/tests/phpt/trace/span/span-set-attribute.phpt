@@ -8,7 +8,7 @@ OTEL_TRACES_EXPORTER=console
 <?php
 use OpenTelemetry\API\Globals;
 
-$span = Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan();
+$span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('root')->startSpan();
 $span->setAttribute('string', 'foo')
      ->setAttribute('int', 99)
      ->setAttribute('double', 1.5)

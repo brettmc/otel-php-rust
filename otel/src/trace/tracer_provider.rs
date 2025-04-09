@@ -1,5 +1,7 @@
 use phper::{
-    classes::{ClassEntity, StateClass, Visibility},
+    classes::{ClassEntity, Interface, StateClass, Visibility},
+    functions::{Argument, ReturnType},
+    types::{ArgumentTypeHint, ReturnTypeHint},
 };
 use std::{
     collections::HashMap,
@@ -141,49 +143,59 @@ pub fn force_flush() {
     tracing::info!("no tracer provider to flush for pid {}", pid);
 }
 
-pub fn make_tracer_provider_class(tracer_class: TracerClass) -> ClassEntity<()> {
+pub fn make_tracer_provider_class(
+    tracer_class: TracerClass,
+    tracer_provider_interface: Interface,
+) -> ClassEntity<()> {
     let mut class =
         ClassEntity::<()>::new_with_default_state_constructor(TRACER_PROVIDER_CLASS_NAME);
 
+    class.implements(tracer_provider_interface);
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });
 
-    class.add_method("getTracer", Visibility::Public, move |_this, arguments| {
-        let provider = get_tracer_provider();
-        let name = arguments[0].expect_z_str()?.to_str()?.to_string();
+    class
+        .add_method("getTracer", Visibility::Public, move |_this, arguments| {
+            let provider = get_tracer_provider();
+            let name = arguments[0].expect_z_str()?.to_str()?.to_string();
 
-        let version = arguments.get(1)
-            .and_then(|arg| arg.as_z_str())
-            .map(|s| s.to_str().ok().map(|s| s.to_string()))
-            .flatten();
+            let version = arguments.get(1)
+                .and_then(|arg| arg.as_z_str())
+                .map(|s| s.to_str().ok().map(|s| s.to_string()))
+                .flatten();
 
-        let schema_url = arguments.get(2)
-            .and_then(|arg| arg.as_z_str())
-            .map(|s| s.to_str().ok().map(|s| s.to_string()))
-            .flatten();
+            let schema_url = arguments.get(2)
+                .and_then(|arg| arg.as_z_str())
+                .map(|s| s.to_str().ok().map(|s| s.to_string()))
+                .flatten();
 
-        let attributes = arguments.get(3)
-            .and_then(|arg| arg.as_z_arr())
-            .map(|zarr| zarr.to_owned());
+            let attributes = arguments.get(3)
+                .and_then(|arg| arg.as_z_arr())
+                .map(|zarr| zarr.to_owned());
 
-        let mut scope_builder = InstrumentationScope::builder(name);
-        if let Some(version) = version {
-            scope_builder = scope_builder.with_version(version);
-        }
-        if let Some(schema_url) = schema_url {
-            scope_builder = scope_builder.with_schema_url(schema_url);
-        }
-        if let Some(attributes) = attributes {
-            scope_builder = scope_builder.with_attributes(util::zval_arr_to_key_value_vec(attributes));
-        }
-        let scope = scope_builder.build();
+            let mut scope_builder = InstrumentationScope::builder(name);
+            if let Some(version) = version {
+                scope_builder = scope_builder.with_version(version);
+            }
+            if let Some(schema_url) = schema_url {
+                scope_builder = scope_builder.with_schema_url(schema_url);
+            }
+            if let Some(attributes) = attributes {
+                scope_builder = scope_builder.with_attributes(util::zval_arr_to_key_value_vec(attributes));
+            }
+            let scope = scope_builder.build();
 
-        let tracer = provider.tracer_with_scope(scope);
-        let mut object = tracer_class.init_object()?;
-        *object.as_mut_state() = Some(tracer);
-        Ok::<_, phper::Error>(object)
-    });
+            let tracer = provider.tracer_with_scope(scope);
+            let mut object = tracer_class.init_object()?;
+            *object.as_mut_state() = Some(tracer);
+            Ok::<_, phper::Error>(object)
+        })
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
+        .argument(Argument::new("version").with_type_hint(ArgumentTypeHint::String).allow_null())
+        .argument(Argument::new("schemaUrl").with_type_hint(ArgumentTypeHint::String).allow_null())
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]")) //todo not called "name" (--re output)
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Trace\TracerInterface"))));
 
     class
 }

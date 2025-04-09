@@ -9,7 +9,7 @@ OTEL_TRACES_EXPORTER=console
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 
-$builder = Globals::tracerProvider()->getTracer("my_tracer")->spanBuilder('root');
+$builder = Globals::tracerProvider()->getTracer("my_tracer", '0.1', 'schema.url')->spanBuilder('root');
 $builder->setAttribute('foo', 'bar')
     ->setAttribute('baz', 'bat');
 $span = $builder->startSpan();
@@ -22,7 +22,7 @@ Resource
 Span #0
 	Instrumentation Scope
 		Name         : "my_tracer"
-
+%A
 	Name        : root
 	TraceId     : %s
 	SpanId      : %s

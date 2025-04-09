@@ -19,7 +19,7 @@ pub type SpanContextClass = StateClass<Option<SpanContext>>;
 pub fn make_span_context_class() -> ClassEntity<Option<SpanContext>> {
     let mut class =
         ClassEntity::<Option<SpanContext>>::new_with_default_state_constructor(SPAN_CONTEXT_CLASS_NAME);
-    let span_context_class = class.bind_class();
+    let span_context_class = class.bound_class();
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
