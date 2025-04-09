@@ -1,6 +1,5 @@
 use super::plugin::Plugin;
 use crate::trace::plugins::{
-    test::TestPlugin,
     psr18::Psr18Plugin,
 };
 use crate::trace::plugin::{FunctionObserver};
@@ -24,8 +23,8 @@ impl PluginManager {
 
     fn init(&mut self) {
         self.plugins.push(Box::new(Psr18Plugin::new()));
-        //#[cfg(feature="test")]
-        self.plugins.push(Box::new(TestPlugin::new()));
+        #[cfg(feature="test")]
+        self.plugins.push(Box::new(crate::trace::plugins::test::TestPlugin::new()));
     }
 
     pub fn plugins(&self) -> &Vec<Box<dyn Plugin + Send + Sync>> {

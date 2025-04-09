@@ -1,12 +1,9 @@
 use phper::{
-    arrays::ZArr,
     classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
     values::ZVal,
-    objects::ZObj,
 };
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::convert::Infallible;
 use crate::context::{
@@ -27,12 +24,12 @@ pub fn make_trace_context_propagator_class(
 
     class.implements(text_map_propagator_interface);
 
-    class.add_method("__construct", Visibility::Private, |this, _| {
+    class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
     });
 
     class
-        .add_method("inject", Visibility::Public, |this, arguments| -> phper::Result<()> {
+        .add_method("inject", Visibility::Public, |_, arguments| -> phper::Result<()> {
             // Context (optional, default to Context::current)
             let context_obj = arguments[2].expect_mut_z_obj()?;
             let context_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
@@ -75,7 +72,7 @@ pub fn make_trace_context_propagator_class(
 
     let context_ce = context_class.bound_class();
     class
-        .add_method("extract", Visibility::Public, move |this, arguments| {
+        .add_method("extract", Visibility::Public, move |_, arguments| {
             // Carrier (input headers)
             let carrier = arguments[0].expect_z_arr()?;
 
