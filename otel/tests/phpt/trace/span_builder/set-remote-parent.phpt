@@ -2,8 +2,6 @@
 Call setParent on SpanBuilder with remote span
 --EXTENSIONS--
 otel
---XFAIL--
-todo implement Globals::propagator
 --ENV--
 OTEL_TRACES_EXPORTER=console
 --FILE--
@@ -11,13 +9,23 @@ OTEL_TRACES_EXPORTER=console
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\Context\Context;
+use OpenTelemetry\Context\ContextInterface;
 
 $builder = Globals::tracerProvider()->getTracer("my_tracer", '0.1', 'schema.url')->spanBuilder('root');
-$parent = Globals::propagator()->extract(['traceparent' => '00-e77388f01a826e2de7afdcd1eefc034e-d6ba64af4fa59b65-01']);
+$carrier = ['traceparent' => '00-e77388f01a826e2de7afdcd1eefc034e-d6ba64af4fa59b65-01'];
+$parent = Globals::propagator()->extract($carrier);
+$span = OpenTelemetry\API\Trace\Span::fromContext($parent);
+$context = $span->getContext();
+
+echo 'Trace ID: ' . $context->getTraceId() . PHP_EOL;
+echo 'Span ID: ' . $context->getSpanId() . PHP_EOL;
+
 $builder->setParent($parent);
 $builder->startSpan()->end();
 ?>
 --EXPECTF--
+Trace ID: e77388f01a826e2de7afdcd1eefc034e
+Span ID: d6ba64af4fa59b65
 Spans
 Resource
 %A

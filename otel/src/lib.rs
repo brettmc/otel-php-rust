@@ -6,6 +6,9 @@ use crate::{
         scope::{build_scope_class, new_scope_class},
         scope_interface::make_scope_interface,
         storage::{build_storage_class, new_storage_class},
+        propagation::{
+            text_map_propagator_interface::{make_text_map_propagator_interface},
+        }
     },
     trace::{
         plugin_manager::PluginManager,
@@ -20,6 +23,9 @@ use crate::{
         },
         tracer_provider_interface::{make_tracer_provider_interface},
         span_context::{make_span_context_class},
+        propagation::{
+            trace_context_propagator::{make_trace_context_propagator_class},
+        },
     },
     globals::{make_globals_class},
 };
@@ -45,6 +51,9 @@ pub mod context{
     pub mod scope;
     pub mod scope_interface;
     pub mod storage;
+    pub mod propagation{
+        pub mod text_map_propagator_interface;
+    }
 }
 pub mod trace{
     pub mod span;
@@ -60,6 +69,9 @@ pub mod trace{
     pub mod plugins{
         pub mod psr18;
         pub mod test;
+    }
+    pub mod propagation{
+        pub mod trace_context_propagator;
     }
 }
 pub mod globals;
@@ -91,6 +103,7 @@ pub fn get_module() -> Module {
     let context_storage_interface = module.add_interface(make_context_storage_interface());
     let tracer_interface = module.add_interface(make_tracer_interface());
     let tracer_provider_interface = module.add_interface(make_tracer_provider_interface());
+    let text_map_propagator_interface = module.add_interface(make_text_map_propagator_interface());
 
     //co-dependent classes
     let mut scope_class_entity = new_scope_class();
@@ -100,6 +113,7 @@ pub fn get_module() -> Module {
     build_context_class(&mut context_class_entity, &scope_class_entity, &storage_class_entity, context_interface);
     build_storage_class(&mut storage_class_entity, &scope_class_entity, &context_class_entity, &context_storage_interface);
 
+    let trace_context_propagator_class = module.add_class(make_trace_context_propagator_class(text_map_propagator_interface, &context_class_entity));
     let span_context_class = module.add_class(make_span_context_class());
     let scope_class = module.add_class(scope_class_entity);
     let context_class = module.add_class(context_class_entity);
@@ -110,7 +124,7 @@ pub fn get_module() -> Module {
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone(), tracer_interface));
     let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone(), tracer_provider_interface));
-    let _globals_class = module.add_class(make_globals_class(tracer_provider_class.clone()));
+    let _globals_class = module.add_class(make_globals_class(tracer_provider_class.clone(), trace_context_propagator_class.clone()));
     let _status_code_interface = module.add_interface(make_status_code_interface());
 
     module.on_module_init(|| {
