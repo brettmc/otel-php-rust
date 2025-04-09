@@ -42,6 +42,14 @@ pub fn current_context() -> Arc<Context> {
         .unwrap_or_else(|| Arc::new(Context::current()))
 }
 
+pub fn resolve_context(instance_id: u64) -> Arc<Context> {
+    if instance_id == 0 {
+        Arc::new(Context::current())
+    } else {
+        get_context_instance(instance_id).expect("context not found")
+    }
+}
+
 pub fn get_context_instance(instance_id: u64) -> Option<Arc<Context>> {
     debug!("Getting context instance {}", instance_id);
     CONTEXT_STORAGE.with(|storage| {

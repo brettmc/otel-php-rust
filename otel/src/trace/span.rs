@@ -303,17 +303,16 @@ pub fn make_span_class(
             let span = this.as_mut_state().take().expect("No span stored!");
 
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let state_obj = unsafe { context_obj.as_state_obj::<Option<Arc<Context>>>() };
-            let context = match state_obj.as_state() {
-                Some(v) => v.clone(),
-                None => return Err(phper::Error::boxed("Invalid Context object")),
-            };
-
-            let arc_ctx = Arc::new(context.clone().with_span(span));
+            let context_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
+            // Always go through storage — handles context_id = 0 as Context::current()
+            let context = storage::resolve_context(context_id as u64);
+            let arc_ctx = Arc::new(context.with_span(span));
             let instance_id = storage::store_context_instance(arc_ctx.clone());
+
             let mut object = context_class.init_object()?;
             *object.as_mut_state() = Some(arc_ctx);
             object.set_property("context_id", instance_id as i64);
+
             Ok::<_, phper::Error>(object)
         }); //argument ContextInterface, return ContextInterface
 

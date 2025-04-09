@@ -65,6 +65,7 @@ pub fn build_context_class(
 
                 let mut object = context_ce.init_object()?;
                 *object.as_mut_state() = Some(context);
+                object.set_property("context_id", 0i64);
                 Ok::<_, phper::Error>(object)
             }
         })
