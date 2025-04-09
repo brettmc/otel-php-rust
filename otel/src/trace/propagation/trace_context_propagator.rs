@@ -1,4 +1,5 @@
 use phper::{
+    arrays::ZArr,
     classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
@@ -33,29 +34,35 @@ pub fn make_trace_context_propagator_class(
     class
         .add_method("inject", Visibility::Public, |this, arguments| -> phper::Result<()> {
             // Context (optional, default to Context::current)
-            /*let context_obj = arguments[2].expect_mut_z_obj()?;
+            let context_obj = arguments[2].expect_mut_z_obj()?;
             let context_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
+            tracing::debug!("inject() using context_id = {}", context_id);
 
             let context = storage::get_context_instance(context_id as u64);
+            let context_ref = context.as_ref().map(|arc| arc.as_ref()).expect("invalid context");
 
-            // Carrier (PHP array passed by ref)
-            //if let Some(array) = arguments.get(1).and_then(|attrs| attrs.as_z_arr()) {
-            let carrier = arguments[0].as_z_arr()?;
+            // Carrier gymnastics (PHP array passed by ref)
+            let carrier_ref = arguments[0].expect_mut_z_ref()?;
+            let carrier_val = carrier_ref.val_mut();
+            let mut cloned = carrier_val.clone();
+
+            let zarr = cloned
+                .as_mut_z_arr()
+                .ok_or_else(|| phper::Error::boxed("Expected carrier to be an array"))?;
+
             let mut out_map = std::collections::HashMap::<String, String>::new();
 
             // Use global propagator to inject
             opentelemetry::global::get_text_map_propagator(|prop| {
-                prop.inject_context(&context, &mut |k, v| {
-                    out_map.insert(k.to_string(), v.to_string());
-                });
+                prop.inject_context(context_ref, &mut out_map);
             });
 
             for (k, v) in out_map {
-                carrier.insert(ZVal::from(k), ZVal::from(v));
+                tracing::debug!(target: "otel::trace::propagation::trace_context_propagator", "inject() inserting {} = {}", k, v);
+                zarr.insert(k.as_str(), ZVal::from(v));
             }
-
-            Ok::<_, phper::Error>(())*/
-            Ok(())
+            *carrier_val = cloned;
+            Ok::<_, phper::Error>(())
         })
         .argument(Argument::new("carrier").with_type_hint(ArgumentTypeHint::Mixed).by_ref())
         .argument(Argument::new("setter").allow_null().with_default_value("null"))

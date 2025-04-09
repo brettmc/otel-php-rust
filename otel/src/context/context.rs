@@ -47,7 +47,6 @@ pub fn build_context_class(
             Ok::<_, Infallible>(())
         });
 
-    //TODO: on context destruct, delete from storage (iff not stored by scope)
     class
         .add_method("__destruct", Visibility::Public, |this, _| {
             let context_id = this.get_property("context_id").as_long().expect("invalid context_id stored");
