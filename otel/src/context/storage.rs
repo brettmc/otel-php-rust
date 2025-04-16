@@ -194,7 +194,6 @@ pub fn build_storage_class(
             attach_context(instance_id as u64).map_err(phper::Error::boxed)?;
 
             let mut object = scope_ce_attach.init_object()?;
-            *object.as_mut_state() = None;
             object.set_property("context_id", instance_id as i64);
             Ok::<_, phper::Error>(object)
         })

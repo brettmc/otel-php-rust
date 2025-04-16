@@ -20,11 +20,11 @@ use std::{
 };
 
 const SCOPE_CLASS_NAME: &str = r"OpenTelemetry\Context\Scope";
-pub type ScopeClass = StateClass<Option<()>>;
-pub type ScopeClassEntity = ClassEntity<Option<()>>;
+pub type ScopeClass = StateClass<()>;
+pub type ScopeClassEntity = ClassEntity<()>;
 
 pub fn new_scope_class() -> ScopeClassEntity {
-    ClassEntity::<Option<()>>::new_with_default_state_constructor(SCOPE_CLASS_NAME)
+    ScopeClassEntity::new_with_default_state_constructor(SCOPE_CLASS_NAME)
 }
 
 pub fn build_scope_class(
