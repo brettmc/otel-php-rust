@@ -1,6 +1,7 @@
 use anyhow::Context as _;
 use phper::{
     eg,
+    ini::ini_get,
     sg,
     sys,
     sys::sapi_module,
@@ -28,6 +29,7 @@ use crate::{
 
 thread_local! {
     static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = RefCell::new(None);
+    static OTEL_CONTEXT_ID: RefCell<Option<u64>> = RefCell::new(None);
 }
 
 pub fn init() {
@@ -39,20 +41,30 @@ pub fn init() {
     }
     let sapi = get_sapi_module_name();
     tracing::debug!("RINIT::sapi module name is: {}", sapi.clone());
+    let mut span_name: Option<String> = None;
     if sapi == "cli" {
-        tracing::debug!("RINIT::not auto-creating root span...");
-        return;
+        let trace_cli = ini_get::<bool>("otel.cli.create_root_span");
+        if trace_cli {
+            tracing::debug!("RINIT::tracing cli enabled by ini");
+            span_name = Some("php:cli".to_string());
+        } else {
+            tracing::debug!("RINIT::not auto-creating root span...");
+            return;
+        }
     }
     let request_details = get_request_details();
-    let span_name = match &request_details.method {
-        Some(method) => format!("{}", method),
-        None => "<unknown>".to_string(),
-    };
-    tracing::debug!("RINIT::otel request is being traced, name={}", span_name.clone());
+    if span_name.is_none() {
+        span_name = match &request_details.method {
+            Some(method) => Some(format!("{}", method)),
+            None => Some("<unknown>".to_string()),
+        };
+    }
+
+    tracing::debug!("RINIT::otel request is being traced, name={}", span_name.clone().unwrap_or("unknown".to_string()));
     let tracer_provider = tracer_provider::get_tracer_provider();
     let scope = InstrumentationScope::builder("php_request").build();
     let tracer = tracer_provider.tracer_with_scope(scope);
-    let span_builder = tracer.span_builder(span_name);
+    let span_builder = tracer.span_builder(span_name.unwrap_or("unknown".to_string()));
     let mut attributes = span_builder.attributes.clone().unwrap_or_default();
     attributes.push(KeyValue::new("php.sapi.name", get_sapi_module_name()));
     attributes.push(KeyValue::new(SemConv::trace::URL_FULL, request_details.uri.unwrap_or_default()));
@@ -67,6 +79,9 @@ pub fn init() {
     let span = tracer.build_with_context(span_builder, &parent_context);
     let ctx = Context::current_with_span(span);
     let context_id = storage::store_context_instance(Arc::new(ctx.clone()));
+    OTEL_CONTEXT_ID.with(|cell| {
+        *cell.borrow_mut() = Some(context_id);
+    });
     if is_local_root {
         local_root_span::store_local_root_span(context_id);
     }
@@ -79,24 +94,45 @@ pub fn init() {
 }
 
 pub fn shutdown() {
+    let is_tracing = OTEL_CONTEXT_ID.with(|cell| cell.borrow().is_some());
     let sapi = get_sapi_module_name();
-    if sapi == "cli" {
+    if !is_tracing {
         tracing::debug!("RSHUTDOWN::not auto-closing root span...");
         return;
     }
+    let is_http_request = sapi != "cli";
     tracing::debug!("RSHUTDOWN::auto-closing root span...");
-    let response_code = get_response_status_code();
     let ctx = Context::current();
     let span = ctx.span();
     if span.span_context().is_valid() {
-        span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
+        if is_http_request {
+            let response_code = get_response_status_code();
+            span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
+        }
         span.end();
-        //TODO remove context from storage
+        OTEL_CONTEXT_ID.with(|cell| {
+            if let Some(context_id) = cell.borrow_mut().take() {
+                tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
+                storage::maybe_remove_context_instance(context_id);
+            } else {
+                tracing::info!("RSHUTDOWN::no context to remove??");
+            }
+        });
     }
 
     OTEL_REQUEST_GUARD.with(|slot| {
         *slot.borrow_mut() = None;
     });
+    OTEL_CONTEXT_ID.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+    //final check: there should be stored context
+    let stored_context_ids = storage::get_context_ids();
+    if !stored_context_ids.is_empty() {
+        tracing::warn!("RSHUTDOWN::context still stored: {:?}", stored_context_ids);
+    } else {
+        tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
+    }
 }
 
 fn get_sapi_module_name() -> String {

@@ -102,6 +102,7 @@ pub fn get_module() -> Module {
     module.add_info("tokio", TOKIO_VERSION);
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
+    module.add_ini("otel.cli.create_root_span", false, Policy::All);
 
     //interfaces
     let scope_interface = module.add_interface(make_scope_interface());

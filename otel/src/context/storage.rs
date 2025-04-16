@@ -222,3 +222,11 @@ pub fn build_storage_class(
         })
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))).allow_null());
 }
+
+pub fn get_context_ids() -> Vec<u64> {
+    CONTEXT_STORAGE.with(|cell| {
+        let storage = cell.borrow();
+        let keys: Vec<u64> = storage.keys().cloned().collect();
+        keys
+    })
+}
