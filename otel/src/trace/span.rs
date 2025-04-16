@@ -274,7 +274,6 @@ pub fn make_span_class(
 
                 let mut object = scope_ce.init_object()?;
                 object.set_property("context_id", instance_id as i64);
-                *object.as_mut_state() = None;
                 Ok::<_, phper::Error>(object)
             }
         });

@@ -178,7 +178,7 @@ pub fn build_storage_class(
 
     class
         .add_static_method("current", Visibility::Public, move |_| {
-            //TODO current from storage's perspective of opentelemetry-rust's?
+            //TODO current from storage's perspective or opentelemetry-rust's?
             let context = Arc::new(Context::current());
             let mut object = context_ce.clone().init_object()?;
             *object.as_mut_state() = Some(context);
@@ -191,11 +191,9 @@ pub fn build_storage_class(
         .add_method("attach", Visibility::Public, move |_, arguments| {
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
             let instance_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
-            //let context = get_context_instance(instance_id as u64).expect("context not found");
             attach_context(instance_id as u64).map_err(phper::Error::boxed)?;
 
             let mut object = scope_ce_attach.init_object()?;
-            *object.as_mut_state() = None;
             object.set_property("context_id", instance_id as i64);
             Ok::<_, phper::Error>(object)
         })
@@ -209,9 +207,8 @@ pub fn build_storage_class(
                 stack.borrow_mut().pop()
             });
             match popped {
-                Some((guard, context_id)) => {
+                Some((_guard, context_id)) => {
                     let mut object = scope_ce_scope.init_object()?;
-                    *object.as_mut_state() = Some(guard);
                     object.set_property("context_id", context_id as i64);
                     Ok::<_, phper::Error>(object.into())
                 }
