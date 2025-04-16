@@ -11,8 +11,11 @@ use crate::{
         }
     },
     trace::{
+        local_root_span::make_local_root_span_class,
+        non_recording_span::make_non_recording_span_class,
         plugin_manager::PluginManager,
         span::{make_span_class},
+        span_interface::make_span_interface,
         span_builder::{make_span_builder_class},
         status_code::{make_status_code_interface},
         tracer::{make_tracer_class},
@@ -56,7 +59,10 @@ pub mod context{
     }
 }
 pub mod trace{
+    pub mod local_root_span;
+    pub mod non_recording_span;
     pub mod span;
+    pub mod span_interface;
     pub mod span_builder;
     pub mod span_context;
     pub mod status_code;
@@ -104,6 +110,7 @@ pub fn get_module() -> Module {
     let tracer_interface = module.add_interface(make_tracer_interface());
     let tracer_provider_interface = module.add_interface(make_tracer_provider_interface());
     let text_map_propagator_interface = module.add_interface(make_text_map_propagator_interface());
+    let span_interface = module.add_interface(make_span_interface());
 
     //co-dependent classes
     let mut scope_class_entity = new_scope_class();
@@ -119,8 +126,10 @@ pub fn get_module() -> Module {
     let context_class = module.add_class(context_class_entity);
     let _storage_class = module.add_class(storage_class_entity);
 
-    let span_class = module.add_class(make_span_class(scope_class, span_context_class.clone(), context_class.clone()));
+    let span_class = module.add_class(make_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
+    let non_recording_span_class = module.add_class(make_non_recording_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
     let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
+    let _local_root_span_class = module.add_class(make_local_root_span_class(span_class.clone(), non_recording_span_class.clone()));
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone(), tracer_interface));
     let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone(), tracer_provider_interface));

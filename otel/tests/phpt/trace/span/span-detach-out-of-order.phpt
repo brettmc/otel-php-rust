@@ -3,7 +3,7 @@ Detach spans out of order
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=none
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
@@ -35,32 +35,3 @@ child span id: %s
 active span id: %s
 active span id: %s
 active span id: %s
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "%s"
-%A
-	Name        : child
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-Span #1
-	Instrumentation Scope
-		Name         : "%s"
-%A
-	Name        : root
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset

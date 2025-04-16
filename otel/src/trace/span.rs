@@ -1,14 +1,13 @@
 use phper::{
     arrays::IterKey,
     alloc::ToRefOwned,
-    classes::{ClassEntity, StateClass, Visibility},
+    classes::{ClassEntity, Interface, StateClass, Visibility},
     errors::ThrowObject,
     functions::Argument,
     objects::{ZObj, ZObject},
 };
 use std::{
     borrow::Cow,
-    cell::RefCell,
     convert::Infallible,
     sync::Arc,
 };
@@ -30,33 +29,29 @@ use crate::{
     },
     trace::{
         span_context::SpanContextClass,
+        local_root_span::store_local_root_span,
     },
     util,
 };
 
 const SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Span";
 
-// The span related to a class instance is stored as a class entity (SdkSpan) if the span has been
-// started but not activated. Once it has been activated, the class entity is set to None, and the context
-// is stored in CONTEXT_STORAGE, and a reference to the context created and stored as a class property.
-// Each method that operates on the span needs to check for SdkSpan then stored context, and then operate on
-// the appropriate one.
-thread_local! {
-    static LOCAL_ROOT_SPAN: RefCell<Option<Context>> = RefCell::new(None);
-}
 pub type SpanClass = StateClass<Option<SdkSpan>>;
 
 pub fn make_span_class(
     scope_class: ScopeClass,
     span_context_class: SpanContextClass,
     context_class: ContextClass,
+    span_interface: &Interface,
 ) -> ClassEntity<Option<SdkSpan>> {
     let mut class =
         ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(SPAN_CLASS_NAME);
     let span_class = class.bound_class();
-    let span_class_clone = span_class.clone();
+
+    class.implements(span_interface.clone());
 
     class.add_property("context_id", Visibility::Private, 0i64);
+    class.add_property("is_local_root", Visibility::Private, false);
 
     class.add_method("__construct", Visibility::Private, |_, _| {
         Ok::<_, Infallible>(())
@@ -258,22 +253,8 @@ pub fn make_span_class(
                 Ok::<_, phper::Error>(object)
             }
         });
-    
-    //TODO move this to LocalRootSpan::current() to match opentelemetry-php ?
-    class
-        .add_static_method("getLocalRoot", Visibility::Public, move |_| {
-            if let Some(ctx) = get_local_root_span() {
-                let instance_id = storage::store_context_instance(Arc::new(ctx.clone()));
-                let mut object = span_class_clone.clone().init_object()?;
-                *object.as_mut_state() = None;
-                object.set_property("context_id", instance_id as i64);
-                Ok::<_, phper::Error>(object)
-            } else {
-                return Err(phper::Error::boxed("No local root span"))
-            }
 
-        });
-
+    //TODO should activate() use storeInContext()
     class
         .add_method("activate", Visibility::Public, {
             let scope_ce = scope_class.clone();
@@ -282,12 +263,12 @@ pub fn make_span_class(
                 let is_local_root = !storage::current_context().span().span_context().is_valid();
 
                 let ctx = Context::current_with_span(span);
-                if is_local_root {
-                    store_local_root_span(ctx.clone());
-                }
-
                 let instance_id = storage::store_context_instance(Arc::new(ctx.clone()));
                 this.set_property("context_id", instance_id as i64);
+                if is_local_root {
+                    this.set_property("is_local_root", true);
+                    store_local_root_span(instance_id);
+                }
 
                 storage::attach_context(instance_id).map_err(phper::Error::boxed)?;
 
@@ -329,12 +310,4 @@ pub fn make_span_class(
         });
 
     class
-}
-
-pub fn store_local_root_span(context: Context) {
-    LOCAL_ROOT_SPAN.with(|storage| *storage.borrow_mut() = Some(context.clone()));
-}
-
-pub fn get_local_root_span() -> Option<Context> {
-    LOCAL_ROOT_SPAN.with(|storage| storage.borrow().clone())
 }
