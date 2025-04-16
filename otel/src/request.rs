@@ -11,6 +11,7 @@ use std::{
     cell::RefCell,
     ffi::CStr,
     collections::HashMap,
+    sync::Arc,
 };
 use opentelemetry::{
     Context,
@@ -20,7 +21,10 @@ use opentelemetry::{
     trace::{SpanKind, Tracer, TraceContextExt, TracerProvider},
 };
 use opentelemetry_semantic_conventions as SemConv;
-use crate::trace::{span, tracer_provider};
+use crate::{
+    context::storage,
+    trace::{local_root_span, tracer_provider},
+};
 
 thread_local! {
     static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = RefCell::new(None);
@@ -62,8 +66,9 @@ pub fn init() {
     let is_local_root = !Context::current().span().span_context().is_valid();
     let span = tracer.build_with_context(span_builder, &parent_context);
     let ctx = Context::current_with_span(span);
+    let context_id = storage::store_context_instance(Arc::new(ctx.clone()));
     if is_local_root {
-        span::store_local_root_span(ctx.clone());
+        local_root_span::store_local_root_span(context_id);
     }
     let guard = ctx.attach();
 

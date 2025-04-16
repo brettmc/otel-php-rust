@@ -1,6 +1,9 @@
-use crate::context::{
-    context::ContextClassEntity,
-    storage,
+use crate::{
+    context::{
+        context::ContextClassEntity,
+        storage,
+    },
+    trace::local_root_span,
 };
 use phper::{
     classes::{
@@ -47,6 +50,7 @@ pub fn build_scope_class(
             let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
             if instance_id > 0 {
                 storage::detach_context(instance_id as u64);
+                local_root_span::maybe_remove_local_root_span(instance_id as u64);
             }
             Ok(())
         })
