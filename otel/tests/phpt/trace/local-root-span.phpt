@@ -1,7 +1,5 @@
 --TEST--
 Local root span
---XFAIL--
-Should return non-recording span
 --EXTENSIONS--
 otel
 --ENV--
@@ -20,18 +18,12 @@ $root = $tracer->spanBuilder('root')->startSpan();
 var_dump($root);
 $scope = $root->activate();
 var_dump($root);
-$local_root = LocalRootSpan::current();
-var_dump($local_root);
+var_dump(LocalRootSpan::current());
 $root->end();
 $scope->detach();
 
 //there should be no local root span
-try {
-    $local_root = LocalRootSpan::current();
-} catch (\Throwable $t) {
-    var_dump($t->getMessage());
-}
-
+var_dump(LocalRootSpan::current());
 ?>
 --EXPECTF--
 object(OpenTelemetry\API\Trace\Span)#3 (2) {

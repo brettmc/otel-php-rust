@@ -12,6 +12,7 @@ use crate::{
         storage,
     },
     trace::{
+        non_recording_span::{NonRecordingSpanClass},
         span::SpanClass,
     },
 };
@@ -24,6 +25,7 @@ thread_local! {
 
 pub fn make_local_root_span_class(
     span_class: SpanClass,
+    non_recording_span_class: NonRecordingSpanClass,
 ) -> ClassEntity<()> {
     let mut class =
         ClassEntity::<()>::new_with_default_state_constructor(LOCAL_ROOT_SPAN_CLASS_NAME);
@@ -41,8 +43,9 @@ pub fn make_local_root_span_class(
                 object.set_property("is_local_root", true);
                 Ok::<_, phper::Error>(object)
             } else {
-                //TODO return a non-recording span
-                return Err(phper::Error::boxed("No local root span"))
+                tracing::info!("Returning non-recording span");
+                let object = non_recording_span_class.clone().init_object()?;
+                Ok::<_, phper::Error>(object)
             }
         })
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Span\SpanInterface"))))
