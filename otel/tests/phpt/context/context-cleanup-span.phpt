@@ -85,3 +85,5 @@ string(13) "pre: span end"
 string(14) "post: span end"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = 0
 %A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::CONTEXT_STORAGE is empty :)
+%A

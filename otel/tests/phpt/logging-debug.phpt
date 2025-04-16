@@ -27,6 +27,7 @@ Globals::tracerProvider()
 %A
 [%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::RSHUTDOWN
 [%s] [DEBUG] [%s] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::not auto-closing root span...
+[%s] [DEBUG] [%s] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::CONTEXT_STORAGE is empty :)
 [%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::MSHUTDOWN
 [%s] [INFO] [%s] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=Flushing TracerProvider for pid %d
 [%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToForceFlush message= name=BatchSpanProcessor.ExportingDueToForceFlush
