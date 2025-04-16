@@ -70,6 +70,7 @@ pub fn init() {
     if is_local_root {
         local_root_span::store_local_root_span(context_id);
     }
+    //TODO use span::storeInContext logic
     let guard = ctx.attach();
 
     OTEL_REQUEST_GUARD.with(|slot| {
@@ -90,6 +91,7 @@ pub fn shutdown() {
     if span.span_context().is_valid() {
         span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
         span.end();
+        //TODO remove context from storage
     }
 
     OTEL_REQUEST_GUARD.with(|slot| {

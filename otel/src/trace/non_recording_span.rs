@@ -94,21 +94,25 @@ pub fn make_non_recording_span_class(
 
     class
         .add_static_method("getCurrent", Visibility::Public, |_| {
+            //TODO
             Ok::<_, phper::Error>(())
         });
 
     class
         .add_method("activate", Visibility::Public, |_, _| {
+            //TODO
             Ok::<_, phper::Error>(())
         });
 
     class
         .add_method("storeInContext", Visibility::Public, move |_, _| {
+            //TODO
             Ok::<_, phper::Error>(())
         }); //argument ContextInterface, return ContextInterface
 
     class
         .add_static_method("fromContext", Visibility::Public, move |_| {
+            //TODO
             Ok::<_, phper::Error>(())
         });
 
