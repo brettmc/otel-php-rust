@@ -18,17 +18,13 @@ use phper::{
 use std::{
     convert::Infallible,
 };
-use opentelemetry::{
-    ContextGuard,
-};
 
 const SCOPE_CLASS_NAME: &str = r"OpenTelemetry\Context\Scope";
-pub type ScopeClass = StateClass<Option<ContextGuard>>;
-pub type ScopeClassEntity = ClassEntity<Option<ContextGuard>>;
+pub type ScopeClass = StateClass<Option<()>>;
+pub type ScopeClassEntity = ClassEntity<Option<()>>;
 
-//TODO no longer directly wraps ContextGuard
 pub fn new_scope_class() -> ScopeClassEntity {
-    ClassEntity::<Option<ContextGuard>>::new_with_default_state_constructor(SCOPE_CLASS_NAME)
+    ClassEntity::<Option<()>>::new_with_default_state_constructor(SCOPE_CLASS_NAME)
 }
 
 pub fn build_scope_class(

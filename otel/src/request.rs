@@ -94,12 +94,14 @@ pub fn init() {
 }
 
 pub fn shutdown() {
-    let is_tracing = OTEL_CONTEXT_ID.with(|cell| cell.borrow().is_some());
+    let context_id = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take());
+    let is_tracing = context_id.is_some();
     let sapi = get_sapi_module_name();
     if is_tracing {
+        let context_id = context_id.unwrap();
         let is_http_request = sapi != "cli";
         tracing::debug!("RSHUTDOWN::auto-closing root span...");
-        let ctx = Context::current();
+        let ctx = storage::get_context_instance(context_id).unwrap();
         let span = ctx.span();
         if span.span_context().is_valid() {
             if is_http_request {
@@ -107,14 +109,9 @@ pub fn shutdown() {
                 span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
             }
             span.end();
-            OTEL_CONTEXT_ID.with(|cell| {
-                if let Some(context_id) = cell.borrow_mut().take() {
-                    tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
-                    storage::maybe_remove_context_instance(context_id);
-                } else {
-                    tracing::info!("RSHUTDOWN::no context to remove??");
-                }
-            });
+            tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
+            drop(ctx);
+            storage::maybe_remove_context_instance(context_id);
         }
 
         OTEL_REQUEST_GUARD.with(|slot| {
