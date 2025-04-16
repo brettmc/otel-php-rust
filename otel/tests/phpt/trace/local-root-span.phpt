@@ -14,6 +14,9 @@ use OpenTelemetry\API\Trace\LocalRootSpan;
 
 $tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 
+//initially, there is no local root span
+var_dump(LocalRootSpan::current());
+
 $root = $tracer->spanBuilder('root')->startSpan();
 var_dump($root);
 $scope = $root->activate();
@@ -26,6 +29,8 @@ $scope->detach();
 var_dump(LocalRootSpan::current());
 ?>
 --EXPECTF--
+object(OpenTelemetry\API\Trace\NonRecordingSpan)#1 (0) {
+}
 object(OpenTelemetry\API\Trace\Span)#3 (2) {
   ["context_id":"OpenTelemetry\API\Trace\Span":private]=>
   int(0)
