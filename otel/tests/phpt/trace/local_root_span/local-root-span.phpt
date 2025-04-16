@@ -16,38 +16,28 @@ $tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')
 
 //initially, there is no local root span
 var_dump(LocalRootSpan::current());
+assert(LocalRootSpan::current()->getContext()->isValid() === false);
 
 $root = $tracer->spanBuilder('root')->startSpan();
-var_dump($root);
 $scope = $root->activate();
-var_dump($root);
+$localRoot = LocalRootSpan::current();
+assert(LocalRootSpan::current()->getContext()->getSpanId() === $root->getContext()->getSpanId());
 var_dump(LocalRootSpan::current());
 $root->end();
 $scope->detach();
 
 //there should be no local root span
 var_dump(LocalRootSpan::current());
+assert(LocalRootSpan::current()->getContext()->isValid() === false);
 ?>
 --EXPECTF--
-object(OpenTelemetry\API\Trace\NonRecordingSpan)#1 (0) {
+object(OpenTelemetry\API\Trace\NonRecordingSpan)#%d (0) {
 }
-object(OpenTelemetry\API\Trace\Span)#3 (2) {
-  ["context_id":"OpenTelemetry\API\Trace\Span":private]=>
-  int(0)
-  ["is_local_root":"OpenTelemetry\API\Trace\Span":private]=>
-  bool(false)
-}
-object(OpenTelemetry\API\Trace\Span)#3 (2) {
+object(OpenTelemetry\API\Trace\Span)#%d (2) {
   ["context_id":"OpenTelemetry\API\Trace\Span":private]=>
   int(1)
   ["is_local_root":"OpenTelemetry\API\Trace\Span":private]=>
   bool(true)
 }
-object(OpenTelemetry\API\Trace\Span)#4 (2) {
-  ["context_id":"OpenTelemetry\API\Trace\Span":private]=>
-  int(1)
-  ["is_local_root":"OpenTelemetry\API\Trace\Span":private]=>
-  bool(true)
-}
-object(OpenTelemetry\API\Trace\NonRecordingSpan)#4 (0) {
+object(OpenTelemetry\API\Trace\NonRecordingSpan)#%d (0) {
 }
