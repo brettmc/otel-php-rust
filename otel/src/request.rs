@@ -96,37 +96,37 @@ pub fn init() {
 pub fn shutdown() {
     let is_tracing = OTEL_CONTEXT_ID.with(|cell| cell.borrow().is_some());
     let sapi = get_sapi_module_name();
-    if !is_tracing {
-        tracing::debug!("RSHUTDOWN::not auto-closing root span...");
-        return;
-    }
-    let is_http_request = sapi != "cli";
-    tracing::debug!("RSHUTDOWN::auto-closing root span...");
-    let ctx = Context::current();
-    let span = ctx.span();
-    if span.span_context().is_valid() {
-        if is_http_request {
-            let response_code = get_response_status_code();
-            span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
-        }
-        span.end();
-        OTEL_CONTEXT_ID.with(|cell| {
-            if let Some(context_id) = cell.borrow_mut().take() {
-                tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
-                storage::maybe_remove_context_instance(context_id);
-            } else {
-                tracing::info!("RSHUTDOWN::no context to remove??");
+    if is_tracing {
+        let is_http_request = sapi != "cli";
+        tracing::debug!("RSHUTDOWN::auto-closing root span...");
+        let ctx = Context::current();
+        let span = ctx.span();
+        if span.span_context().is_valid() {
+            if is_http_request {
+                let response_code = get_response_status_code();
+                span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
             }
-        });
-    }
+            span.end();
+            OTEL_CONTEXT_ID.with(|cell| {
+                if let Some(context_id) = cell.borrow_mut().take() {
+                    tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
+                    storage::maybe_remove_context_instance(context_id);
+                } else {
+                    tracing::info!("RSHUTDOWN::no context to remove??");
+                }
+            });
+        }
 
-    OTEL_REQUEST_GUARD.with(|slot| {
-        *slot.borrow_mut() = None;
-    });
-    OTEL_CONTEXT_ID.with(|slot| {
-        *slot.borrow_mut() = None;
-    });
-    //final check: there should be stored context
+        OTEL_REQUEST_GUARD.with(|slot| {
+            *slot.borrow_mut() = None;
+        });
+        OTEL_CONTEXT_ID.with(|slot| {
+            *slot.borrow_mut() = None;
+        });
+    } else {
+        tracing::debug!("RSHUTDOWN::not auto-closing root span...");
+    }
+    //final check: there should be zero stored context
     let stored_context_ids = storage::get_context_ids();
     if !stored_context_ids.is_empty() {
         tracing::warn!("RSHUTDOWN::context still stored: {:?}", stored_context_ids);
