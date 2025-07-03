@@ -2,6 +2,7 @@ services:
   php:
     build:
       context: .
+      dockerfile: Dockerfile
     volumes:
     - ./otel/:/usr/src/myapp
     - ./otel/.cargo/registry:/home/php-rust/.cargo/registry

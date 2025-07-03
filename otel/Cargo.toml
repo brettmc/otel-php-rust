@@ -1,11 +1,13 @@
 [package]
 name = "otel"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2021"
 publish = false
 
 [features]
 test = []
+php_observer = [] #enable observer API support (php8+)
+php_execute = [] #enable execute API support (php7)
 
 [lib]
 name = "otel"

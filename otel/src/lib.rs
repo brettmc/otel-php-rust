@@ -13,7 +13,6 @@ use crate::{
     trace::{
         local_root_span::make_local_root_span_class,
         non_recording_span::make_non_recording_span_class,
-        plugin_manager::PluginManager,
         span::{make_span_class},
         span_interface::make_span_interface,
         span_builder::{make_span_builder_class},
@@ -36,7 +35,6 @@ use phper::{
     ini::Policy,
     modules::Module,
     php_get_module,
-    sys,
 };
 use opentelemetry::{
     global,
@@ -82,9 +80,19 @@ pub mod trace{
 }
 pub mod globals;
 pub mod request;
-pub mod observer;
 pub mod logging;
 pub mod util;
+
+// conditional compilation for observer feature (php8+)
+#[cfg(feature = "php_observer")]
+pub mod observer;
+#[cfg(feature = "php_observer")]
+use crate::trace::plugin_manager::PluginManager;
+#[cfg(feature = "php_observer")]
+use phper::sys;
+
+#[cfg(feature = "php_execute")]
+pub mod execute;
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
@@ -140,15 +148,24 @@ pub fn get_module() -> Module {
     module.on_module_init(|| {
         logging::print_message("OpenTelemetry::MINIT".to_string());
 
-        observer::init(PluginManager::new());
-        unsafe {
-            sys::zend_observer_fcall_register(Some(observer::observer_instrument));
+        #[cfg(feature = "php_observer")]
+        {
+            observer::init(PluginManager::new());
+            //todo: do this in observer.rs ?
+            unsafe {
+                sys::zend_observer_fcall_register(Some(observer::observer_instrument));
+            }
+            logging::print_message("registered fcall handlers".to_string());
         }
-        logging::print_message("registered fcall handlers".to_string());
+        #[cfg(feature = "php_execute")]
+        {
+            execute::register_exec_functions();
+            //PluginManager::init();
+        }
     });
     module.on_module_shutdown(|| {
         logging::print_message("OpenTelemetry::MSHUTDOWN".to_string());
-        tracer_provider::force_flush();
+        tracer_provider::shutdown();
     });
     module.on_request_init(|| {
         logging::print_message("OpenTelemetry::RINIT".to_string());

@@ -1,21 +1,20 @@
 --TEST--
-Test internal events logged
+Test php7 functionality
 --EXTENSIONS--
 otel
 --INI--
 otel.log.level="trace"
 otel.log.file="/dev/stdout"
+--SKIPIF--
+<?php if (PHP_VERSION_ID > 80000) die('skip requires PHP7'); ?>
 --ENV--
 OTEL_TRACES_EXPORTER=console
 --FILE--
 <?php
-use OpenTelemetry\API\Globals;
-
-Globals::tracerProvider()
-    ->getTracer('my_tracer', '0.1', 'schema.url')
-    ->spanBuilder('root')
-    ->startSpan()
-    ->end();
+function my_test() {
+    echo "hello world\n";
+}
+my_test();
 ?>
 --EXPECTF--
 %A
@@ -29,11 +28,14 @@ Globals::tracerProvider()
 [%s] [DEBUG] [%s] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::not auto-closing root span...
 [%s] [DEBUG] [%s] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::CONTEXT_STORAGE is empty :)
 [%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::MSHUTDOWN
-[%s] [INFO] [%s] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=Shutting down TracerProvider for pid %d
-[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToShutdown message= name=BatchSpanProcessor.ExportingDueToShutdown
+[%s] [INFO] [%s] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=Flushing TracerProvider for pid %d
+[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToForceFlush message= name=BatchSpanProcessor.ExportingDueToForceFlush
 Spans
 Resource
 %A
 Span #0
 %A
+[%s] [DEBUG] [%s] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=OpenTelemetry tracer provider flush success
+[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToShutdown message= name=BatchSpanProcessor.ExportingDueToShutdown
+[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadExiting message= name=BatchSpanProcessor.ThreadExiting reason=ShutdownRequested
 [%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStopped message= name=BatchSpanProcessor.ThreadStopped
