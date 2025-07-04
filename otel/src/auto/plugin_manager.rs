@@ -1,8 +1,8 @@
-use crate::auto::plugin::Plugin;
+use crate::auto::plugin::{FunctionObserver, Plugin};
 use crate::auto::plugins::{
     psr18::Psr18Plugin,
 };
-use crate::auto::plugin::{FunctionObserver};
+use crate::logging;
 use phper::{
     classes::ClassEntry,
     functions::ZFunc,
@@ -16,6 +16,8 @@ pub struct PluginManager {
 
 impl PluginManager {
     pub fn new() -> Self {
+        logging::print_message("PluginManager::init".to_string());
+        // tracing::debug!("PluginManager::new");
         let mut manager = Self {plugins: vec![] };
         manager.init();
         manager

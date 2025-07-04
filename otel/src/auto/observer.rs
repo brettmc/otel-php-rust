@@ -6,7 +6,6 @@ use phper::{
         ZVal,
     }
 };
-use lazy_static::lazy_static;
 use crate::{
     logging,
     auto::{
@@ -22,19 +21,15 @@ use crate::{
 };
 use std::{
     collections::HashMap,
-    sync::{OnceLock, RwLock, Mutex},
+    sync::{OnceLock, RwLock},
 };
 
 static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, FunctionObserver>>> = OnceLock::new();
-
-lazy_static! {
-    static ref PLUGIN_MANAGER: Mutex<Option<PluginManager>> = Mutex::new(None);
-}
+static PLUGIN_MANAGER: OnceLock<PluginManager> = OnceLock::new();
 
 pub fn init(plugin_manager: PluginManager) {
-    logging::print_message("PluginManager::init".to_string());
-    let mut manager_lock = PLUGIN_MANAGER.lock().unwrap();
-    *manager_lock = Some(plugin_manager);
+    logging::print_message("Observer::init".to_string());
+    PLUGIN_MANAGER.get_or_init(|| plugin_manager);
     FUNCTION_OBSERVERS.get_or_init(|| RwLock::new(HashMap::new()));
 }
 
@@ -42,23 +37,19 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
     if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
         let fqn = get_fqn(exec_data);
         //tracing::trace!("observer::observer_instrument checking: {}", fqn);
-        let manager_lock = PLUGIN_MANAGER.lock().unwrap();
-        if let Some(plugin_manager) = manager_lock.as_ref() {
-            if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
-                let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-                let fqn = fqn.to_string();
-                let mut lock = observers.write().unwrap();
-                lock.insert(fqn, observer);
+        let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
+        if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
+            let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
+            let fqn = fqn.to_string();
+            let mut lock = observers.write().unwrap();
+            lock.insert(fqn, observer);
 
-                static mut HANDLERS: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
-                    begin: Some(pre_observe_c_function),
-                    end: Some(post_observe_c_function),
-                };
+            static mut HANDLERS: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
+                begin: Some(pre_observe_c_function),
+                end: Some(post_observe_c_function),
+            };
 
-                return unsafe { HANDLERS };
-            }
-        } else {
-            tracing::error!("Plugin manager not available");
+            return unsafe { HANDLERS };
         }
     }
 

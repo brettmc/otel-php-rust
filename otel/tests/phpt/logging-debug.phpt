@@ -19,8 +19,6 @@ Globals::tracerProvider()
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [%s] [ThreadId(%d)] PluginManager::init
-[%s] [DEBUG] [%s] [ThreadId(%d)] registered fcall handlers
 [%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::RINIT
 %A
 [%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048

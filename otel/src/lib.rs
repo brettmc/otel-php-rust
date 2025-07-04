@@ -108,6 +108,8 @@ pub mod auto{
         pub mod test;
     }
 }
+#[cfg(feature = "php_execute")]
+use crate::auto::plugin_manager::PluginManager;
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
@@ -185,8 +187,7 @@ pub fn get_module() -> Module {
         }
         #[cfg(feature = "php_execute")]
         {
-            crate::auto::execute::register_exec_functions();
-            //PluginManager::init();
+            crate::auto::execute::init(PluginManager::new());
         }
     });
     module.on_module_shutdown(|| {
