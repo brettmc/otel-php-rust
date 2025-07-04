@@ -7,7 +7,7 @@ use phper::{
     functions::{Argument, ReturnType},
     objects::ZObj,
     types::{ArgumentTypeHint, ReturnTypeHint},
-    values::ZVal,
+    values::{ExecuteData, ZVal},
 };
 use std::{
     cell::RefCell,
@@ -33,6 +33,7 @@ pub type StorageClassEntity = ClassEntity<()>;
 thread_local! {
     static CONTEXT_STORAGE: RefCell<HashMap<u64, Arc<Context>>> = RefCell::new(HashMap::new());
     static GUARD_STACK: RefCell<Vec<(ContextGuard, u64)>> = RefCell::new(Vec::new());
+    static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new()); //for observer use
 }
 static INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -226,4 +227,16 @@ pub fn get_context_ids() -> Vec<u64> {
         let keys: Vec<u64> = storage.keys().cloned().collect();
         keys
     })
+}
+
+pub fn store_guard(exec_data: *mut ExecuteData, guard: ContextGuard) {
+    let key = exec_data as *const ExecuteData as usize;
+    CONTEXT_GUARD_MAP.with(|map| {
+        map.borrow_mut().insert(key, guard);
+    });
+}
+
+pub fn take_guard(exec_data: *mut ExecuteData) -> Option<ContextGuard> {
+    let key = exec_data as *const ExecuteData as usize;
+    CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
 }

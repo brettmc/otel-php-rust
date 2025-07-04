@@ -1,8 +1,8 @@
-use super::plugin::Plugin;
-use crate::trace::plugins::{
+use crate::auto::plugin::Plugin;
+use crate::auto::plugins::{
     psr18::Psr18Plugin,
 };
-use crate::trace::plugin::{FunctionObserver};
+use crate::auto::plugin::{FunctionObserver};
 use phper::{
     classes::ClassEntry,
     functions::ZFunc,
@@ -24,7 +24,7 @@ impl PluginManager {
     fn init(&mut self) {
         self.plugins.push(Box::new(Psr18Plugin::new()));
         #[cfg(feature="test")]
-        self.plugins.push(Box::new(crate::trace::plugins::test::TestPlugin::new()));
+        self.plugins.push(Box::new(crate::auto::plugins::test::TestPlugin::new()));
     }
 
     pub fn plugins(&self) -> &Vec<Box<dyn Plugin + Send + Sync>> {
@@ -41,14 +41,14 @@ impl PluginManager {
                     let callbacks = handler.get_callbacks();
 
                     if let Some(pre) = callbacks.pre_observe {
-                        observer.add_pre_hook(Box::new(move |execute_data, span_details| unsafe {
-                            pre(execute_data, span_details);
+                        observer.add_pre_hook(Box::new(move |execute_data| unsafe {
+                            pre(execute_data);
                         }));
                     }
 
                     if let Some(post) = callbacks.post_observe {
-                        observer.add_post_hook(Box::new(move |execute_data, span_ref, retval, exception| unsafe {
-                            post(execute_data, span_ref, retval, exception);
+                        observer.add_post_hook(Box::new(move |execute_data, retval, exception| unsafe {
+                            post(execute_data, retval, exception);
                         }));
                     }
                 }
@@ -64,6 +64,7 @@ impl PluginManager {
 }
 
 fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String], plugin_name: &str) -> bool {
+    //TODO cache decisions
     let function_name: ZString = func.get_function_or_method_name();
     let function_name_str = match function_name.to_str() {
         Ok(name) => name,

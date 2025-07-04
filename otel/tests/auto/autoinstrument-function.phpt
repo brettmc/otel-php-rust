@@ -4,6 +4,9 @@ Autoinstrument a function
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+--INI--
+otel.log.level="warn"
+otel.log.file="/dev/stdout"
 --FILE--
 <?php
 function demoFunction() {
@@ -21,7 +24,7 @@ Span #0
 	Instrumentation Scope
 		Name         : "php-auto-instrumentation"
 
-	Name        : i-was-renamed
+	Name        : demo-function
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
@@ -34,5 +37,5 @@ Span #0
 		 ->  code.function.name: String(Owned("demoFunction"))
 		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/autoinstrument-function.php"))
 		 ->  code.line.number: I64(%d)
-		 ->  my-attribute: String(Static("my-value"))
+		 ->  my-attribute: String(Owned("my-value"))
 		 ->  post.attribute: String(Owned("post.value"))

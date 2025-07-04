@@ -53,7 +53,7 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "php-auto-instrumentation"
+		Name         : "psr18"
 %A
 	Name        : GET
 	TraceId     : %s

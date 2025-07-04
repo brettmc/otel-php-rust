@@ -1,10 +1,18 @@
-use crate::trace::plugin::{Handler, HandlerCallbacks, Plugin, SpanDetails};
+use crate::auto::{
+    execute_data::{get_default_attributes},
+    plugin::{Handler, HandlerCallbacks, Plugin},
+};
+use crate::tracer_provider;
+use crate::context::storage::{store_guard, take_guard};
 use opentelemetry::{
     KeyValue,
     Context,
     global,
-    trace::{SpanKind, SpanRef},
+    trace::{SpanKind},
 };
+use opentelemetry::trace::TraceContextExt;
+use opentelemetry::trace::TracerProvider;
+use opentelemetry::trace::Tracer;
 use opentelemetry_semantic_conventions as SemConv;
 use std::{
     sync::Arc,
@@ -28,7 +36,7 @@ impl Psr18Plugin {
     pub fn new() -> Self {
         Self {
             handlers: vec![
-                Arc::new(Psr18Handler),
+                Arc::new(Psr18SendRequestHandler),
             ],
         }
     }
@@ -46,9 +54,9 @@ impl Plugin for Psr18Plugin {
     }
 }
 
-pub struct Psr18Handler;
+pub struct Psr18SendRequestHandler;
 
-impl Handler for Psr18Handler {
+impl Handler for Psr18SendRequestHandler {
     fn get_functions(&self) -> Vec<String> {
         vec![]
     }
@@ -65,13 +73,14 @@ impl Handler for Psr18Handler {
     }
 }
 
-impl Psr18Handler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData, span_details: &mut SpanDetails) {
-        //TODO this uses parent span (if there is one) as the traceparent header, since this span is not
-        //     active yet. Should this handler create its own span??
+impl Psr18SendRequestHandler {
+    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+        let tracer = tracer_provider::get_tracer_provider().tracer("psr18"); //TODO: store tracer in a static variable
+        let mut name = "psr18.request".to_string();
+        let mut attributes = get_default_attributes(&*exec_data);
+
         let exec_data_ref = &mut *exec_data;
         let request_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
-        span_details.set_kind(SpanKind::Client);
 
         //TODO add more SemConv attributes...
         if let Some(request_obj) = request_zval.as_mut_z_obj() {
@@ -79,35 +88,44 @@ impl Psr18Handler {
                 if let Some(uri_obj) = uri_zval.as_mut_z_obj() {
                     if let Ok(uri_str_zval) = uri_obj.call("__toString", []) {
                         if let Some(uri_str) = uri_str_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                            span_details.add_attribute(KeyValue::new(SemConv::trace::URL_FULL, uri_str.to_owned()));
+                            attributes.push(KeyValue::new(SemConv::trace::URL_FULL, uri_str.to_owned()));
                         }
                     }
                     uri_obj.call("getScheme", [])
                         .ok()
                         .and_then(|scheme_zval| scheme_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
-                        .map(|scheme| span_details.add_attribute(KeyValue::new(SemConv::trace::URL_SCHEME, scheme)));
+                        .map(|scheme| attributes.push(KeyValue::new(SemConv::trace::URL_SCHEME, scheme)));
                     uri_obj.call("getPath", [])
                         .ok()
                         .and_then(|path_zval| path_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
-                        .map(|path| span_details.add_attribute(KeyValue::new(SemConv::trace::URL_PATH, path)));
+                        .map(|path| attributes.push(KeyValue::new(SemConv::trace::URL_PATH, path)));
                     uri_obj.call("getHost", [])
                         .ok()
                         .and_then(|host_zval| host_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
-                        .map(|host| span_details.add_attribute(KeyValue::new(SemConv::trace::SERVER_ADDRESS, host)));
+                        .map(|host| attributes.push(KeyValue::new(SemConv::trace::SERVER_ADDRESS, host)));
                     uri_obj.call("getPort", [])
                         .ok()
                         .and_then(|port_zval| port_zval.as_long())
-                        .map(|port| span_details.add_attribute(KeyValue::new(SemConv::trace::SERVER_PORT, port)));
+                        .map(|port| attributes.push(KeyValue::new(SemConv::trace::SERVER_PORT, port)));
                 }
             }
             if let Ok(method_zval) = request_obj.call("getMethod", []) {
                 if let Some(method_str) = method_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                    span_details.add_attribute(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, method_str.to_owned()));
-                    span_details.update_name(method_str);
+                    attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, method_str.to_owned()));
+                    name = method_str.to_string();
                 }
             }
         }
 
+        let span_builder = tracer.span_builder(name)
+            .with_kind(SpanKind::Client)
+            .with_attributes(attributes);
+        let span = tracer.build_with_context(span_builder, &Context::current());
+        let ctx = Context::current_with_span(span);
+        let guard = ctx.attach();
+        store_guard(exec_data, guard);
+
+        //now inject the trace context into the request headers, using the span we just started
         let mut carrier = HashMap::new();
         global::get_text_map_propagator(|prop| prop.inject_context(&Context::current(), &mut carrier));
 
@@ -126,15 +144,23 @@ impl Psr18Handler {
     }
 
     unsafe extern "C" fn post_callback(
-        _exec_data: *mut ExecuteData,
-        span_ref: &SpanRef,
+        exec_data: *mut ExecuteData,
         retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
+        //get the current span
+        let context = Context::current();
+        let span_ref = context.span();
         if let Some(exception) = exception {
             if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
                 span_ref.record_error(&throwable);
             }
+        }
+        if let Some(_guard) = take_guard(exec_data) {
+            //do nothing, _guard will go out of scope at end of function
+        } else {
+            tracing::warn!("Psr18Handler: No context guard found for post callback");
+            return;
         }
 
         if !retval.get_type_info().is_object() {

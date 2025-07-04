@@ -68,12 +68,6 @@ pub mod trace{
     pub mod tracer_interface;
     pub mod tracer_provider;
     pub mod tracer_provider_interface;
-    pub mod plugin_manager;
-    pub mod plugin;
-    pub mod plugins{
-        pub mod psr18;
-        pub mod test;
-    }
     pub mod propagation{
         pub mod trace_context_propagator;
     }
@@ -85,14 +79,28 @@ pub mod util;
 
 // conditional compilation for observer feature (php8+)
 #[cfg(feature = "php_observer")]
-pub mod observer;
+pub mod auto{
+    pub mod execute_data;
+    pub mod observer;
+    pub mod plugin_manager;
+    pub mod plugin;
+    pub mod plugins{
+        pub mod psr18;
+        pub mod test;
+    }
+}
 #[cfg(feature = "php_observer")]
-use crate::trace::plugin_manager::PluginManager;
+use crate::auto::{
+    observer,
+    plugin_manager::PluginManager
+};
 #[cfg(feature = "php_observer")]
 use phper::sys;
 
 #[cfg(feature = "php_execute")]
-pub mod execute;
+pub mod auto{
+    pub mod execute;
+}
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
