@@ -4,6 +4,9 @@ Autoinstrument an interface
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+--INI--
+otel.log.level="warn"
+otel.log.file="/dev/stdout"
 --FILE--
 <?php
 interface IDemo {

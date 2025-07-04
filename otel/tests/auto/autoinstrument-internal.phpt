@@ -4,6 +4,11 @@ Autoinstrument an internal function
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+--SKIPIF--
+<?php
+if (!defined('OTEL_AUTO_INSTRUMENTATION') || OTEL_AUTO_INSTRUMENTATION !== 'observer') {
+    die("skip observer auto-instrumentation not enabled");
+}
 --FILE--
 <?php
 var_dump(phpversion());

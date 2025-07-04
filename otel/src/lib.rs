@@ -100,6 +100,13 @@ use phper::sys;
 #[cfg(feature = "php_execute")]
 pub mod auto{
     pub mod execute;
+    pub mod execute_data;
+    pub mod plugin_manager;
+    pub mod plugin;
+    pub mod plugins{
+        pub mod psr18;
+        pub mod test;
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
@@ -119,6 +126,17 @@ pub fn get_module() -> Module {
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
     module.add_ini("otel.cli.create_root_span", false, Policy::All);
+    //which auto-instrumentation mechanism is enabled
+    #[cfg(feature = "php_observer")]
+    {
+        module.add_info("auto-instrumentation", "observer".to_string());
+        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "observer".to_string());
+    }
+    #[cfg(feature = "php_execute")]
+    {
+        module.add_info("auto-instrumentation", "zend_execute_ex".to_string());
+        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "zend_execute_ex".to_string());
+    }
 
     //interfaces
     let scope_interface = module.add_interface(make_scope_interface());
@@ -167,7 +185,7 @@ pub fn get_module() -> Module {
         }
         #[cfg(feature = "php_execute")]
         {
-            execute::register_exec_functions();
+            crate::auto::execute::register_exec_functions();
             //PluginManager::init();
         }
     });

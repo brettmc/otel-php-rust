@@ -1,7 +1,9 @@
 // Handle auto-instrumentation via zend_execute_ex wrapping (PHP 7)
 use phper::{sys, values::ExecuteData};
+use phper::values::ZVal;
 use std::ptr::null_mut;
-use crate::trace::plugin_manager::PluginManager;
+use crate::auto::plugin_manager::PluginManager;
+use crate::auto::execute_data::get_global_exception;
 use std::sync::OnceLock;
 
 static PLUGIN_MANAGER: OnceLock<PluginManager> = OnceLock::new();
@@ -22,7 +24,7 @@ pub fn register_exec_functions() {
 // This is our exec function that wraps the upstream PHP one.
 // This allows us to gather our execution timing data.
 unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
-    let execute_data = match ExecuteData::try_from_mut_ptr(execute_data) {
+    let exec_data = match ExecuteData::try_from_mut_ptr(execute_data) {
         Some(execute_data) => execute_data,
         None => {
             upstream_execute_ex(None);
@@ -31,19 +33,25 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
     };
 
     let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
-    if let Some(observer) = plugin_manager.get_function_observer(execute_data) {
+    if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
         // Run pre hooks
         for hook in observer.pre_hooks() {
-            hook(execute_data);
+            hook(exec_data);
         }
     }
 
-    upstream_execute_ex(Some(execute_data));
+    upstream_execute_ex(Some(exec_data));
 
-    if let Some(observer) = plugin_manager.get_function_observer(execute_data) {
+    if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
+        let retval_ptr: *mut sys::zval = unsafe { (*execute_data).return_value };
+        let retval = if retval_ptr.is_null() {
+            &mut ZVal::from(())
+        } else {
+            unsafe { ZVal::from_mut_ptr(retval_ptr) }
+        };
         // Run post hooks
         for hook in observer.post_hooks() {
-            hook(execute_data);
+            hook(exec_data, retval, get_global_exception());
         }
     }
 
