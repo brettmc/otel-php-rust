@@ -3,34 +3,31 @@ Create a span and record exception
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('root')->startSpan();
 $span->recordException(new \Exception('kaboom'))
      ->end();
+assert(Memory::count() === 1);
+var_dump(Memory::getSpans()[0]['events']);
 ?>
 --EXPECTF--
-Spans
-Resource
-	 ->  %A
-Span #0
-	Instrumentation Scope
-%A
-	Name        : root
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Events:
-	Event #0
-	Name      : exception
-	Timestamp : %s
-	Attributes:
-		 ->  exception.message: String(Owned("kaboom"))
+array(1) {
+  [0]=>
+  array(3) {
+    ["name"]=>
+    string(9) "exception"
+    ["timestamp"]=>
+    int(%d)
+    ["attributes"]=>
+    array(1) {
+      ["exception.message"]=>
+      string(6) "kaboom"
+    }
+  }
+}

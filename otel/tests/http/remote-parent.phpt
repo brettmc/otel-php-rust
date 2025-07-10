@@ -26,9 +26,7 @@ run_server('server-remote-parent.php', $options);
 string(32) "e77388f01a826e2de7afdcd1eefc034e"
 string(16) "%s"
 bool(false)
-==== Server Output ====
-[%s] PHP %s Development Server (%s) started
-[%s] %s Accepted
+==== Server Output ====%A
 Spans
 Resource
 %A
@@ -47,5 +45,4 @@ Span #0
 	Attributes:
 		 ->  php.sapi.name: String(Owned("cli-server"))
 		 ->  url.full: String(Owned("/"))
-		 ->  http.request.method: String(Owned("GET"))
-[%s] %s Closing
+		 ->  http.request.method: String(Owned("GET"))%A

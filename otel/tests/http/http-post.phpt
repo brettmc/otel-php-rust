@@ -23,8 +23,7 @@ run_server('server-post.php', $options);
 --EXPECTF--
 ==== Response ====
 string(4) "POST"
-==== Server Output ====
-%A
+==== Server Output ====%A
 Spans
 Resource
 %A
@@ -44,5 +43,4 @@ Span #0
 		 ->  php.sapi.name: String(Owned("cli-server"))
 		 ->  url.full: String(Owned("/"))
 		 ->  http.request.method: String(Owned("POST"))
-		 ->  http.response.status_code: I64(201)
-%A
+		 ->  http.response.status_code: I64(201)%A

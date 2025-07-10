@@ -4,6 +4,7 @@ Create a span with link
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

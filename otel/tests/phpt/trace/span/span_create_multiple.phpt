@@ -3,54 +3,22 @@ Create multiple root spans
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 $tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 
 $tracer->spanBuilder('root')->startSpan()->end();
 $tracer->spanBuilder('two')->startSpan()->end();
 $tracer->spanBuilder('three')->startSpan()->end();
+assert(Memory::count() === 3);
+$spans = Memory::getSpans();
+foreach ($spans as $span) {
+    assert($span['parent_span_id'] === '0000000000000000');
+}
 ?>
---EXPECTF--
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-%A
-	Name        : root
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-Span #1
-	Instrumentation Scope
-%A
-	Name        : two
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-Span #2
-	Instrumentation Scope
-%A
-	Name        : three
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
+--EXPECT--

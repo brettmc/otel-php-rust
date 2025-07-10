@@ -3,13 +3,15 @@ Store span in context (context created from propagator)
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\Span;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\Scope;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 $headers = [
     'traceparent' => '00-e77388f01a826e2de7afdcd1eefc034e-d6ba64af4fa59b65-01',
@@ -26,20 +28,11 @@ $scope = Context::storage()->scope();
 $scope->detach();
 $span = Span::fromContext($scope->context());
 $span->end();
+
+$span = Memory::getSpans()[0];
+var_dump($span['span_context']['trace_id']);
+var_dump($span['parent_span_id']);
 ?>
---EXPECTF--
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-%A
-	Name        : root
-	TraceId     : e77388f01a826e2de7afdcd1eefc034e
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: d6ba64af4fa59b65
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
+--EXPECT--
+string(32) "e77388f01a826e2de7afdcd1eefc034e"
+string(16) "d6ba64af4fa59b65"

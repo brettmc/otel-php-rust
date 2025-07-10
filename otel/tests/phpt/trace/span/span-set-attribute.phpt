@@ -3,10 +3,12 @@ Create a span with all features
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 $span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('root')->startSpan();
 $span->setAttribute('string', 'foo')
@@ -17,28 +19,37 @@ $span->setAttribute('string', 'foo')
      ->setAttribute('array_int', [1,2,3])
      ->setAttribute('array_string', ['one','two','three'])
      ->end();
+assert(Memory::count() === 1);
+var_dump(Memory::getSpans()[0]['attributes']);
 ?>
---EXPECTF--
-Spans
-Resource
-	 ->  %A
-Span #0
-	Instrumentation Scope
-%A
-	Name        : %s
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: %s
-	Attributes:
-		 ->  string: String(Owned("foo"))
-		 ->  int: I64(99)
-		 ->  double: F64(1.5)
-		 ->  bool_true: Bool(true)
-		 ->  bool_false: Bool(false)
-		 ->  array_int: Array(I64([1, 2, 3]))
-		 ->  array_string: Array(String([Owned("one"), Owned("two"), Owned("three")]))
+--EXPECT--
+array(7) {
+  ["string"]=>
+  string(3) "foo"
+  ["int"]=>
+  int(99)
+  ["double"]=>
+  float(1.5)
+  ["bool_true"]=>
+  bool(true)
+  ["bool_false"]=>
+  bool(false)
+  ["array_int"]=>
+  array(3) {
+    [0]=>
+    int(1)
+    [1]=>
+    int(2)
+    [2]=>
+    int(3)
+  }
+  ["array_string"]=>
+  array(3) {
+    [0]=>
+    string(3) "one"
+    [1]=>
+    string(3) "two"
+    [2]=>
+    string(5) "three"
+  }
+}

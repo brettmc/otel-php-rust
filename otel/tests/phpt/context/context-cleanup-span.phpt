@@ -1,9 +1,9 @@
 --TEST--
-Activate context
+Internal context storage empty after use
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
 --INI--
 otel.log.level="trace"
 otel.log.file="/dev/stdout"
@@ -15,6 +15,7 @@ use OpenTelemetry\Context\Context;
 
 $tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 
+// "pre hook"
 var_dump('pre: start span');
 $span = $tracer->spanBuilder('root')->startSpan();
 var_dump('post: start span');
@@ -26,7 +27,7 @@ Context::storage()->attach($span->storeInContext($context));
 var_dump('post: storage attach');
 unset($span);
 
-//later
+// "post hook"
 var_dump('pre: get scope from storage');
 $scope = Context::storage()->scope();
 var_dump('post: get scope from storage');
@@ -85,5 +86,4 @@ string(13) "pre: span end"
 string(14) "post: span end"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = 0
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::CONTEXT_STORAGE is empty :)
-%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::CONTEXT_STORAGE is empty :)%A

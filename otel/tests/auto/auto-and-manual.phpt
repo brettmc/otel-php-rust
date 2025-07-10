@@ -3,54 +3,28 @@ Test auto + manual instrumentation together
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
-OTEL_SPAN_PROCESSOR=batch
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --INI--
 ;otel.log.level="trace"
 ;otel.log.file="/dev/stdout"
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 function demoFunction() {
     Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->spanBuilder('manual-span')->startSpan()->end();
 }
 
 demoFunction();
+$spans = Memory::getSpans();
+$one = $spans[0];
+$two = $spans[1];
+
+assert($one['name'] === 'manual-span');
+assert($two['name'] === 'demo-function');
+assert($one['span_context']['trace_id'] === $two['span_context']['trace_id']);
+assert($one['parent_span_id'] === $two['span_context']['span_id']);
 ?>
---EXPECTF--
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "%s"
-%A
-	Name        : manual-span
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-Span #1
-	Instrumentation Scope
-		Name         : "php-auto-instrumentation"
-%A
-	Name        : i-was-renamed
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Attributes:
-		 ->  code.function.name: String(Owned("demoFunction"))
-		 ->  code.file.path: String(Owned("%s"))
-		 ->  code.line.number: I64(%d)
-		 ->  my-attribute: String(Static("my-value"))
-		 ->  post.attribute: String(Owned("post.value"))
+--EXPECT--

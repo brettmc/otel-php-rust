@@ -1,12 +1,21 @@
 use cargo_metadata::MetadataCommand;
+use phper_sys::*;
 use std::fs;
 use std::path::Path;
 
 fn main() {
     #[cfg(target_os = "macos")]
     {
-       println!("cargo:rustc-link-arg=-undefined");
-       println!("cargo:rustc-link-arg=dynamic_lookup");
+        println!("cargo:rustc-link-arg=-undefined");
+        println!("cargo:rustc-link-arg=dynamic_lookup");
+    }
+
+    println!("cargo::rustc-check-cfg=cfg(otel_observer_supported)");
+    println!("cargo::rustc-check-cfg=cfg(otel_observer_not_supported)");
+    if PHP_MAJOR_VERSION >= 8 {
+        println!("cargo::rustc-cfg=otel_observer_supported");
+    } else {
+        println!("cargo::rustc-cfg=otel_observer_not_supported");
     }
 
     //get metadata about interesting dependencies

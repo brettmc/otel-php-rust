@@ -3,11 +3,14 @@ Activate a span, modify it via getCurrent()
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\Span;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
+
 $tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 
 $root = $tracer->spanBuilder('root')->startSpan();
@@ -19,23 +22,12 @@ assert($current->getContext()->getSpanId() === $root->getContext()->getSpanId())
 $scope->detach();
 $current->updateName("updated");
 $current->end();
+var_dump(Memory::getSpans()[0]['name']);
+var_dump(Memory::getSpans()[0]['attributes']);
 ?>
---EXPECTF--
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "%s"
-%A
-	Name        : updated
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Attributes:
-		 ->  is_root: Bool(true)
+--EXPECT--
+string(7) "updated"
+array(1) {
+  ["is_root"]=>
+  bool(true)
+}

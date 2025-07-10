@@ -1,6 +1,7 @@
 use phper::{
     classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::Argument,
+    types::ArgumentTypeHint,
 };
 use std::{
     convert::Infallible,
@@ -43,7 +44,7 @@ pub fn make_tracer_class(
             *object.as_mut_state() = my_span_builder;
             Ok::<_, phper::Error>(object)
         })
-        .argument(Argument::new("name"));
+        .argument(Argument::new("spanName").with_type_hint(ArgumentTypeHint::String));
 
     class
 }

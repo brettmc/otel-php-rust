@@ -12,8 +12,8 @@ use crate::{
     },
     trace::{
         local_root_span::make_local_root_span_class,
+        memory_exporter::make_memory_exporter_class,
         non_recording_span::make_non_recording_span_class,
-        plugin_manager::PluginManager,
         span::{make_span_class},
         span_interface::make_span_interface,
         span_builder::{make_span_builder_class},
@@ -36,7 +36,6 @@ use phper::{
     ini::Policy,
     modules::Module,
     php_get_module,
-    sys,
 };
 use opentelemetry::{
     global,
@@ -60,6 +59,7 @@ pub mod context{
 }
 pub mod trace{
     pub mod local_root_span;
+    pub mod memory_exporter;
     pub mod non_recording_span;
     pub mod span;
     pub mod span_interface;
@@ -70,21 +70,48 @@ pub mod trace{
     pub mod tracer_interface;
     pub mod tracer_provider;
     pub mod tracer_provider_interface;
-    pub mod plugin_manager;
-    pub mod plugin;
-    pub mod plugins{
-        pub mod psr18;
-        pub mod test;
-    }
     pub mod propagation{
         pub mod trace_context_propagator;
     }
 }
 pub mod globals;
 pub mod request;
-pub mod observer;
 pub mod logging;
 pub mod util;
+
+// conditional compilation for observer feature (php8+)
+#[cfg(otel_observer_supported)]
+pub mod auto{
+    pub mod execute_data;
+    pub mod observer;
+    pub mod plugin_manager;
+    pub mod plugin;
+    pub mod plugins{
+        pub mod psr18;
+        pub mod test;
+    }
+}
+#[cfg(otel_observer_supported)]
+use crate::auto::{
+    observer,
+    plugin_manager::PluginManager
+};
+#[cfg(otel_observer_supported)]
+use phper::sys;
+
+#[cfg(otel_observer_not_supported)]
+pub mod auto{
+    pub mod execute;
+    pub mod execute_data;
+    pub mod plugin_manager;
+    pub mod plugin;
+    pub mod plugins{
+        pub mod psr18;
+        pub mod test;
+    }
+}
+#[cfg(otel_observer_not_supported)]
+use crate::auto::plugin_manager::PluginManager;
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
@@ -100,9 +127,24 @@ pub fn get_module() -> Module {
     module.add_info("opentelemetry-rust", OPENTELEMETRY_VERSION);
     module.add_info("phper", PHPER_VERSION);
     module.add_info("tokio", TOKIO_VERSION);
+    #[cfg(otel_observer_supported)]
+    module.add_info("auto-instrumentation", "observer_api");
+    #[cfg(otel_observer_not_supported)]
+    module.add_info("auto-instrumentation", "zend_execute_ex");
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
     module.add_ini("otel.cli.create_root_span", false, Policy::All);
+    //which auto-instrumentation mechanism is enabled
+    #[cfg(otel_observer_supported)]
+    {
+        module.add_info("auto-instrumentation", "observer".to_string());
+        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "observer".to_string());
+    }
+    #[cfg(otel_observer_not_supported)]
+    {
+        module.add_info("auto-instrumentation", "zend_execute_ex".to_string());
+        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "zend_execute_ex".to_string());
+    }
 
     //interfaces
     let scope_interface = module.add_interface(make_scope_interface());
@@ -126,6 +168,7 @@ pub fn get_module() -> Module {
     let scope_class = module.add_class(scope_class_entity);
     let context_class = module.add_class(context_class_entity);
     let _storage_class = module.add_class(storage_class_entity);
+    let _in_memory_exporter_class = module.add_class(make_memory_exporter_class());
 
     let span_class = module.add_class(make_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
     let non_recording_span_class = module.add_class(make_non_recording_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
@@ -140,15 +183,23 @@ pub fn get_module() -> Module {
     module.on_module_init(|| {
         logging::print_message("OpenTelemetry::MINIT".to_string());
 
-        observer::init(PluginManager::new());
-        unsafe {
-            sys::zend_observer_fcall_register(Some(observer::observer_instrument));
+        #[cfg(otel_observer_supported)]
+        {
+            observer::init(PluginManager::new());
+            //todo: do this in observer.rs ?
+            unsafe {
+                sys::zend_observer_fcall_register(Some(observer::observer_instrument));
+            }
+            logging::print_message("registered fcall handlers".to_string());
         }
-        logging::print_message("registered fcall handlers".to_string());
+        #[cfg(otel_observer_not_supported)]
+        {
+            crate::auto::execute::init(PluginManager::new());
+        }
     });
     module.on_module_shutdown(|| {
         logging::print_message("OpenTelemetry::MSHUTDOWN".to_string());
-        tracer_provider::force_flush();
+        tracer_provider::shutdown();
     });
     module.on_request_init(|| {
         logging::print_message("OpenTelemetry::RINIT".to_string());

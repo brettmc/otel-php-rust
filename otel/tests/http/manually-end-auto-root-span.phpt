@@ -24,9 +24,7 @@ run_server('server-end-root-span.php', $options);
 ?>
 --EXPECTF--
 ==== Response ====
-==== Server Output ====
-[%s] PHP %s Development Server (%s) started
-[%s] %s Accepted
+==== Server Output ====%A
 Spans
 Resource
 %A
@@ -45,5 +43,4 @@ Span #0
 	Attributes:
 		 ->  php.sapi.name: String(Owned("cli-server"))
 		 ->  url.full: String(Owned("/"))
-		 ->  http.request.method: String(Owned("OPTIONS"))
-[%s] %s Closing
+		 ->  http.request.method: String(Owned("OPTIONS"))%A

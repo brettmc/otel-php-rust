@@ -33,6 +33,7 @@ use crate::{
     trace::tracer::TracerClass,
     util,
 };
+use crate::trace::memory_exporter::MEMORY_EXPORTER;
 use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";
@@ -70,6 +71,14 @@ pub fn init_once() {
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
         tracing::debug!("Using Console trace exporter");
         let exporter = StdoutSpanExporter::default();
+        if use_simple_exporter {
+            builder = builder.with_simple_exporter(exporter);
+        } else {
+            builder = builder.with_batch_exporter(exporter);
+        }
+    } else if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("memory") {
+        tracing::debug!("Using in-memory test exporter");
+        let exporter = MEMORY_EXPORTER.lock().unwrap().clone();
         if use_simple_exporter {
             builder = builder.with_simple_exporter(exporter);
         } else {
@@ -128,19 +137,27 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
 
 pub fn force_flush() {
     let pid = process::id();
+    let providers = TRACER_PROVIDERS.lock().unwrap();
+    if let Some(provider) = providers.get(&pid) {
+        tracing::info!("Flushing TracerProvider for pid {}", pid);
+        match provider.force_flush() {
+            Ok(_) => tracing::debug!("OpenTelemetry tracer provider flush success"),
+            Err(err) => tracing::warn!("Failed to flush OpenTelemetry tracer provider: {:?}", err),
+        }
+    } else {
+        tracing::info!("no tracer provider to flush for pid {}", pid);
+    }
+}
+
+pub fn shutdown() {
+    let pid = process::id();
     let mut providers = TRACER_PROVIDERS.lock().unwrap();
     if providers.contains_key(&pid) {
-        if let Some(provider) = providers.get(&pid) {
-            tracing::info!("Flushing TracerProvider for pid {}", pid);
-            match provider.force_flush() {
-                Ok(_) => tracing::debug!("OpenTelemetry tracer provider flush success"),
-                Err(err) => tracing::warn!("Failed to flush OpenTelemetry tracer provider: {:?}", err),
-            }
-            providers.remove(&pid);
-            return;
-        }
+        tracing::info!("Shutting down TracerProvider for pid {}", pid);
+        providers.remove(&pid);
+    } else {
+        tracing::info!("no tracer provider to shutdown for pid {}", pid);
     }
-    tracing::info!("no tracer provider to flush for pid {}", pid);
 }
 
 pub fn make_tracer_provider_class(
@@ -194,8 +211,13 @@ pub fn make_tracer_provider_class(
         .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
         .argument(Argument::new("version").with_type_hint(ArgumentTypeHint::String).allow_null())
         .argument(Argument::new("schemaUrl").with_type_hint(ArgumentTypeHint::String).allow_null())
-        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]")) //todo not called "name" (--re output)
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]"))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Trace\TracerInterface"))));
+
+    class.add_method("forceFlush", Visibility::Public, |_, _| {
+        force_flush();
+        Ok::<_, Infallible>(())
+    });
 
     class
 }

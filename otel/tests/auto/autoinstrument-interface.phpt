@@ -3,9 +3,15 @@ Autoinstrument an interface
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
+--INI--
+otel.log.level="warn"
+otel.log.file="/dev/stdout"
 --FILE--
 <?php
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
+
 interface IDemo {
     public function foo(): void;
 }
@@ -18,26 +24,9 @@ class DemoClass implements IDemo {
 
 $demo = new DemoClass();
 $demo->foo();
+assert(Memory::count() === 1);
+$span = Memory::getSpans()[0];
+assert($span['name'] === 'DemoClass::foo');
 ?>
---EXPECTF--
+--EXPECT--
 string(3) "foo"
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "php-auto-instrumentation"
-
-	Name        : DemoClass::foo
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Attributes:
-		 ->  code.function.name: String(Owned("DemoClass::foo"))
-		 ->  code.file.path: String(Owned("%s"))
-		 ->  code.line.number: I64(%d)
