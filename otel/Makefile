@@ -23,6 +23,7 @@ install: build
 	@echo "📌 To enable it, add 'extension=$(EXTENSION_NAME).so' to php.ini"
 clean:
 	cargo clean
+clean-build-test: clean test-all
 test: build-test
 	@echo "Running all tests..."
 	php ~/run-tests.php -q --show-diff tests/phpt/

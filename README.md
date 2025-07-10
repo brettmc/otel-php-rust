@@ -39,23 +39,25 @@ test in. I've added `Makefile`s to make things easier, and written some tests us
 Quick-start:
 
 * `git clone <this repo>`
-* `make build`
-* `make bash`
+* `PHP_VERSION=x.y make build`
+* `PHP_VERSION=x.y make bash`
 
 From this bash shell, there is another Makefile to build the extension and run the tests.
 Tests are organised as:
 
-- `test` - all tests
+- `test` - basic phpt tests
 - `test-auto` - auto-instrumentation
-- `test-otlp` - otlp (`http/protobuf` + `grpc`) exporting to a local collector
-- `test-phpt` - test the API via PHP code
+- `test-export` - otlp (`http/protobuf` + `grpc`) exporting to a local collector
+- `test-http` - spin up a cli-server and test auto-creation of root spans
+- `test-all` - all tests
 
 For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
 ### PHP 7.x
 
-As above, but modify `docker-compose.yaml` to use `Dockerfile-7.3`.
-Note that most of the tests fail because they rely on console exporting and logging, which is flaky during MSHUTDOWN in PHP 7.x.
+(tested back to 7.0)
+
+Note that a couple of tests are skipped because they check for logs written during RSHUTDOWN/MSHUTDOWN, which doens't work in PHP 7.x.
 
 ### Debugging
 
