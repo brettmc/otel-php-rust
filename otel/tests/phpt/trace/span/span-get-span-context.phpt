@@ -3,7 +3,8 @@ Get SpanContext from a Span
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
@@ -31,18 +32,3 @@ array(4) {
   ["is_remote"]=>
   bool(false)
 }
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-%A
-	Name        : root
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset

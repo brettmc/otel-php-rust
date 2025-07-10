@@ -3,9 +3,12 @@ Autoinstrument a class + function
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
+
 class DemoClass {
     public function test(): void
     {
@@ -20,44 +23,15 @@ class DemoClass {
 
 $demo = new DemoClass();
 $demo->test();
+$spans = Memory::getSpans();
+$test = $spans[0];
+$inner = $spans[1];
+assert($test['name'] === 'DemoClass::inner');
+assert($inner['name'] === 'DemoClass::test');
+assert($test['span_context']['trace_id'] === $inner['span_context']['trace_id']);
+assert($test['parent_span_id'] === $inner['span_context']['span_id']);
+//var_dump(Memory::getSpans());
 ?>
---EXPECTF--
+--EXPECT--
 string(4) "test"
 string(5) "inner"
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "php-auto-instrumentation"
-
-	Name        : DemoClass::inner
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Attributes:
-		 ->  code.function.name: String(Owned("DemoClass::inner"))
-		 ->  code.file.path: String(Owned("%s"))
-		 ->  code.line.number: I64(%d)
-Span #1
-	Instrumentation Scope
-		Name         : "php-auto-instrumentation"
-
-	Name        : DemoClass::test
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Attributes:
-		 ->  code.function.name: String(Owned("DemoClass::test"))
-		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/autoinstrument-class.php"))
-		 ->  code.line.number: I64(5)

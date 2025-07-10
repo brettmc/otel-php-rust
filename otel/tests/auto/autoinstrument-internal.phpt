@@ -6,15 +6,15 @@ otel
 OTEL_TRACES_EXPORTER=console
 --SKIPIF--
 <?php
-if (!defined('OTEL_AUTO_INSTRUMENTATION') || OTEL_AUTO_INSTRUMENTATION !== 'observer') {
-    die("skip observer auto-instrumentation not enabled");
+if (PHP_VERSION_ID < 80000) {
+    die("skip requires PHP 8.0");
 }
 --FILE--
 <?php
 var_dump(phpversion());
 ?>
 --EXPECTF--
-string(5) "%s"
+string(%d) "%s"
 Spans
 Resource
 %A

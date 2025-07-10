@@ -94,6 +94,7 @@ As above
 * Batch and Simple span processors
 * Get SpanContext from a Span
 * Access "local root span"
+* `memory` exporter for testing
 
 Basic usage:
 ```php

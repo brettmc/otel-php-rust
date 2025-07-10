@@ -3,8 +3,8 @@ Inject outgoing trace headers to psr-18 request
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
-OTEL_SPAN_PROCESSOR=batch
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.log.level="warn"
 otel.log.file="/dev/stdout"
@@ -16,12 +16,13 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Nyholm\Psr7\Request;
 use Nyholm\Psr7\Response;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 require 'vendor/autoload.php';
 
 class MockHttpClient implements ClientInterface
 {
-	private ?RequestInterface $request = null;
+	private $request = null;
 
     public function sendRequest(RequestInterface $request): ResponseInterface
     {
@@ -52,46 +53,37 @@ var_dump($traceParent);
 
 $span->end();
 $scope->detach();
+
+assert(Memory::count() === 2);
+$spans = Memory::getSpans();
+$psr18 = $spans[0];
+var_dump($psr18['name']);
+var_dump($psr18['span_kind']);
+var_dump($psr18['attributes']);
 ?>
 --EXPECTF--
 string(55) "00-%s-%s-01"
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "psr18"
-%A
-	Name        : OPTIONS
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Client
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Attributes:
-		 ->  code.function.name: String(Owned("MockHttpClient::sendRequest"))
-		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/psr18/psr18-inject.php"))
-		 ->  code.line.number: I64(15)
-		 ->  url.full: String(Owned("http://example.com:8000/resource/100"))
-		 ->  url.scheme: String(Owned("http"))
-		 ->  url.path: String(Owned("/resource/100"))
-		 ->  server.address: String(Owned("example.com"))
-		 ->  server.port: I64(8000)
-		 ->  http.request.method: String(Owned("OPTIONS"))
-		 ->  http.response.status_code: I64(200)
-Span #1
-	Instrumentation Scope
-		Name         : "my_tracer"
-%A
-	Name        : root
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
+string(7) "OPTIONS"
+string(6) "Client"
+array(10) {
+  ["code.function.name"]=>
+  string(27) "MockHttpClient::sendRequest"
+  ["code.file.path"]=>
+  string(48) "/usr/src/myapp/tests/auto/psr18/psr18-inject.php"
+  ["code.line.number"]=>
+  int(%d)
+  ["url.full"]=>
+  string(36) "http://example.com:8000/resource/100"
+  ["url.scheme"]=>
+  string(4) "http"
+  ["url.path"]=>
+  string(13) "/resource/100"
+  ["server.address"]=>
+  string(11) "example.com"
+  ["server.port"]=>
+  int(8000)
+  ["http.request.method"]=>
+  string(7) "OPTIONS"
+  ["http.response.status_code"]=>
+  int(200)
+}

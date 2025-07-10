@@ -33,6 +33,7 @@ use crate::{
     trace::tracer::TracerClass,
     util,
 };
+use crate::trace::memory_exporter::MEMORY_EXPORTER; //todo provide a function?
 use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";
@@ -70,6 +71,14 @@ pub fn init_once() {
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
         tracing::debug!("Using Console trace exporter");
         let exporter = StdoutSpanExporter::default();
+        if use_simple_exporter {
+            builder = builder.with_simple_exporter(exporter);
+        } else {
+            builder = builder.with_batch_exporter(exporter);
+        }
+    } else if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("memory") {
+        tracing::debug!("Using in-memory test exporter");
+        let exporter = MEMORY_EXPORTER.lock().unwrap().clone();
         if use_simple_exporter {
             builder = builder.with_simple_exporter(exporter);
         } else {

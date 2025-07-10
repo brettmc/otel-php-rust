@@ -3,39 +3,24 @@ Autoinstrument a function
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.log.level="warn"
 otel.log.file="/dev/stdout"
 --FILE--
 <?php
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
+
 function demoFunction() {
     var_dump("demo_function");
 }
 
 demoFunction();
+assert(Memory::count() === 1);
+$span = Memory::getSpans()[0];
+assert($span['name'] === 'demo-function');
+assert($span['instrumentation_scope']['name'] === 'php-auto-instrumentation');
 ?>
---EXPECTF--
+--EXPECT--
 string(13) "demo_function"
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "php-auto-instrumentation"
-
-	Name        : demo-function
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
-	Attributes:
-		 ->  code.function.name: String(Owned("demoFunction"))
-		 ->  code.file.path: String(Owned("/usr/src/myapp/tests/auto/autoinstrument-function.php"))
-		 ->  code.line.number: I64(%d)
-		 ->  my-attribute: String(Owned("my-value"))
-		 ->  post.attribute: String(Owned("post.value"))

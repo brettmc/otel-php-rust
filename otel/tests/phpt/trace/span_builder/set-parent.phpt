@@ -3,31 +3,19 @@ Call setParent on span builder
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\Context\Context;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 $builder = Globals::tracerProvider()->getTracer("my_tracer", '0.1', 'schema.url')->spanBuilder('root');
 $builder->setParent(Context::getCurrent());
 $builder->startSpan()->end();
+var_dump(Memory::getSpans()[0]['parent_span_id']);
 ?>
---EXPECTF--
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-		Name         : "my_tracer"
-%A
-	Name        : root
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
+--EXPECT--
+string(16) "0000000000000000"

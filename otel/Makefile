@@ -10,7 +10,8 @@ build:
 	cp target/release/libotel.so modules/otel.so
 build-test:
 	@echo "Building for test..."
-	cargo build --features test --features php_execute
+	cargo build --features test
+	cp target/debug/libotel.so modules/otel.so
 re: build-test
 	php -d extension=target/debug/libotel.so --re otel
 check:

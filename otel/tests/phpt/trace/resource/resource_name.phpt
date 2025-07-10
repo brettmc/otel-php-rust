@@ -4,6 +4,7 @@ Detects resource SERVICE_NAME
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=console
+OTEL_SPAN_PROCESSOR=simple
 OTEL_SERVICE_NAME=service_one
 --FILE--
 <?php

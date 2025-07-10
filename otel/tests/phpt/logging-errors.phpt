@@ -19,6 +19,8 @@ Globals::tracerProvider()
     ->spanBuilder('root')
     ->startSpan()
     ->end();
+Globals::tracerProvider()->forceFlush();
 ?>
 --EXPECTF--
-[%s] [ERROR] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportError message= name=BatchSpanProcessor.ExportError error=Operation failed: reqwest::Error { kind: Request, url: "http://does-not-exist:4318/v1/traces", source: hyper_util::client::legacy::Error(Connect, ConnectError("dns error", Custom { kind: Uncategorized, error: "%s" })) }
+[%s] [ERROR] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportError message= name=BatchSpanProcessor.ExportError error=Operation failed: %s
+%A

@@ -1,12 +1,19 @@
 --TEST--
 Leave a dangling span
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80000) {
+    die("skip requires RSHUTDOWN output only available in PHP 8.0+");
+}
+?>
 --EXTENSIONS--
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=none
 --INI--
 otel.log.level="trace"
-otel.log.file="/dev/stdout"
+;use stderr to avoid interfering with SKIPIF output
+otel.log.file="/dev/stderr"
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

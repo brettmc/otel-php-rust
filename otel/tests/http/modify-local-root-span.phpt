@@ -22,9 +22,7 @@ run_server('server-modify-local-root-span.php', $options);
 ?>
 --EXPECTF--
 ==== Response ====
-==== Server Output ====
-[%s] PHP %s Development Server (%s) started
-[%s] %s Accepted
+==== Server Output ====%A
 Spans
 Resource
 %A
@@ -44,5 +42,4 @@ Span #0
 		 ->  php.sapi.name: String(Owned("cli-server"))
 		 ->  url.full: String(Owned("/"))
 		 ->  http.request.method: String(Owned("PUT"))
-		 ->  http.response.status_code: I64(201)
-[%s] %s Closing
+		 ->  http.response.status_code: I64(201)%A

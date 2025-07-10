@@ -3,7 +3,8 @@ Store span in context then attach to storage
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=console
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.log.level="error"
 otel.log.file="/dev/stdout"
@@ -13,6 +14,7 @@ use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Trace\Span;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\Scope;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
 $tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
 $span = $tracer->spanBuilder('root')->startSpan();
@@ -26,20 +28,7 @@ $span = Span::fromContext($scope->context());
 $span->updateName('foo');
 $span->end();
 $scope->detach();
+var_dump(Memory::getSpans()[0]['name']);
 ?>
---EXPECTF--
-Spans
-Resource
-%A
-Span #0
-	Instrumentation Scope
-%A
-	Name        : foo
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
+--EXPECT--
+string(3) "foo"
