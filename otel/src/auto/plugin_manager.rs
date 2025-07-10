@@ -66,7 +66,6 @@ impl PluginManager {
 }
 
 fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String], plugin_name: &str) -> bool {
-    //TODO cache decisions
     let function_name: ZString = func.get_function_or_method_name();
     let function_name_str = match function_name.to_str() {
         Ok(name) => name,

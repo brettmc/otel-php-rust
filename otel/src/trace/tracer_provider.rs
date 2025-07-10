@@ -33,7 +33,7 @@ use crate::{
     trace::tracer::TracerClass,
     util,
 };
-use crate::trace::memory_exporter::MEMORY_EXPORTER; //todo provide a function?
+use crate::trace::memory_exporter::MEMORY_EXPORTER;
 use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";

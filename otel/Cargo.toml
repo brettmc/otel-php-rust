@@ -7,8 +7,6 @@ build = "build.rs"
 
 [features]
 test = []
-php_observer = [] #enable observer API support (php8+)
-php_execute = [] #enable execute API support (php7)
 
 [lib]
 name = "otel"
@@ -34,7 +32,6 @@ dashmap = "6.1.0"
 
 [build-dependencies]
 cargo_metadata = "0.19.2"
-phper-build = "0.15.3"
 phper-sys = "0.15.3"
 
 [dev-dependencies]

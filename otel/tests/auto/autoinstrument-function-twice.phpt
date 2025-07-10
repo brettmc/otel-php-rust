@@ -1,6 +1,5 @@
 --TEST--
-Autoinstrument a function twice
-
+Autoinstrument a function twice (zend_execute_ex)
 --DESCRIPTION--
 Test caching of instrumentation decisions when using zend_execute_ex
 --EXTENSIONS--
@@ -9,8 +8,8 @@ otel
 OTEL_TRACES_EXPORTER=none
 --SKIPIF--
 <?php
-if (!defined('OTEL_AUTO_INSTRUMENTATION') || OTEL_AUTO_INSTRUMENTATION !== 'zend_execute_ex') {
-    die("skip requires zend_execute_ex instrumentation");
+if (PHP_VERSION_ID >= 80000) {
+    die("skip requires PHP 7.x");
 }
 --INI--
 otel.log.level="warn"

@@ -54,7 +54,7 @@ For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
 ### PHP 7.x
 
-As above, but modify `docker-compose.yaml` to use `Dockerfile-7.4`, and modify `otel/Makefile` to use --features php_execute`.
+As above, but modify `docker-compose.yaml` to use `Dockerfile-7.3`.
 Note that most of the tests fail because they rely on console exporting and logging, which is flaky during MSHUTDOWN in PHP 7.x.
 
 ### Debugging
@@ -86,6 +86,7 @@ As above
 ## What works?
 
 * Auto-instrumentation of userland (PHP8.0+) and internal (PHP8.2+) code, via zend_observer API (see `tests/auto/*`)
+* AUto-instrumentation of userland code via `zend_execute_ex` (PHP 7.x only)
 * Start a span in RINIT, use `traceparent` headers, set HTTP response code in RSHUTDOWN
 * TracerProvider created in RINIT (so that child processes have a working instance)
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
@@ -125,9 +126,7 @@ $scope->detach();
 
 ## What doesn't work or isn't implemented? (todo list)
 
-- auto-instumentation for PHP 7.x using `zend_execute_ex` (WIP)
-- read config from `.env` files
-- support multi-site installations that don't use vhosts
+- read config from `.env` files (support multi-site installations that don't use vhosts?)
 - Context storage - otel-rust doesn't support storing non-simple values, and context keys are created at compile time.
 This will probably never work like opentelemetry-php.
 
