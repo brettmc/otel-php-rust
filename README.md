@@ -14,11 +14,11 @@ strongly encouraged to only depend on the API, this should be all they need.
 
 ### PHP 8.x
 
-Works, and can do some auto-instrumentation via the zend_observer API if the `php_observer` feature is enabled.
+Works, and can do some auto-instrumentation via the zend_observer API.
 
 ### PHP 7.x
 
-Seems to work (runs and exports traces via OTLP). The capability to do auto-instrumentation via `zend_execute_ex` is WIP.
+Works (runs and exports traces via OTLP). Can do auto-instrumentation of userland code via `zend_execute_ex`.
 Note that writing to stdout/stderr during MSHUTDOWN doesn't seem to work in PHP 7.x, so console exporting and
 log writing do not work for this stage. Logging to a file does work, and exporting via OTLP (http/protobuf + grpc) does work.
 
@@ -28,11 +28,11 @@ log writing do not work for this stage. Logging to a file does work, and exporti
 
 Requires `llvm-dev`, `libclang-dev`, rust compiler and cargo.
 
-`php pie.phar install brettmc/otel-php-rust:dev-main`
+`php pie.phar install brettmc/otel-php-rust:<version>`
 
 ## Development
 
-Using docker + compose, `Dockerfile` provides PHP 8.4 + rust environment to build and
+Using docker + compose, `Dockerfile` provides PHP 7.0-8.4 + rust environment to build and
 test in. I've added `Makefile`s to make things easier, and written some tests using PHP's
 [phpt](https://qa.php.net/phpt_details.php).
 
@@ -45,11 +45,12 @@ Quick-start:
 From this bash shell, there is another Makefile to build the extension and run the tests.
 Tests are organised as:
 
-- `test` - basic phpt tests
-- `test-auto` - auto-instrumentation
-- `test-export` - otlp (`http/protobuf` + `grpc`) exporting to a local collector
-- `test-http` - spin up a cli-server and test auto-creation of root spans
-- `test-all` - all tests
+- `make clean` - clean up. Make sure you do this when switching PHP versions.
+- `make test` - basic phpt tests
+- `make test-auto` - auto-instrumentation
+- `make test-export` - otlp (`http/protobuf` + `grpc`) exporting to a local collector
+- `make test-http` - spin up a cli-server and test auto-creation of root spans
+- `make test-all` - all tests
 
 For the `otlp` tests, be sure to `docker compose up -d collector` first.
 
@@ -88,7 +89,7 @@ As above
 ## What works?
 
 * Auto-instrumentation of userland (PHP8.0+) and internal (PHP8.2+) code, via zend_observer API (see `tests/auto/*`)
-* AUto-instrumentation of userland code via `zend_execute_ex` (PHP 7.x only)
+* AUto-instrumentation of userland code via `zend_execute_ex` (PHP 7.x)
 * Start a span in RINIT, use `traceparent` headers, set HTTP response code in RSHUTDOWN
 * TracerProvider created in RINIT (so that child processes have a working instance)
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
