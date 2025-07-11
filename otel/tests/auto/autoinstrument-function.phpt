@@ -8,6 +8,7 @@ OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.log.level="warn"
 otel.log.file="/dev/stdout"
+otel.cli.enable=1
 --FILE--
 <?php
 use OpenTelemetry\API\Trace\SpanExporter\Memory;

@@ -2,6 +2,8 @@
 Detects resource SERVICE_NAME
 --EXTENSIONS--
 otel
+--INI--
+otel.cli.enable=1
 --ENV--
 OTEL_TRACES_EXPORTER=console
 OTEL_SPAN_PROCESSOR=simple

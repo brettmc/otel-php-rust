@@ -3,3 +3,4 @@
 .cargo
 vendor/
 composer.lock
+.env

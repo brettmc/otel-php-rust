@@ -2,12 +2,18 @@
 Inject outgoing trace headers to psr-18 request
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 70200) {
+    die("skip requires PHP 7.2+");
+}
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.log.level="warn"
-otel.log.file="/dev/stdout"
+otel.log.file="/dev/stderr"
+otel.cli.enable=1
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

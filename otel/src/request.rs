@@ -4,13 +4,11 @@ use phper::{
     ini::ini_get,
     sg,
     sys,
-    sys::sapi_module,
     arrays::{IterKey, ZArr},
     values::ZVal,
 };
 use std::{
     cell::RefCell,
-    ffi::CStr,
     collections::HashMap,
     sync::Arc,
 };
@@ -25,6 +23,7 @@ use opentelemetry_semantic_conventions as SemConv;
 use crate::{
     context::storage,
     trace::{local_root_span, tracer_provider},
+    util::{get_sapi_module_name},
 };
 
 thread_local! {
@@ -130,10 +129,6 @@ pub fn shutdown() {
     } else {
         tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
     }
-}
-
-fn get_sapi_module_name() -> String {
-    unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
 }
 
 fn get_request_details() -> RequestDetails {

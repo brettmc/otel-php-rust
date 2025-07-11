@@ -6,8 +6,7 @@ otel
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
-;otel.log.level="trace"
-;otel.log.file="/dev/stdout"
+otel.cli.enable=1
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

@@ -15,6 +15,7 @@ version => %s
 
 Directive => Local Value => Master Value
 otel.cli.create_root_span => 0 => 0
+otel.cli.enable => 0 => 0
 otel.log.file => %s => %s
 otel.log.level => error => error
 %A

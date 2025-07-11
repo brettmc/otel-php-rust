@@ -1,3 +1,4 @@
+FROM composer:lts AS composer
 FROM debian:bullseye
 
 WORKDIR /usr/src/myapp
@@ -17,16 +18,15 @@ USER php-rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 USER root
 
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+
 ENV PATH="/home/php-rust/.cargo/bin:${PATH}" \
     TEST_PHP_EXECUTABLE="/usr/bin/php"
 
 ARG PHP_VERSION=8.4
 
-RUN apt-get install -y php${PHP_VERSION}-cli php${PHP_VERSION}-dev
-RUN ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so
-
-RUN wget https://getcomposer.org/download/latest-stable/composer.phar -O /usr/local/bin/composer \
-  && chmod +x /usr/local/bin/composer \
+RUN apt-get install -y php${PHP_VERSION}-cli php${PHP_VERSION}-dev \
+  && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so \
   && find /usr/lib/php/ -type f -name run-tests.php -exec cp {} /home/php-rust \;
 
 USER php-rust

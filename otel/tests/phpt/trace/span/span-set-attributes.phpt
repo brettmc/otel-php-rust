@@ -2,6 +2,8 @@
 Create a span with attributes
 --EXTENSIONS--
 otel
+--INI--
+otel.cli.enable=1
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple

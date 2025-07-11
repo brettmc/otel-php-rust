@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
       args:
         PHP_VERSION: ${PHP_VERSION}
+    image: php-rust:${PHP_VERSION}
     volumes:
     - ./otel/:/usr/src/myapp
     - ./otel/.cargo/registry:/home/php-rust/.cargo/registry
