@@ -2,6 +2,8 @@
 Autoinstrument an internal function
 --EXTENSIONS--
 otel
+--INI--
+otel.cli.enable=1
 --ENV--
 OTEL_TRACES_EXPORTER=console
 --SKIPIF--

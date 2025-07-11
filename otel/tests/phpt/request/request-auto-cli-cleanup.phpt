@@ -8,6 +8,7 @@ OTEL_TRACES_EXPORTER=none
 otel.log.level="trace"
 otel.log.file="/dev/stdout"
 otel.cli.create_root_span="On"
+otel.cli.enable=1
 --FILE--
 <?php
 

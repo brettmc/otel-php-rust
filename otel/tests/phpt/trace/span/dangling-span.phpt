@@ -14,6 +14,7 @@ OTEL_TRACES_EXPORTER=none
 otel.log.level="trace"
 ;use stderr to avoid interfering with SKIPIF output
 otel.log.file="/dev/stderr"
+otel.cli.enable=1
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

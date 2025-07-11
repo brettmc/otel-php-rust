@@ -2,9 +2,17 @@
 Autoinstrument a class + function
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 70200) {
+    die("skip requires PHP 7.2+");
+}
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
+--INI--
+otel.cli.enable=1
+otel.log.level="warn"
 --FILE--
 <?php
 use OpenTelemetry\API\Trace\SpanExporter\Memory;

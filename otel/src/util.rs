@@ -1,6 +1,7 @@
 use phper::{
     arrays::{IterKey, ZArray},
     values::ZVal,
+    sys::sapi_module,
 };
 use opentelemetry::{
     Array,
@@ -8,6 +9,7 @@ use opentelemetry::{
     StringValue,
     Value,
 };
+use std::ffi::CStr;
 
 pub fn zval_to_key_value(key: &str, value: &ZVal) -> Option<KeyValue> {
     let type_info = value.get_type_info();
@@ -94,4 +96,8 @@ fn zval_to_vec(key: &str, value: &ZVal) -> Option<KeyValue> {
     }
 
     None
+}
+
+pub fn get_sapi_module_name() -> String {
+    unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
 }

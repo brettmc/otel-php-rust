@@ -30,10 +30,11 @@ use crate::{
             trace_context_propagator::{make_trace_context_propagator_class},
         },
     },
+    util::get_sapi_module_name,
     globals::{make_globals_class},
 };
 use phper::{
-    ini::Policy,
+    ini::{ini_get, Policy},
     modules::Module,
     php_get_module,
 };
@@ -116,6 +117,7 @@ use crate::auto::plugin_manager::PluginManager;
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
 static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
+static DISABLED: OnceCell<bool> = OnceCell::new();
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -134,6 +136,7 @@ pub fn get_module() -> Module {
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
     module.add_ini("otel.cli.create_root_span", false, Policy::All);
+    module.add_ini("otel.cli.enable", false, Policy::All);
     //which auto-instrumentation mechanism is enabled
     #[cfg(otel_observer_supported)]
     {
@@ -181,6 +184,14 @@ pub fn get_module() -> Module {
     let _status_code_interface = module.add_interface(make_status_code_interface());
 
     module.on_module_init(|| {
+        let cli_enabled = ini_get::<bool>("otel.cli.enable");
+        let sapi = get_sapi_module_name();
+        let disabled = sapi == "cli" && !cli_enabled;
+        DISABLED.set(disabled).ok();
+        if disabled {
+            logging::print_message("OpenTelemetry::MINIT disabled for cli".to_string());
+            return;
+        }
         logging::print_message("OpenTelemetry::MINIT".to_string());
 
         #[cfg(otel_observer_supported)]
@@ -198,10 +209,17 @@ pub fn get_module() -> Module {
         }
     });
     module.on_module_shutdown(|| {
+        let is_disabled = *DISABLED.get().unwrap_or(&false);
+        if is_disabled {
+            return;
+        }
         logging::print_message("OpenTelemetry::MSHUTDOWN".to_string());
         tracer_provider::shutdown();
     });
     module.on_request_init(|| {
+        if *DISABLED.get().unwrap_or(&false) {
+            return;
+        }
         logging::print_message("OpenTelemetry::RINIT".to_string());
         logging::init_once();
 
@@ -219,6 +237,10 @@ pub fn get_module() -> Module {
         request::init();
     });
     module.on_request_shutdown(|| {
+        let is_disabled = *DISABLED.get().unwrap_or(&false);
+        if is_disabled {
+            return;
+        }
         logging::print_message("OpenTelemetry::RSHUTDOWN".to_string());
         request::shutdown();
     });
