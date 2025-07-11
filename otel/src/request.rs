@@ -133,14 +133,25 @@ pub fn shutdown() {
 
 fn get_request_details() -> RequestDetails {
     unsafe {
+        //depending in SAPI, request_info.request_uri may not be what we want (eg "index.php" instead of url)
         let request_info = sg!(request_info);
+        let server = get_request_server();
+        let uri = server
+            .ok()
+            .and_then(|server| server.get("REQUEST_URI"))
+            .and_then(|zv| z_val_to_string(zv))
+            // Fallback to request_info.request_uri if not found
+            .or_else(|| {
+                Some(request_info.request_uri)
+                    .filter(|ptr| !ptr.is_null())
+                    .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned())
+            });
+
         RequestDetails {
             method: Some(request_info.request_method)
                 .filter(|ptr| !ptr.is_null())
                 .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
-            uri: Some(request_info.request_uri)
-                .filter(|ptr| !ptr.is_null())
-                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
+            uri,
             body_length: request_info.content_length as u64,
             content_type: Some(request_info.content_type)
                 .filter(|ptr| !ptr.is_null())
