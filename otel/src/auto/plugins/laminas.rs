@@ -72,6 +72,7 @@ impl LaminasRouteHandler {
         LocalRootSpan::current()->updateName(sprintf('%s %s', $method, $route));
      */
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+        tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch)");
         let exec_data_ref = &mut *exec_data;
         let mvc_event_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
 
@@ -85,7 +86,7 @@ impl LaminasRouteHandler {
                             //todo this is an ID, need to fetch from storage from span.rs
                             let instance_id = get_local_root_span().unwrap_or(0);
                             if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
-                                tracing::debug!("Auto::Laminas::updateName (post MvcEvent::setRouteMatch)");
+                                tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
                                 ctx.span().update_name(name);
                             }
                         }
