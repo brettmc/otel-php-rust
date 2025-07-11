@@ -209,8 +209,8 @@ pub fn make_tracer_provider_class(
             Ok::<_, phper::Error>(object)
         })
         .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
-        .argument(Argument::new("version").with_type_hint(ArgumentTypeHint::String).allow_null())
-        .argument(Argument::new("schemaUrl").with_type_hint(ArgumentTypeHint::String).allow_null())
+        .argument(Argument::new("version").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
+        .argument(Argument::new("schemaUrl").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
         .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]"))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Trace\TracerInterface"))));
 
