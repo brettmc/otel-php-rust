@@ -1,5 +1,6 @@
 use crate::auto::plugin::{FunctionObserver, Plugin};
 use crate::auto::plugins::{
+    laminas::LaminasPlugin,
     psr18::Psr18Plugin,
 };
 use crate::logging;
@@ -24,6 +25,9 @@ impl PluginManager {
     }
 
     fn init(&mut self) {
+        #[cfg(not(feature="without-laminas"))]
+        self.plugins.push(Box::new(LaminasPlugin::new()));
+        #[cfg(not(feature="without-psr18"))]
         self.plugins.push(Box::new(Psr18Plugin::new()));
         #[cfg(feature="test")]
         self.plugins.push(Box::new(crate::auto::plugins::test::TestPlugin::new()));

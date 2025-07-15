@@ -131,7 +131,7 @@ pub fn shutdown() {
     }
 }
 
-fn get_request_details() -> RequestDetails {
+pub fn get_request_details() -> RequestDetails {
     unsafe {
         //depending in SAPI, request_info.request_uri may not be what we want (eg "index.php" instead of url)
         let request_info = sg!(request_info);
@@ -161,8 +161,8 @@ fn get_request_details() -> RequestDetails {
 }
 
 #[allow(dead_code)]
-struct RequestDetails {
-    method: Option<String>,
+pub struct RequestDetails {
+    pub method: Option<String>,
     uri: Option<String>,
     body_length: u64,
     content_type: Option<String>,
