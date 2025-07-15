@@ -6,7 +6,10 @@ use crate::{
     trace::local_root_span::get_local_root_span,
 };
 use crate::context::storage;
-use opentelemetry::trace::TraceContextExt;
+use opentelemetry::{
+    KeyValue,
+    trace::TraceContextExt,
+};
 use std::{
     sync::Arc,
 };
@@ -76,22 +79,32 @@ impl LaminasRouteHandler {
      */
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch)");
+        let instance_id = get_local_root_span().unwrap_or(0);
+        if instance_id == 0 {
+            tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no local root span found, skipping");
+            return;
+        }
+        let ctx = match storage::get_context_instance(instance_id as u64) {
+            Some(ctx) => ctx,
+            None => {
+                tracing::warn!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no context found for instance id {}", instance_id);
+                return;
+            }
+        };
         let exec_data_ref = &mut *exec_data;
         let route_match_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         let request = get_request_details();
-
-        if let Some(route_match_obj) = route_match_zval.as_mut_z_obj() {
-            if let Ok(route_name_zval) = route_match_obj.call("getMatchedRouteName", []) {
-                if let Some(route_name_str) = route_name_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                    let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
-                    let instance_id = get_local_root_span().unwrap_or(0);
-                    if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
-                        tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
-                        ctx.span().update_name(name);
-                    }
-                }
-            }
+        if let Some(route_name_str) = route_match_zval
+            .as_mut_z_obj()
+            .and_then(|obj| obj.call("getMatchedRouteName", []).ok())
+            .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
+        {
+            let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
+            tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
+            ctx.span().update_name(name);
+            ctx.span().set_attribute(KeyValue::new("php.mvc.framework", "laminas"));
+            //ctx.span().set_attribute(KeyValue::new("php.mvc.controller", "controller-name"));
+            //ctx.span().set_attribute(KeyValue::new("php.mvc.action", "action-name"));
         }
-
     }
 }
