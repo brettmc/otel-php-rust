@@ -66,17 +66,6 @@ impl Handler for LaminasRouteHandler {
 }
 
 impl LaminasRouteHandler {
-    /*
-        $rm = $e->getRouteMatch();
-        $method = $e->getRequest()->getMethod();
-        $routeName = $rm->getMatchedRouteName();
-
-        $config = $e->getApplication()->getServiceManager()->get('config');
-        $routeConfig = $config['router']['routes'][$routeName] ?? null;
-
-        $route = $routeConfig['options']['route'] ?? $routeName;
-        LocalRootSpan::current()->updateName(sprintf('%s %s', $method, $route));
-     */
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch)");
         let instance_id = get_local_root_span().unwrap_or(0);
@@ -115,12 +104,12 @@ impl LaminasRouteHandler {
                 let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
                 tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
                 ctx.span().update_name(name);
-                ctx.span().set_attribute(KeyValue::new("php.http.framework.name", "laminas"));
+                ctx.span().set_attribute(KeyValue::new("php.framework.name", "laminas"));
                 if let Some(controller) = &controller {
-                    ctx.span().set_attribute(KeyValue::new("php.http.framework.controller.name", controller.clone()));
+                    ctx.span().set_attribute(KeyValue::new("php.framework.controller.name", controller.clone()));
                 }
                 if let Some(action) = &action {
-                    ctx.span().set_attribute(KeyValue::new("php.http.framework.action.name", action.clone()));
+                    ctx.span().set_attribute(KeyValue::new("php.framework.action.name", action.clone()));
                 }
             }
         }
