@@ -1,7 +1,10 @@
 use crate::auto::{
     plugin::{Handler, HandlerCallbacks, Plugin},
 };
-use crate::trace::local_root_span::get_local_root_span;
+use crate::{
+    request::get_request_details,
+    trace::local_root_span::get_local_root_span,
+};
 use crate::context::storage;
 use opentelemetry::trace::TraceContextExt;
 use std::{
@@ -75,11 +78,12 @@ impl LaminasRouteHandler {
         tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch)");
         let exec_data_ref = &mut *exec_data;
         let route_match_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
+        let request = get_request_details();
 
         if let Some(route_match_obj) = route_match_zval.as_mut_z_obj() {
             if let Ok(route_name_zval) = route_match_obj.call("getMatchedRouteName", []) {
                 if let Some(route_name_str) = route_name_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                    let name = format!("<method> {}", route_name_str); //todo method
+                    let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
                     let instance_id = get_local_root_span().unwrap_or(0);
                     if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
                         tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
