@@ -79,21 +79,14 @@ impl LaminasRouteHandler {
         if let Some(route_match_obj) = route_match_zval.as_mut_z_obj() {
             if let Ok(route_name_zval) = route_match_obj.call("getMatchedRouteName", []) {
                 if let Some(route_name_str) = route_name_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                    tracing::debug!("Reached innermost if: route_name_str = {}", route_name_str);
-                    // let name = format!("<method> {}", route_name_str); //todo method
-                    // let instance_id = get_local_root_span().unwrap_or(0);
-                    // if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
-                    //     tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
-                    //     ctx.span().update_name(name);
-                    // }
-                } else {
-                    tracing::debug!("Failed: route_name_zval.as_z_str()");
+                    let name = format!("<method> {}", route_name_str); //todo method
+                    let instance_id = get_local_root_span().unwrap_or(0);
+                    if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+                        tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
+                        ctx.span().update_name(name);
+                    }
                 }
-            } else {
-                tracing::debug!("Failed: route_match_obj.call(getMatchedRouteName)");
             }
-        } else {
-            tracing::debug!("Failed: route_match_zval.as_mut_z_obj()");
         }
 
     }
