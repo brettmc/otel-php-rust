@@ -31,6 +31,10 @@ pub fn init(plugin_manager: PluginManager) {
     logging::print_message("Observer::init".to_string());
     PLUGIN_MANAGER.get_or_init(|| plugin_manager);
     FUNCTION_OBSERVERS.get_or_init(|| RwLock::new(HashMap::new()));
+    unsafe {
+        sys::zend_observer_fcall_register(Some(observer_instrument));
+    }
+    logging::print_message("registered fcall handlers".to_string());
 }
 
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {

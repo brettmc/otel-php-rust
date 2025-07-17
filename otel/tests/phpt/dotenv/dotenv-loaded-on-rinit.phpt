@@ -1,0 +1,26 @@
+--TEST--
+dotenv support enabled
+--EXTENSIONS--
+otel
+--INI--
+otel.cli.enable=On
+otel.dotenv.per_request=On
+otel.log.level=debug
+--ENV--
+OTEL_TRACES_EXPORTER=console
+OTEL_SPAN_PROCESSOR=simple
+--FILE--
+<?php
+use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
+Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpan()->end();
+?>
+--EXPECTF--
+%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] OpenTelemetry::RINIT::Loading .env file%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=creating tracer provider for key (%d, "from-dotenv:service.namespace=my-dotenv-service,service.version=0.1.0")
+%A
+Spans
+Resource%A
+	 ->  service.namespace=String(Owned("my-dotenv-service"))
+%A

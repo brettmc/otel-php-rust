@@ -7,10 +7,12 @@ use phper::{
     arrays::{IterKey, ZArr},
     values::ZVal,
 };
+use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     collections::HashMap,
     sync::Arc,
+    sync::Mutex,
 };
 use opentelemetry::{
     Context,
@@ -30,6 +32,8 @@ thread_local! {
     static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = RefCell::new(None);
     static OTEL_CONTEXT_ID: RefCell<Option<u64>> = RefCell::new(None);
 }
+//store .env resource attributes for request duration
+static REQUEST_ENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn init() {
     tracing::debug!("RINIT::initializing request handler");
@@ -172,6 +176,9 @@ pub struct RequestDetails {
 #[allow(static_mut_refs)]
 pub fn get_request_server<'a>() -> anyhow::Result<&'a ZArr> {
     unsafe {
+        // Ensure $_SERVER is initialized
+        let mut server = "_SERVER".to_string();
+        sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
         let symbol_table = ZArr::from_mut_ptr(&mut eg!(symbol_table));
         let carrier = symbol_table
             .get("_SERVER")
@@ -179,6 +186,13 @@ pub fn get_request_server<'a>() -> anyhow::Result<&'a ZArr> {
             .context("$_SERVER is null")?;
         Ok(carrier)
     }
+}
+
+pub fn get_server_var(key: &str) -> Option<String> {
+    get_request_server()
+        .ok()
+        .and_then(|server| server.get(key))
+        .and_then(|zv| z_val_to_string(zv))
 }
 
 pub fn extract_request_headers(server: &ZArr) -> HashMap<String, String> {
@@ -225,4 +239,20 @@ pub fn get_propagated_context() -> Context {
     let headers = extract_request_headers(server);
 
     global::get_text_map_propagator(|prop| prop.extract(&headers))
+}
+
+//per-request .env support
+pub fn set_request_env(env: HashMap<String, String>) {
+    let pid = std::process::id();
+    REQUEST_ENV.lock().unwrap().insert(pid, env);
+}
+
+pub fn get_request_env() -> Option<HashMap<String, String>> {
+    let pid = std::process::id();
+    REQUEST_ENV.lock().unwrap().get(&pid).cloned()
+}
+
+pub fn clear_request_env() {
+    let pid = std::process::id();
+    REQUEST_ENV.lock().unwrap().remove(&pid);
 }
