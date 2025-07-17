@@ -9,6 +9,8 @@ otel.log.level=debug
 --ENV--
 OTEL_TRACES_EXPORTER=console
 OTEL_SPAN_PROCESSOR=simple
+OTEL_SERVICE_NAME=do-not-use
+OTEL_RESOURCE_ATTRIBUTES=service.namespace=do-not-use
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;
@@ -22,5 +24,4 @@ Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpa
 %A
 Spans
 Resource%A
-	 ->  service.namespace=String(Owned("my-dotenv-service"))
-%A
+	 ->  service.name=String(Owned("from-dotenv"))%A

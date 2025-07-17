@@ -73,6 +73,11 @@ pub fn init_once() {
         return;
     }
     // set some allowed environment variables from .env so that the builder will pick them up
+    // save current env values
+    let otel_vars = ["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"];
+    let env_backup = env::vars()
+        .filter(|(k, _)| otel_vars.iter().any(|&v| v == k))
+        .collect::<HashMap<_, _>>();
     if let Some(env_map) = request::get_request_env() {
         if let Some(val) = env_map.get("OTEL_SERVICE_NAME") {
             env::set_var("OTEL_SERVICE_NAME", val);
@@ -87,6 +92,12 @@ pub fn init_once() {
         .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
         .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
         .build();
+
+    // restore environment variables
+    for (k, v) in env_backup {
+        tracing::debug!("Restoring environment variable {}={}", k, v);
+        env::set_var(k, v);
+    }
 
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
