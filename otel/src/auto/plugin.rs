@@ -5,8 +5,6 @@ use phper::{
 };
 
 pub trait Plugin: Send + Sync {
-    /// Determines whether this plugin is enabled. Could be based on .ini config, or custom logic.
-    fn is_enabled(&self) -> bool;
     fn get_handlers(&self) -> &[Arc<dyn Handler + Send + Sync>];
     fn get_name(&self) -> &str;
 }

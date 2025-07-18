@@ -138,6 +138,7 @@ pub fn get_module() -> Module {
     module.add_ini("otel.cli.create_root_span", false, Policy::All);
     module.add_ini("otel.cli.enable", false, Policy::All);
     module.add_ini("otel.dotenv.per_request", false, Policy::All);
+    module.add_ini("otel.auto.disabled_plugins", "".to_string(), Policy::All);
     //which auto-instrumentation mechanism is enabled
     #[cfg(otel_observer_supported)]
     {

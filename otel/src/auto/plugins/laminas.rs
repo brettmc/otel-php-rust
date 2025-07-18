@@ -35,9 +35,6 @@ impl LaminasPlugin {
 }
 
 impl Plugin for LaminasPlugin {
-    fn is_enabled(&self) -> bool {
-        true
-    }
     fn get_handlers(&self) -> &HandlerSlice {
         &self.handlers
     }

@@ -7,8 +7,13 @@ use crate::logging;
 use phper::{
     classes::ClassEntry,
     functions::ZFunc,
+    ini::ini_get,
     strings::{ZString},
     values::ExecuteData,
+};
+use std::{
+    ffi::CStr,
+    collections::HashSet,
 };
 
 pub struct PluginManager {
@@ -25,12 +30,17 @@ impl PluginManager {
     }
 
     fn init(&mut self) {
-        #[cfg(not(feature="without-laminas"))]
-        self.plugins.push(Box::new(LaminasPlugin::new()));
-        #[cfg(not(feature="without-psr18"))]
-        self.plugins.push(Box::new(Psr18Plugin::new()));
-        #[cfg(feature="test")]
-        self.plugins.push(Box::new(crate::auto::plugins::test::TestPlugin::new()));
+        let disabled = get_disabled_plugins();
+        if !disabled.contains("laminas") {
+            self.plugins.push(Box::new(LaminasPlugin::new()));
+        }
+        if !disabled.contains("psr18") {
+            self.plugins.push(Box::new(Psr18Plugin::new()));
+        }
+        if !disabled.contains("test") {
+            #[cfg(feature="test")]
+            self.plugins.push(Box::new(crate::auto::plugins::test::TestPlugin::new()));
+        }
     }
 
     pub fn plugins(&self) -> &Vec<Box<dyn Plugin + Send + Sync>> {
@@ -67,6 +77,17 @@ impl PluginManager {
             None
         }
     }
+}
+
+fn get_disabled_plugins() -> HashSet<String> {
+    let value = ini_get::<Option<&CStr>>("otel.auto.disabled_plugins")
+        .and_then(|cstr| cstr.to_str().ok())
+        .unwrap_or("");
+    value
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 fn should_trace(func: &ZFunc, functions: &[String], interfaces: &[String], plugin_name: &str) -> bool {

@@ -100,6 +100,8 @@ As above
 * Access "local root span"
 * `memory` exporter for testing
 * Support for shared hosting (ie one apache/fpm server with multiple sites), via `.env` files and `otel.dotenv.per_request` ini setting
+* Disabling of auto-instrumentation via `.ini` setting `otel.auto.disabled_plugins`
+  - eg `otel.auto.disabled_plugins=laminas,psr18`
 
 Basic usage:
 ```php

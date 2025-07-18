@@ -43,9 +43,6 @@ impl Psr18Plugin {
 }
 
 impl Plugin for Psr18Plugin {
-    fn is_enabled(&self) -> bool {
-        true
-    }
     fn get_handlers(&self) -> &HandlerSlice {
         &self.handlers
     }
