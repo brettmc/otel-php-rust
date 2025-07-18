@@ -98,8 +98,6 @@ use crate::auto::{
     observer,
     plugin_manager::PluginManager
 };
-#[cfg(otel_observer_supported)]
-use phper::sys;
 
 #[cfg(otel_observer_not_supported)]
 pub mod auto{
@@ -139,6 +137,7 @@ pub fn get_module() -> Module {
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
     module.add_ini("otel.cli.create_root_span", false, Policy::All);
     module.add_ini("otel.cli.enable", false, Policy::All);
+    module.add_ini("otel.dotenv.per_request", false, Policy::All);
     //which auto-instrumentation mechanism is enabled
     #[cfg(otel_observer_supported)]
     {
@@ -199,11 +198,6 @@ pub fn get_module() -> Module {
         #[cfg(otel_observer_supported)]
         {
             observer::init(PluginManager::new());
-            //todo: do this in observer.rs ?
-            unsafe {
-                sys::zend_observer_fcall_register(Some(observer::observer_instrument));
-            }
-            logging::print_message("registered fcall handlers".to_string());
         }
         #[cfg(otel_observer_not_supported)]
         {
@@ -232,6 +226,8 @@ pub fn get_module() -> Module {
             TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
             logging::print_message("OpenTelemetry::RINIT::tokio runtime initialized".to_string());
         }
+
+        request::process_dotenv();
 
         tracer_provider::init_once();
         global::set_text_map_propagator(TraceContextPropagator::new());

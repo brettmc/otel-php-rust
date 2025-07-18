@@ -30,6 +30,7 @@ use opentelemetry_sdk::{
 };
 use once_cell::sync::Lazy;
 use crate::{
+    request,
     trace::tracer::TracerClass,
     util,
 };
@@ -40,16 +41,26 @@ const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvide
 
 pub type TracerProviderClass = StateClass<()>;
 
-static TRACER_PROVIDERS: Lazy<Mutex<HashMap<u32, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static TRACER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+//tracer provider per (service_name, resource_attributes) pair (from .env, if enabled)
+fn get_tracer_provider_key() -> (u32, String) {
+    let pid = process::id();
+    let env = request::get_request_env().unwrap_or_default();
+    let service_name = env.get("OTEL_SERVICE_NAME").cloned().unwrap_or_default();
+    let resource_attrs = env.get("OTEL_RESOURCE_ATTRIBUTES").cloned().unwrap_or_default();
+    let key = format!("{}:{}", service_name, resource_attrs);
+    (pid, key)
+}
 
 pub fn init_once() {
-    let pid = process::id();
+    let key = get_tracer_provider_key();
     let mut providers = TRACER_PROVIDERS.lock().unwrap();
-    if providers.contains_key(&pid) {
-        tracing::debug!("tracer provider already exists for pid {}", pid);
+    if providers.contains_key(&key) {
+        tracing::debug!("tracer provider already exists for key {:?}", key);
         return;
     }
-    tracing::debug!("creating tracer provider for pid {}", pid);
+    tracing::debug!("creating tracer provider for key {:?}", key);
     let use_simple_exporter = env::var("OTEL_SPAN_PROCESSOR").as_deref() == Ok("simple");
     tracing::debug!("SpanProcessor={}", if use_simple_exporter {"simple"} else {"batch"});
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("none") {
@@ -58,14 +69,35 @@ pub fn init_once() {
             .with_resource(Resource::builder_empty().build())
             .with_sampler(AlwaysOff)
             .build();
-        providers.insert(pid, Arc::new(provider.clone()));
+        providers.insert(key, Arc::new(provider.clone()));
         return;
     }
+    // set some allowed environment variables from .env so that the builder will pick them up
+    // save current env values
+    let otel_vars = ["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"];
+    let env_backup = env::vars()
+        .filter(|(k, _)| otel_vars.iter().any(|&v| v == k))
+        .collect::<HashMap<_, _>>();
+    if let Some(env_map) = request::get_request_env() {
+        if let Some(val) = env_map.get("OTEL_SERVICE_NAME") {
+            env::set_var("OTEL_SERVICE_NAME", val);
+        }
+        if let Some(val) = env_map.get("OTEL_RESOURCE_ATTRIBUTES") {
+            env::set_var("OTEL_RESOURCE_ATTRIBUTES", val);
+        }
+    }
+
     let resource = Resource::builder()
         .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
         .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
         .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
         .build();
+
+    // restore environment variables
+    for (k, v) in env_backup {
+        tracing::debug!("Restoring environment variable {}={}", k, v);
+        env::set_var(k, v);
+    }
 
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
@@ -117,13 +149,14 @@ pub fn init_once() {
         .with_resource(resource)
         .build()
     );
-    providers.insert(pid, provider.clone());
+    providers.insert(key, provider.clone());
 }
 
 pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
     let pid = process::id();
     let providers = TRACER_PROVIDERS.lock().unwrap();
-    if let Some(provider) = providers.get(&pid) {
+    let key = get_tracer_provider_key();
+    if let Some(provider) = providers.get(&key) {
         return provider.clone();
     } else {
         tracing::error!("no tracer provider initialized for pid {}, using no-op", pid);
@@ -138,7 +171,8 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
 pub fn force_flush() {
     let pid = process::id();
     let providers = TRACER_PROVIDERS.lock().unwrap();
-    if let Some(provider) = providers.get(&pid) {
+    let key = get_tracer_provider_key();
+    if let Some(provider) = providers.get(&key) {
         tracing::info!("Flushing TracerProvider for pid {}", pid);
         match provider.force_flush() {
             Ok(_) => tracing::debug!("OpenTelemetry tracer provider flush success"),
@@ -152,11 +186,19 @@ pub fn force_flush() {
 pub fn shutdown() {
     let pid = process::id();
     let mut providers = TRACER_PROVIDERS.lock().unwrap();
-    if providers.contains_key(&pid) {
-        tracing::info!("Shutting down TracerProvider for pid {}", pid);
-        providers.remove(&pid);
+    let keys_to_remove: Vec<_> = providers
+        .keys()
+        .filter(|(k_pid, _)| *k_pid == pid)
+        .cloned()
+        .collect();
+    if !keys_to_remove.is_empty() {
+        tracing::info!("Shutting down all TracerProviders for pid {}", pid);
+        for key in keys_to_remove {
+            tracing::debug!("Shutting down TracerProvider for key {:?}", key);
+            providers.remove(&key);
+        }
     } else {
-        tracing::info!("no tracer provider to shutdown for pid {}", pid);
+        tracing::info!("no tracer providers to shutdown for pid {}", pid);
     }
 }
 
