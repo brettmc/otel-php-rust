@@ -11,6 +11,7 @@ use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     collections::HashMap,
+    fs,
     sync::Arc,
     sync::Mutex,
 };
@@ -34,6 +35,46 @@ thread_local! {
 }
 //store .env resource attributes for request duration
 static REQUEST_ENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub fn process_dotenv() {
+    let per_request_dotenv = ini_get::<bool>("otel.dotenv.per_request");
+    if per_request_dotenv {
+        if let Some(script_filename) = get_server_var("SCRIPT_FILENAME") {
+            if let Some(cwd) = std::path::Path::new(&script_filename).parent() {
+                let env_path = cwd.join(".env");
+                if fs::metadata(&env_path).is_ok() {
+                    let mut service_name = None;
+                    let mut resource_attributes = None;
+                    if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
+                        for item in iter.flatten() {
+                            match item.0.as_str() {
+                                "OTEL_SERVICE_NAME" => service_name = Some(item.1),
+                                "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
+                                _ => {}
+                            }
+                            if service_name.is_some() && resource_attributes.is_some() {
+                                break;
+                            }
+                        }
+                        //now we _might_ have service name and resource attributes
+                        let mut env = HashMap::new();
+                        if let Some(service_name) = service_name {
+                            env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
+                        }
+                        if let Some(resource_attributes) = resource_attributes {
+                            env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), resource_attributes);
+                        }
+                        set_request_env(env);
+                    }
+                } else {
+                    tracing::warn!("No .env file found in {:?}", cwd);
+                }
+            }
+        } else {
+            tracing::debug!("No SCRIPT_FILENAME found, skipping loading .env");
+        }
+    }
+}
 
 pub fn init() {
     tracing::debug!("RINIT::initializing request handler");
@@ -133,6 +174,7 @@ pub fn shutdown() {
     } else {
         tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
     }
+    clear_request_env();
 }
 
 pub fn get_request_details() -> RequestDetails {

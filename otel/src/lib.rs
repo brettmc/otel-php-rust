@@ -10,11 +10,6 @@ use crate::{
             text_map_propagator_interface::{make_text_map_propagator_interface},
         }
     },
-    request::{
-        get_server_var,
-        clear_request_env,
-        set_request_env,
-    },
     trace::{
         local_root_span::make_local_root_span_class,
         memory_exporter::make_memory_exporter_class,
@@ -38,7 +33,6 @@ use crate::{
     util::get_sapi_module_name,
     globals::{make_globals_class},
 };
-use std::fs;
 use phper::{
     ini::{ini_get, Policy},
     modules::Module,
@@ -52,7 +46,6 @@ use opentelemetry_sdk::{
 };
 use tokio::runtime::Runtime;
 use once_cell::sync::OnceCell;
-use std::collections::HashMap;
 
 pub mod context{
     pub mod context;
@@ -234,44 +227,7 @@ pub fn get_module() -> Module {
             logging::print_message("OpenTelemetry::RINIT::tokio runtime initialized".to_string());
         }
 
-        let per_request_dotenv = ini_get::<bool>("otel.dotenv.per_request");
-        if per_request_dotenv {
-            logging::print_message("OpenTelemetry::RINIT::Loading .env file".to_string());
-            if let Some(script_filename) = get_server_var("SCRIPT_FILENAME") {
-                if let Some(cwd) = std::path::Path::new(&script_filename).parent() {
-                    let env_path = cwd.join(".env");
-                    if fs::metadata(&env_path).is_ok() {
-                        let mut service_name = None;
-                        let mut resource_attributes = None;
-                        if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
-                            for item in iter.flatten() {
-                                match item.0.as_str() {
-                                    "OTEL_SERVICE_NAME" => service_name = Some(item.1),
-                                    "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
-                                    _ => {}
-                                }
-                                if service_name.is_some() && resource_attributes.is_some() {
-                                    break;
-                                }
-                            }
-                            //now we _might_ have service name and resource attributes
-                            let mut env = HashMap::new();
-                            if let Some(service_name) = service_name {
-                                env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
-                            }
-                            if let Some(resource_attributes) = resource_attributes {
-                                env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), resource_attributes);
-                            }
-                            set_request_env(env);
-                        }
-                    } else {
-                        logging::print_message(format!("OpenTelemetry::RINIT::No .env file found in {:?}", cwd));
-                    }
-                }
-            } else {
-                logging::print_message("OpenTelemetry::RINIT::No SCRIPT_FILENAME found, skipping .env".to_string());
-            }
-        }
+        request::process_dotenv();
 
         tracer_provider::init_once();
         global::set_text_map_propagator(TraceContextPropagator::new());
@@ -283,7 +239,6 @@ pub fn get_module() -> Module {
         if is_disabled {
             return;
         }
-        clear_request_env();
         logging::print_message("OpenTelemetry::RSHUTDOWN".to_string());
         request::shutdown();
     });

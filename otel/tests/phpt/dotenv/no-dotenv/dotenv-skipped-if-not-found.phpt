@@ -17,8 +17,7 @@ Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpa
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] OpenTelemetry::RINIT::Loading .env file%A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] OpenTelemetry::RINIT::No .env file found in "/usr/src/myapp/tests/phpt/dotenv/no-dotenv"
+[%s] [WARN] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=No .env file found in "/usr/src/myapp/tests/phpt/dotenv/no-dotenv"
 %A
 Spans
 Resource%A
