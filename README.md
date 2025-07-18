@@ -86,10 +86,10 @@ As above
 ### `cgi-fcgi`
 As above
 
-## What works?
+## Features
 
 * Auto-instrumentation of userland (PHP8.0+) and internal (PHP8.2+) code, via zend_observer API (see `tests/auto/*`)
-* AUto-instrumentation of userland code via `zend_execute_ex` (PHP 7.x)
+* Auto-instrumentation of userland code via `zend_execute_ex` (PHP 7.x)
 * Start a span in RINIT, use `traceparent` headers, set HTTP response code in RSHUTDOWN
 * TracerProvider created in RINIT (so that child processes have a working instance)
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
@@ -99,6 +99,7 @@ As above
 * Get SpanContext from a Span
 * Access "local root span"
 * `memory` exporter for testing
+* Support for shared hosting (ie one apache/fpm server with multiple sites), via `.env` files and `otel.dotenv.per_request` ini setting
 
 Basic usage:
 ```php
@@ -129,7 +130,6 @@ $scope->detach();
 
 ## What doesn't work or isn't implemented? (todo list)
 
-- read config from `.env` files (support multi-site installations that don't use vhosts?)
 - Context storage - otel-rust doesn't support storing non-simple values, and context keys are created at compile time.
 This will probably never work like opentelemetry-php.
 
