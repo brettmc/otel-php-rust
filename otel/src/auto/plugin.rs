@@ -19,8 +19,8 @@ pub trait Handler: Send + Sync {
 }
 
 pub struct HandlerCallbacks {
-    pub pre_observe: Option<Box<dyn Fn(*mut ExecuteData) + Send + Sync>>,
-    pub post_observe: Option<Box<dyn Fn(*mut ExecuteData, &mut ZVal, Option<&mut ZObj>) + Send + Sync>>,
+    pub pre_observe: Option<ObserverPreHook>,
+    pub post_observe: Option<ObserverPostHook>,
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData) + Send + Sync>;
