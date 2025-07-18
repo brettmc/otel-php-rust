@@ -37,7 +37,7 @@ pub fn init_once() {
     };
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+    tracing::subscriber::set_global_default(subscriber).ok();
     tracing::debug!("Logging::initialized level={}", level_filter);
     logger_pids.insert(pid, ());
 }
