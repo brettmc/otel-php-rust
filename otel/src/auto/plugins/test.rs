@@ -3,7 +3,7 @@
 // - DemoFunctionHandler: observes a specific function with a different pre and post callback
 use crate::auto::{
     execute_data::{get_default_attributes, get_fqn},
-    plugin::{Handler, HandlerCallbacks, Plugin},
+    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
 };
 use opentelemetry::{
     KeyValue,
@@ -26,7 +26,7 @@ use opentelemetry::{
 };
 
 pub struct TestPlugin {
-    handlers: Vec<Arc<dyn Handler + Send + Sync>>,
+    handlers: HandlerList,
 }
 
 impl TestPlugin {
@@ -44,8 +44,8 @@ impl Plugin for TestPlugin {
     fn is_enabled(&self) -> bool {
         true
     }
-    fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>> {
-        self.handlers.clone()
+    fn get_handlers(&self) -> &HandlerSlice {
+        &self.handlers
     }
     fn get_name(&self) -> &str {
         "test"
