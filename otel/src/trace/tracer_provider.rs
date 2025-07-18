@@ -194,6 +194,7 @@ pub fn shutdown() {
     if !keys_to_remove.is_empty() {
         tracing::info!("Shutting down all TracerProviders for pid {}", pid);
         for key in keys_to_remove {
+            tracing::debug!("Shutting down TracerProvider for key {:?}", key);
             providers.remove(&key);
         }
     } else {
