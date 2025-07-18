@@ -74,6 +74,7 @@ pub fn process_dotenv() {
                             name: scope_name,
                             version: scope_version,
                         };
+                        tracing::debug!("Storing instrumentation scope: {:?}", scope);
                         if let Some(service_name) = service_name {
                             env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
                         }
