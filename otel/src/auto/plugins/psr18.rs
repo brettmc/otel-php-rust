@@ -1,6 +1,6 @@
 use crate::auto::{
     execute_data::{get_default_attributes},
-    plugin::{Handler, HandlerCallbacks, Plugin},
+    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
 };
 use crate::tracer_provider;
 use crate::context::storage::{store_guard, take_guard};
@@ -29,7 +29,7 @@ use phper::{
 };
 
 pub struct Psr18Plugin {
-    handlers: Vec<Arc<dyn Handler + Send + Sync>>,
+    handlers: HandlerList,
 }
 
 impl Psr18Plugin {
@@ -43,11 +43,8 @@ impl Psr18Plugin {
 }
 
 impl Plugin for Psr18Plugin {
-    fn is_enabled(&self) -> bool {
-        true
-    }
-    fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>> {
-        self.handlers.clone()
+    fn get_handlers(&self) -> &HandlerSlice {
+        &self.handlers
     }
     fn get_name(&self) -> &str {
         "psr-18"
@@ -67,8 +64,12 @@ impl Handler for Psr18SendRequestHandler {
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
-            pre_observe: Some(Self::pre_callback),
-            post_observe: Some(Self::post_callback),
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
         }
     }
 }

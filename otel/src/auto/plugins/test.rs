@@ -3,7 +3,7 @@
 // - DemoFunctionHandler: observes a specific function with a different pre and post callback
 use crate::auto::{
     execute_data::{get_default_attributes, get_fqn},
-    plugin::{Handler, HandlerCallbacks, Plugin},
+    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
 };
 use opentelemetry::{
     KeyValue,
@@ -26,7 +26,7 @@ use opentelemetry::{
 };
 
 pub struct TestPlugin {
-    handlers: Vec<Arc<dyn Handler + Send + Sync>>,
+    handlers: HandlerList,
 }
 
 impl TestPlugin {
@@ -41,11 +41,8 @@ impl TestPlugin {
 }
 
 impl Plugin for TestPlugin {
-    fn is_enabled(&self) -> bool {
-        true
-    }
-    fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>> {
-        self.handlers.clone()
+    fn get_handlers(&self) -> &HandlerSlice {
+        &self.handlers
     }
     fn get_name(&self) -> &str {
         "test"
@@ -70,8 +67,12 @@ impl Handler for DemoHandler {
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
-            pre_observe: Some(Self::pre_callback),
-            post_observe: Some(Self::post_callback),
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
         }
     }
 }
@@ -117,8 +118,12 @@ impl Handler for DemoFunctionHandler {
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
-            pre_observe: Some(Self::pre_callback),
-            post_observe: Some(Self::post_callback),
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
         }
     }
 }

@@ -157,13 +157,12 @@ pub fn init_once() {
 }
 
 pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
-    let pid = process::id();
     let providers = TRACER_PROVIDERS.lock().unwrap();
     let key = get_tracer_provider_key();
     if let Some(provider) = providers.get(&key) {
         return provider.clone();
     } else {
-        tracing::error!("no tracer provider initialized for pid {}, using no-op", pid);
+        tracing::warn!("no tracer provider initialized for key {:?}, using no-op", key);
         Arc::new(SdkTracerProvider::builder()
             .with_resource(Resource::builder_empty().build())
             .with_sampler(AlwaysOff)

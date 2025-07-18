@@ -17,11 +17,9 @@ static LOGGER_PIDS: LazyLock<Mutex<HashMap<u32, ()>>> = LazyLock::new(|| Mutex::
 /// Initialize logging subscriber if it's not already running for this PID (for SAPIs that
 /// spawn worker processes)
 pub fn init_once() {
-    print_message("logging::init_once".to_string());
     let pid = process::id();
     let mut logger_pids = LOGGER_PIDS.lock().unwrap();
     if logger_pids.contains_key(&pid) {
-        print_message(format!("logging already initialized for pid: {}", pid));
         return;
     }
 
@@ -40,7 +38,7 @@ pub fn init_once() {
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
-    print_message(format!("Logging::initialized level={}", level_filter));
+    tracing::debug!("Logging::initialized level={}", level_filter);
     logger_pids.insert(pid, ());
 }
 
@@ -72,30 +70,6 @@ fn log_message(message: &str) {
             }
         }
     }
-}
-
-/// public message printer, for MINIT (before logging is initialized)
-/// TODO: honour log levels!
-pub fn print_message(message: String) {
-    let log_level = ini_get::<Option<&CStr>>("otel.log.level")
-        .and_then(|cstr| cstr.to_str().ok())
-        .unwrap_or("none");
-    match log_level {
-        "none" => {return;}
-        "error" => {return;}
-        "warn" => {return;}
-        _ => {}
-    }
-    let thread_id = thread::current().id();
-    let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
-    let log_entry = format!(
-        "[{}] [DEBUG] [pid={}] [{:?}] {}",
-        timestamp,
-        process::id(),
-        thread_id,
-        message
-    );
-    eprintln!("{}", log_entry);
 }
 
 /// A visitor that captures structured log fields into a string.

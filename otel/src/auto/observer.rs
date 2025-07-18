@@ -7,7 +7,6 @@ use phper::{
     }
 };
 use crate::{
-    logging,
     auto::{
         execute_data::{
             get_fqn,
@@ -28,13 +27,13 @@ static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, FunctionObserver>>> =
 static PLUGIN_MANAGER: OnceLock<PluginManager> = OnceLock::new();
 
 pub fn init(plugin_manager: PluginManager) {
-    logging::print_message("Observer::init".to_string());
+    tracing::debug!("Observer::init");
     PLUGIN_MANAGER.get_or_init(|| plugin_manager);
     FUNCTION_OBSERVERS.get_or_init(|| RwLock::new(HashMap::new()));
     unsafe {
         sys::zend_observer_fcall_register(Some(observer_instrument));
     }
-    logging::print_message("registered fcall handlers".to_string());
+    tracing::debug!("registered fcall handlers");
 }
 
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {

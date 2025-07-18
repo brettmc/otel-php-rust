@@ -25,7 +25,7 @@ static mut UPSTREAM_EXECUTE_EX: Option<
 > = None;
 
 pub fn init(plugin_manager: PluginManager) {
-    logging::print_message("Execute::init".to_string());
+    tracing::debug!("Execute::init");
     PLUGIN_MANAGER.get_or_init(|| plugin_manager);
     OBSERVER_MAP.get_or_init(|| Arc::new(DashMap::new()));
     unsafe {

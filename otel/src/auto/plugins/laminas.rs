@@ -1,5 +1,5 @@
 use crate::auto::{
-    plugin::{Handler, HandlerCallbacks, Plugin},
+    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
 };
 use crate::{
     request::get_request_details,
@@ -21,7 +21,7 @@ use phper::{
 };
 
 pub struct LaminasPlugin {
-    handlers: Vec<Arc<dyn Handler + Send + Sync>>,
+    handlers: HandlerList,
 }
 
 impl LaminasPlugin {
@@ -35,11 +35,8 @@ impl LaminasPlugin {
 }
 
 impl Plugin for LaminasPlugin {
-    fn is_enabled(&self) -> bool {
-        true
-    }
-    fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>> {
-        self.handlers.clone()
+    fn get_handlers(&self) -> &HandlerSlice {
+        &self.handlers
     }
     fn get_name(&self) -> &str {
         "laminas"
@@ -59,7 +56,9 @@ impl Handler for LaminasRouteHandler {
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
-            pre_observe: Some(Self::pre_callback),
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
             post_observe: None,
         }
     }

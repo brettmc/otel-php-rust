@@ -5,9 +5,7 @@ use phper::{
 };
 
 pub trait Plugin: Send + Sync {
-    /// Determines whether this plugin is enabled. Could be based on .ini config, or custom logic.
-    fn is_enabled(&self) -> bool;
-    fn get_handlers(&self) -> Vec<Arc<dyn Handler + Send + Sync>>;
+    fn get_handlers(&self) -> &[Arc<dyn Handler + Send + Sync>];
     fn get_name(&self) -> &str;
 }
 
@@ -19,12 +17,14 @@ pub trait Handler: Send + Sync {
 }
 
 pub struct HandlerCallbacks {
-    pub pre_observe: Option<unsafe extern "C" fn(*mut ExecuteData)>,
-    pub post_observe: Option<unsafe extern "C" fn(*mut ExecuteData, &mut ZVal, Option<&mut ZObj>)>,
+    pub pre_observe: Option<ObserverPreHook>,
+    pub post_observe: Option<ObserverPostHook>,
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData) + Send + Sync>;
 pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &mut ZVal, Option<&mut ZObj>) + Send + Sync>;
+pub type HandlerList = Vec<Arc<dyn Handler + Send + Sync>>;
+pub type HandlerSlice = [Arc<dyn Handler + Send + Sync>];
 
 pub struct FunctionObserver {
     pre_hooks: Vec<ObserverPreHook>,

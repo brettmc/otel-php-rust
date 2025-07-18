@@ -21,9 +21,9 @@ Globals::tracerProvider()->forceFlush();
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [%s] [ThreadId(%d)] OpenTelemetry::RINIT%A
-[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048
+[%s] [DEBUG] [%s] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RINIT
 %A
+[%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ThreadStarted message= name=BatchSpanProcessor.ThreadStarted interval_in_millisecs=5000 max_export_batch_size=512 max_queue_size=2048%A
 [%s] [DEBUG] [%s] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportingDueToForceFlush message= name=BatchSpanProcessor.ExportingDueToForceFlush
 Spans
 Resource
