@@ -47,13 +47,13 @@ impl PluginManager {
                     let callbacks = handler.get_callbacks();
 
                     if let Some(pre) = callbacks.pre_observe {
-                        observer.add_pre_hook(Box::new(move |execute_data| unsafe {
+                        observer.add_pre_hook(Box::new(move |execute_data| {
                             pre(execute_data);
                         }));
                     }
 
                     if let Some(post) = callbacks.post_observe {
-                        observer.add_post_hook(Box::new(move |execute_data, retval, exception| unsafe {
+                        observer.add_post_hook(Box::new(move |execute_data, retval, exception| {
                             post(execute_data, retval, exception);
                         }));
                     }

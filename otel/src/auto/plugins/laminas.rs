@@ -59,7 +59,9 @@ impl Handler for LaminasRouteHandler {
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
-            pre_observe: Some(Self::pre_callback),
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
             post_observe: None,
         }
     }

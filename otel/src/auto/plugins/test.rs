@@ -70,8 +70,12 @@ impl Handler for DemoHandler {
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
-            pre_observe: Some(Self::pre_callback),
-            post_observe: Some(Self::post_callback),
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
         }
     }
 }
@@ -117,8 +121,12 @@ impl Handler for DemoFunctionHandler {
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
-            pre_observe: Some(Self::pre_callback),
-            post_observe: Some(Self::post_callback),
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
         }
     }
 }
