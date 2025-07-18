@@ -186,15 +186,16 @@ pub fn get_module() -> Module {
     let _status_code_interface = module.add_interface(make_status_code_interface());
 
     module.on_module_init(|| {
+        logging::init_once(); //from here on we can use tracing macros
         let cli_enabled = ini_get::<bool>("otel.cli.enable");
         let sapi = get_sapi_module_name();
         let disabled = sapi == "cli" && !cli_enabled;
         DISABLED.set(disabled).ok();
         if disabled {
-            logging::print_message("OpenTelemetry::MINIT disabled for cli".to_string());
+            tracing::debug!("OpenTelemetry::MINIT disabled for cli");
             return;
         }
-        logging::print_message("OpenTelemetry::MINIT".to_string());
+        tracing::debug!("OpenTelemetry::MINIT");
 
         #[cfg(otel_observer_supported)]
         {
@@ -210,22 +211,22 @@ pub fn get_module() -> Module {
         if is_disabled {
             return;
         }
-        logging::print_message("OpenTelemetry::MSHUTDOWN".to_string());
+        tracing::debug!("OpenTelemetry::MSHUTDOWN");
         tracer_provider::shutdown();
     });
     module.on_request_init(|| {
         if *DISABLED.get().unwrap_or(&false) {
             return;
         }
-        logging::print_message("OpenTelemetry::RINIT".to_string());
-        logging::init_once();
+        logging::init_once(); //we maybe need to initialize logging for each worker (apache, fpm)
+        tracing::debug!("OpenTelemetry::RINIT");
 
         if TOKIO_RUNTIME.get().is_none() {
-            logging::print_message("OpenTelemetry::RINIT::Creating tokio runtime".to_string());
+            tracing::debug!("OpenTelemetry::RINIT::Creating tokio runtime");
             //TODO don't create runtime unless using grpc
             let runtime = Runtime::new().expect("Failed to create Tokio runtime");
             TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
-            logging::print_message("OpenTelemetry::RINIT::tokio runtime initialized".to_string());
+            tracing::debug!("OpenTelemetry::RINIT::tokio runtime initialized");
         }
 
         request::process_dotenv();
@@ -240,7 +241,7 @@ pub fn get_module() -> Module {
         if is_disabled {
             return;
         }
-        logging::print_message("OpenTelemetry::RSHUTDOWN".to_string());
+        tracing::debug!("OpenTelemetry::RSHUTDOWN");
         request::shutdown();
     });
 

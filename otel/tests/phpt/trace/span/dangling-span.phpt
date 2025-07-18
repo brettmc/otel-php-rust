@@ -28,7 +28,7 @@ $scope = $span->activate();
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] OpenTelemetry::RSHUTDOWN
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RSHUTDOWN
 %A
 [%s] [WARN] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::context still stored: [%d]
 %A

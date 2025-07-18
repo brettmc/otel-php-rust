@@ -18,6 +18,8 @@ $tracer->spanBuilder('root')->startSpan()->end();
 var_dump(Memory::count());
 ?>
 --EXPECTF--
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] OpenTelemetry::MINIT disabled for cli
-int(0)
+%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::MINIT disabled for cli
+%A
+int(0)%A
 int(0)

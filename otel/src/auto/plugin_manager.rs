@@ -3,7 +3,6 @@ use crate::auto::plugins::{
     laminas::LaminasPlugin,
     psr18::Psr18Plugin,
 };
-use crate::logging;
 use phper::{
     classes::ClassEntry,
     functions::ZFunc,
@@ -22,7 +21,7 @@ pub struct PluginManager {
 
 impl PluginManager {
     pub fn new() -> Self {
-        logging::print_message("PluginManager::init".to_string());
+        tracing::debug!("PluginManager::init");
         // tracing::debug!("PluginManager::new");
         let mut manager = Self {plugins: vec![] };
         manager.init();

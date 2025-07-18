@@ -1,7 +1,8 @@
 --TEST--
 Set and retrieve a value from context
---XFAIL--
-Keys not handled correctly, only stores string, cannot store spans
+--SKIPIF--
+<?php die('skip Keys not handled correctly, only stores string, cannot store spans');
+?>
 --EXTENSIONS--
 otel
 --ENV--

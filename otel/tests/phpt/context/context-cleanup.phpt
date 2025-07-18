@@ -42,5 +42,5 @@ string(15) "detaching scope"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Maybe remove context for instance 1
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Removing context instance 1 (ref count = 1, no external holders)
 string(14) "scope detached"
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] OpenTelemetry::RSHUTDOWN
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RSHUTDOWN
 %A
