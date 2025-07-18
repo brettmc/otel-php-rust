@@ -101,3 +101,13 @@ fn zval_to_vec(key: &str, value: &ZVal) -> Option<KeyValue> {
 pub fn get_sapi_module_name() -> String {
     unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
 }
+
+pub fn get_php_version() -> String {
+    let php_version = format!(
+        "{}.{}.{}",
+        phper::sys::PHP_MAJOR_VERSION,
+        phper::sys::PHP_MINOR_VERSION,
+        phper::sys::PHP_RELEASE_VERSION
+    );
+    php_version
+}

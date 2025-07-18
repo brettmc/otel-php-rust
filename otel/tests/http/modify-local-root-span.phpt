@@ -39,7 +39,6 @@ Span #0
 	End time: %s
 	Status: Unset
 	Attributes:
-		 ->  php.sapi.name: String(Owned("cli-server"))
 		 ->  url.full: String(Owned("/"))
 		 ->  http.request.method: String(Owned("PUT"))
 		 ->  http.response.status_code: I64(201)%A

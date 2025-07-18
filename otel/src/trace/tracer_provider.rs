@@ -91,6 +91,10 @@ pub fn init_once() {
         .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
         .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
         .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
+        .with_attribute(KeyValue::new("process.runtime.name", util::get_sapi_module_name()))
+        .with_attribute(KeyValue::new("process.runtime.version", util::get_php_version()))
+        .with_attribute(KeyValue::new("process.pid", process::id().to_string()))
+        .with_attribute(KeyValue::new("host.name", hostname::get().unwrap_or_default().to_string_lossy().to_string()))
         .build();
 
     // restore environment variables

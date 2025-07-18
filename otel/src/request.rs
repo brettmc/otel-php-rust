@@ -110,7 +110,6 @@ pub fn init() {
     let tracer = tracer_provider.tracer_with_scope(scope);
     let span_builder = tracer.span_builder(span_name.unwrap_or("unknown".to_string()));
     let mut attributes = span_builder.attributes.clone().unwrap_or_default();
-    attributes.push(KeyValue::new("php.sapi.name", get_sapi_module_name()));
     attributes.push(KeyValue::new(SemConv::trace::URL_FULL, request_details.uri.unwrap_or_default()));
     attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, request_details.method.unwrap_or_default()));
     //attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_BODY_SIZE, request_details.body_length.unwrap_or_default()));
