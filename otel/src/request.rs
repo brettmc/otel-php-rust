@@ -29,12 +29,20 @@ use crate::{
     util::{get_sapi_module_name},
 };
 
+#[derive(Clone, Debug)]
+pub struct ScopeInfo {
+    name: Option<String>,
+    version: Option<String>,
+}
+
 thread_local! {
     static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = RefCell::new(None);
     static OTEL_CONTEXT_ID: RefCell<Option<u64>> = RefCell::new(None);
 }
 //store .env resource attributes for request duration
 static REQUEST_ENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static REQUEST_SCOPE: Lazy<Mutex<HashMap<u32, ScopeInfo>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
 
 pub fn process_dotenv() {
     let per_request_dotenv = ini_get::<bool>("otel.dotenv.per_request");
@@ -45,11 +53,15 @@ pub fn process_dotenv() {
                 if fs::metadata(&env_path).is_ok() {
                     let mut service_name = None;
                     let mut resource_attributes = None;
+                    let mut scope_name = None;
+                    let mut scope_version = None;
                     if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
                         for item in iter.flatten() {
                             match item.0.as_str() {
                                 "OTEL_SERVICE_NAME" => service_name = Some(item.1),
                                 "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
+                                "OTEL_SCOPE_NAME" => scope_name = Some(item.1),
+                                "OTEL_SCOPE_VERSION" => scope_version = Some(item.1),
                                 _ => {}
                             }
                             if service_name.is_some() && resource_attributes.is_some() {
@@ -58,13 +70,19 @@ pub fn process_dotenv() {
                         }
                         //now we _might_ have service name and resource attributes
                         let mut env = HashMap::new();
+                        let scope = ScopeInfo {
+                            name: scope_name,
+                            version: scope_version,
+                        };
                         if let Some(service_name) = service_name {
                             env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
                         }
                         if let Some(resource_attributes) = resource_attributes {
                             env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), resource_attributes);
                         }
+
                         set_request_env(env);
+                        set_request_scope(scope);
                     }
                 } else {
                     tracing::warn!("No .env file found in {:?}", cwd);
@@ -105,8 +123,17 @@ pub fn init() {
     }
 
     tracing::debug!("RINIT::otel request is being traced, name={}", span_name.clone().unwrap_or("unknown".to_string()));
+    let scope_info = get_request_scope().unwrap_or_else(|| ScopeInfo {
+        name: None,
+        version: None,
+    });
+    tracing::debug!("Instrumentation scope: {:?}", scope_info);
     let tracer_provider = tracer_provider::get_tracer_provider();
-    let scope = InstrumentationScope::builder("php_request").build();
+    let mut scope_builder = InstrumentationScope::builder(scope_info.name.unwrap_or("php_request".to_string()));
+    if let Some(version) = scope_info.version {
+        scope_builder = scope_builder.with_version(version);
+    }
+    let scope = scope_builder.build();
     let tracer = tracer_provider.tracer_with_scope(scope);
     let span_builder = tracer.span_builder(span_name.unwrap_or("unknown".to_string()));
     let mut attributes = span_builder.attributes.clone().unwrap_or_default();
@@ -174,6 +201,7 @@ pub fn shutdown() {
         tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
     }
     clear_request_env();
+    clear_request_scope();
 }
 
 pub fn get_request_details() -> RequestDetails {
@@ -296,4 +324,19 @@ pub fn get_request_env() -> Option<HashMap<String, String>> {
 pub fn clear_request_env() {
     let pid = std::process::id();
     REQUEST_ENV.lock().unwrap().remove(&pid);
+}
+
+pub fn set_request_scope(scope: ScopeInfo) {
+    let pid = std::process::id();
+    REQUEST_SCOPE.lock().unwrap().insert(pid, scope);
+}
+
+pub fn get_request_scope() -> Option<ScopeInfo> {
+    let pid = std::process::id();
+    REQUEST_SCOPE.lock().unwrap().get(&pid).cloned()
+}
+
+pub fn clear_request_scope() {
+    let pid = std::process::id();
+    REQUEST_SCOPE.lock().unwrap().remove(&pid);
 }
