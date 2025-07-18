@@ -64,9 +64,6 @@ pub fn process_dotenv() {
                                 "OTEL_SCOPE_VERSION" => scope_version = Some(item.1),
                                 _ => {}
                             }
-                            if service_name.is_some() && resource_attributes.is_some() {
-                                break;
-                            }
                         }
                         //now we _might_ have service name and resource attributes
                         let mut env = HashMap::new();
