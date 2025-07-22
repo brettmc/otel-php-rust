@@ -130,6 +130,31 @@ $root->end();
 $scope->detach();
 ```
 
+## Multi-site support
+
+### Vhosts
+
+Multi-site using apache vhosts should "just work". You should set the required environment variables in the vhost config.
+For example (untested):
+```
+<VirtualHost *:80>
+    ServerName site1.example.com
+    SetEnv OTEL_SERVICE_NAME my-service
+    SetEnv OTEL_RESOURCE_ATTRIBUTES "service.namespace=site1,service.version=1.0"
+    # Other config...
+</VirtualHost>
+```
+
+If you cannot modify vhost config, you can also use the `.env` file support described below.
+
+### No vhosts
+
+If you have multiple sites on a single host (for example each application is a subdirectory of the web root), you can
+use the `.env` file support to set the environment variables for each site. The extension will look for a `.env` file
+for each request in the directory of the processed .php file (eg `/var/www/site1/public/index.php` -> `/var/www/site1/public/.env`). The .env files will be
+checked for `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` variables, and if they are set, they will be used to
+configure the tracer.
+
 ## What doesn't work or isn't implemented? (todo list)
 
 - Context storage - otel-rust doesn't support storing non-simple values, and context keys are created at compile time.
