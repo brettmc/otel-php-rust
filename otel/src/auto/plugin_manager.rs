@@ -2,6 +2,7 @@ use crate::auto::plugin::{FunctionObserver, Plugin};
 use crate::auto::plugins::{
     laminas::LaminasPlugin,
     psr18::Psr18Plugin,
+    zf1::Zf1Plugin,
 };
 use phper::{
     classes::ClassEntry,
@@ -35,6 +36,9 @@ impl PluginManager {
         }
         if !disabled.contains("psr18") {
             self.plugins.push(Box::new(Psr18Plugin::new()));
+        }
+        if !disabled.contains("zf1") {
+            self.plugins.push(Box::new(Zf1Plugin::new()));
         }
         if !disabled.contains("test") {
             #[cfg(feature="test")]
