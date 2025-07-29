@@ -91,6 +91,7 @@ pub mod auto{
         pub mod laminas;
         pub mod psr18;
         pub mod test;
+        pub mod zf1;
     }
 }
 #[cfg(otel_observer_supported)]
@@ -109,6 +110,7 @@ pub mod auto{
         pub mod laminas;
         pub mod psr18;
         pub mod test;
+        pub mod zf1;
     }
 }
 #[cfg(otel_observer_not_supported)]

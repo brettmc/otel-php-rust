@@ -25,7 +25,7 @@ ENV PATH="/home/php-rust/.cargo/bin:${PATH}" \
 
 ARG PHP_VERSION=8.4
 
-RUN apt-get install -y php${PHP_VERSION}-cli php${PHP_VERSION}-dev \
+RUN apt-get install -y php${PHP_VERSION}-cli php${PHP_VERSION}-xdebug php${PHP_VERSION}-dev unzip \
   && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so \
   && find /usr/lib/php/ -type f -name run-tests.php -exec cp {} /home/php-rust \;
 

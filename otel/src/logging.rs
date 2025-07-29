@@ -37,9 +37,13 @@ pub fn init_once() {
     };
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
-    tracing::debug!("Logging::initialized level={}", level_filter);
-    logger_pids.insert(pid, ());
+    let result = tracing::subscriber::set_global_default(subscriber);
+    if result.is_ok() {
+        logger_pids.insert(pid, ());
+        tracing::debug!("Logging::initialized level={}", level_filter);
+    } else {
+        tracing::debug!("Logging::already initialized for pid={}", pid);
+    }
 }
 
 fn log_message(message: &str) {
