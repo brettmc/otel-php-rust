@@ -14,14 +14,13 @@ use crate::{
     }
 };
 use std::{
-    cell::RefCell,
+    collections::HashMap,
     sync::OnceLock,
 };
-use dashmap::DashMap;
 
 static PLUGIN_MANAGER: OnceLock<PluginManager> = OnceLock::new();
 thread_local! {
-    static OBSERVER_MAP: RefCell<DashMap<String, bool>> = RefCell::new(DashMap::new());
+    static OBSERVER_MAP: std::cell::RefCell<HashMap<String, bool>> = std::cell::RefCell::new(HashMap::new());
 }
 
 static mut UPSTREAM_EXECUTE_EX: Option<
@@ -58,7 +57,7 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
             },
         };
 
-    if let Some(observed) = OBSERVER_MAP.with(|map| map.borrow().get(&key).map(|r| *r)) {
+    if let Some(observed) = OBSERVER_MAP.with(|map| map.borrow_mut().get(&key).copied()) {
         if !observed {
             // We already know we're not interested in this function
             tracing::trace!("execute_ex: {} already seen and skipped", key);
@@ -70,7 +69,7 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
     let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
     let observer = plugin_manager.get_function_observer(exec_data);
     OBSERVER_MAP.with(|map| {
-        map.borrow().insert(key.clone(), observer.is_some()); //observer was found
+        map.borrow_mut().insert(key.clone(), observer.is_some()); //observer was found
     });
 
     //run pre hooks
