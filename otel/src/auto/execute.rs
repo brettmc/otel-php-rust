@@ -64,39 +64,35 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
             tracing::trace!("execute_ex: {} already seen and skipped", key);
             upstream_execute_ex(Some(exec_data));
             return;
-        } else {
-            tracing::trace!("execute_ex: {} already seen and observed", key);
         }
     }
 
     let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
-    if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
+    let observer = plugin_manager.get_function_observer(exec_data);
+    OBSERVER_MAP.with(|map| {
+        map.borrow().insert(key.clone(), observer.is_some()); //observer was found
+    });
+
+    //run pre hooks
+    if let Some(ref obs) = observer {
         tracing::trace!("execute_ex: Observing: {}", key);
-        OBSERVER_MAP.with(|map| {
-            map.borrow().insert(key.clone(), true);
-        });
-        // Run pre hooks
-        for hook in observer.pre_hooks() {
+        for hook in obs.pre_hooks() {
             hook(exec_data);
         }
-    } else {
-        OBSERVER_MAP.with(|map| {
-            map.borrow().insert(key.clone(), false);
-        });
     }
 
+    //run the observed function
     upstream_execute_ex(Some(exec_data));
 
-    //todo tidy up: duplicated fetch
-    if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
+    //run post hooks
+    if let Some(ref obs) = observer {
         let retval_ptr: *mut sys::zval = unsafe { (*execute_data).return_value };
         let retval = if retval_ptr.is_null() {
             &mut ZVal::from(())
         } else {
             unsafe { ZVal::from_mut_ptr(retval_ptr) }
         };
-        // Run post hooks
-        for hook in observer.post_hooks() {
+        for hook in obs.post_hooks() {
             hook(exec_data, retval, get_global_exception());
         }
     }
