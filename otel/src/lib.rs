@@ -80,28 +80,10 @@ pub mod request;
 pub mod logging;
 pub mod util;
 
-// conditional compilation for observer feature (php8+)
-#[cfg(otel_observer_supported)]
 pub mod auto{
-    pub mod execute_data;
+    #[cfg(otel_observer_supported)]
     pub mod observer;
-    pub mod plugin_manager;
-    pub mod plugin;
-    pub mod plugins{
-        pub mod laminas;
-        pub mod psr18;
-        pub mod test;
-        pub mod zf1;
-    }
-}
-#[cfg(otel_observer_supported)]
-use crate::auto::{
-    observer,
-    plugin_manager::PluginManager
-};
-
-#[cfg(otel_observer_not_supported)]
-pub mod auto{
+    #[cfg(otel_observer_not_supported)]
     pub mod execute;
     pub mod execute_data;
     pub mod plugin_manager;
@@ -113,7 +95,6 @@ pub mod auto{
         pub mod zf1;
     }
 }
-#[cfg(otel_observer_not_supported)]
 use crate::auto::plugin_manager::PluginManager;
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
@@ -198,14 +179,15 @@ pub fn get_module() -> Module {
             return;
         }
         tracing::debug!("OpenTelemetry::MINIT");
+        let plugin_manager = PluginManager::new();
 
         #[cfg(otel_observer_supported)]
         {
-            observer::init(PluginManager::new());
+            crate::auto::observer::init(plugin_manager);
         }
         #[cfg(otel_observer_not_supported)]
         {
-            crate::auto::execute::init(PluginManager::new());
+            crate::auto::execute::init(plugin_manager);
         }
     });
     module.on_module_shutdown(|| {

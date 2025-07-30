@@ -126,6 +126,7 @@ pub fn init() {
         *cell.borrow_mut() = Some(context_id);
     });
     if is_local_root {
+        tracing::debug!("RINIT::is_local_root: {}", is_local_root);
         local_root_span::store_local_root_span(context_id);
     }
     //TODO use span::storeInContext logic
@@ -134,6 +135,7 @@ pub fn init() {
     OTEL_REQUEST_GUARD.with(|slot| {
         *slot.borrow_mut() = Some(guard);
     });
+    tracing::debug!("RINIT::request initialized");
 }
 
 pub fn shutdown() {

@@ -5,7 +5,6 @@ use phper::{
 };
 use std::ptr::null_mut;
 use crate::{
-    logging,
     auto::{
         execute_data::{
             get_global_exception,
@@ -14,11 +13,16 @@ use crate::{
         plugin_manager::PluginManager,
     }
 };
-use std::sync::{Arc, OnceLock};
+use std::{
+    cell::RefCell,
+    sync::OnceLock,
+};
 use dashmap::DashMap;
 
 static PLUGIN_MANAGER: OnceLock<PluginManager> = OnceLock::new();
-static OBSERVER_MAP: OnceLock<Arc<DashMap<String, bool>>> = OnceLock::new();
+thread_local! {
+    static OBSERVER_MAP: RefCell<DashMap<String, bool>> = RefCell::new(DashMap::new());
+}
 
 static mut UPSTREAM_EXECUTE_EX: Option<
     unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data),
@@ -27,11 +31,11 @@ static mut UPSTREAM_EXECUTE_EX: Option<
 pub fn init(plugin_manager: PluginManager) {
     tracing::debug!("Execute::init");
     PLUGIN_MANAGER.get_or_init(|| plugin_manager);
-    OBSERVER_MAP.get_or_init(|| Arc::new(DashMap::new()));
     unsafe {
         UPSTREAM_EXECUTE_EX = sys::zend_execute_ex;
         sys::zend_execute_ex = Some(execute_ex);
     }
+    tracing::debug!("swapped zend_execute_ex with custom execute_ex");
 }
 
 // This is our exec function that wraps the upstream PHP one.
@@ -53,9 +57,9 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
                 return;
             },
         };
-    let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
-    if let Some(observed) = OBSERVER_MAP.get().and_then(|map| map.get(&key)) {
-        if !*observed {
+
+    if let Some(observed) = OBSERVER_MAP.with(|map| map.borrow().get(&key).map(|r| *r)) {
+        if !observed {
             // We already know we're not interested in this function
             tracing::trace!("execute_ex: {} already seen and skipped", key);
             upstream_execute_ex(Some(exec_data));
@@ -65,19 +69,25 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         }
     }
 
+    let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
     if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
         tracing::trace!("execute_ex: Observing: {}", key);
-        OBSERVER_MAP.get().unwrap().insert(key, true);
+        OBSERVER_MAP.with(|map| {
+            map.borrow().insert(key.clone(), true);
+        });
         // Run pre hooks
         for hook in observer.pre_hooks() {
             hook(exec_data);
         }
     } else {
-        OBSERVER_MAP.get().unwrap().insert(key, false);
+        OBSERVER_MAP.with(|map| {
+            map.borrow().insert(key.clone(), false);
+        });
     }
 
     upstream_execute_ex(Some(exec_data));
 
+    //todo tidy up: duplicated fetch
     if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
         let retval_ptr: *mut sys::zval = unsafe { (*execute_data).return_value };
         let retval = if retval_ptr.is_null() {
