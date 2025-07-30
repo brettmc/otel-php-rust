@@ -19,7 +19,3 @@ Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpa
 %A
 [%s] [WARN] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=No .env file found in "/usr/src/myapp/tests/phpt/dotenv/no-dotenv"
 %A
-Spans
-Resource%A
-	 ->  service.name=String(Static("unknown_service"))
-%A

@@ -1,6 +1,8 @@
 FROM composer:lts AS composer
 FROM debian:bullseye
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /usr/src/myapp
 
 RUN groupadd -g 1000 php-rust \
@@ -25,7 +27,16 @@ ENV PATH="/home/php-rust/.cargo/bin:${PATH}" \
 
 ARG PHP_VERSION=8.4
 
-RUN apt-get install -y php${PHP_VERSION}-cli php${PHP_VERSION}-xdebug php${PHP_VERSION}-dev unzip \
+# php-dev installed separately to avoid accidental install of latest php version when installing 7.x :(
+RUN apt-get update \
+  && apt-get install -y \
+    php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-cli-dbgsym \
+    php${PHP_VERSION}-common-dbgsym \
+    procps \
+    strace \
+    unzip \
+  && apt-get install -y php${PHP_VERSION}-dev \
   && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so \
   && find /usr/lib/php/ -type f -name run-tests.php -exec cp {} /home/php-rust \;
 
