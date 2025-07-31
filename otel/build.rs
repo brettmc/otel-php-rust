@@ -30,7 +30,7 @@ fn main() {
         let version = metadata
             .packages
             .iter()
-            .find(|p| p.name == pkg)
+            .find(|p| p.name.as_str() == pkg)
             .map(|p| p.version.to_string())
             .unwrap_or_else(|| "unknown".to_string());
         
