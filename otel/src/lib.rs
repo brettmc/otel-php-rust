@@ -173,9 +173,9 @@ pub fn get_module() -> Module {
     module.on_module_init(|| {
         logging::init_once(); //from here on we can use tracing macros
         let cli_enabled = ini_get::<bool>("otel.cli.enabled");
-        let ini_disabled = !ini_get::<bool>("otel.enabled");
+        let ini_enabled = ini_get::<bool>("otel.enabled");
         let sapi = get_sapi_module_name();
-        let disabled = ini_disabled || (sapi == "cli" && !cli_enabled);
+        let disabled = !ini_enabled || (sapi == "cli" && !cli_enabled);
         DISABLED.set(disabled).ok();
         if disabled {
             tracing::debug!("OpenTelemetry::MINIT disabled");
@@ -207,10 +207,13 @@ pub fn get_module() -> Module {
         }
         logging::init_once(); //we maybe need to initialize logging for each worker (apache, fpm)
         tracing::debug!("OpenTelemetry::RINIT");
-
         request::process_dotenv();
-        // check OTEL_DISABLED env var, and return early if "true"
-        if std::env::var("OTEL_DISABLED").map_or(false, |v| v == "true") {
+
+        // check OTEL_DISABLED env var (which may have come from dotenv), and return early if "true"
+        let env = request::get_request_env().unwrap_or_default();
+        let otel_disabled = env.get("OTEL_DISABLED").cloned().unwrap_or_default();
+
+        if (otel_disabled == "true") || std::env::var("OTEL_DISABLED").map_or(false, |v| v == "true") {
             tracing::debug!("OpenTelemetry::RINIT: OTEL_DISABLED is set to true, skipping initialization");
             return;
         }

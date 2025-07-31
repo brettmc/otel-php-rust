@@ -4,6 +4,7 @@ disable otel via OTEL_DISABLED in .env file is more powerful than env
 otel
 --INI--
 otel.dotenv.per_request=On
+otel.cli.enabled=On
 otel.log.level=debug
 --ENV--
 OTEL_DISABLED=false
@@ -12,4 +13,5 @@ OTEL_DISABLED=false
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::MINIT disabled
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RINIT: OTEL_DISABLED is set to true, skipping initialization
+%A
