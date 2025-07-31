@@ -2,7 +2,6 @@ use crate::auto::{
     plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
 };
 use crate::{
-    request::get_request_details,
     trace::local_root_span::get_local_root_span,
 };
 use crate::context::storage;
@@ -71,27 +70,36 @@ impl Handler for Zf1RouteHandler {
 
 impl Zf1RouteHandler {
     unsafe extern "C" fn post_callback(
-        _exec_data: *mut ExecuteData,
+        exec_data: *mut ExecuteData,
         retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
-        tracing::debug!("Auto::Zf1::pre (Router_Interface::route)");
+        tracing::debug!("Auto::Zf1::post (Router_Interface::route)");
         let instance_id = get_local_root_span().unwrap_or(0);
         if instance_id == 0 {
-            tracing::debug!("Auto::Zf1::pre (Router_Interface::route) - no local root span found, skipping");
+            tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no local root span found, skipping");
             return;
         }
         let ctx = match storage::get_context_instance(instance_id as u64) {
             Some(ctx) => ctx,
             None => {
-                tracing::warn!("Auto::Zf1::pre (Router_Interface::route) - no context found for instance id {}", instance_id);
+                tracing::warn!("Auto::Zf1::post (Router_Interface::route) - no context found for instance id {}", instance_id);
                 return;
             }
         };
         ctx.span().set_attribute(KeyValue::new("php.framework.name", "zf1"));
-        let _request = get_request_details();
 
-        if let Some(zf1_request_obj) = retval.as_mut_z_obj() {
+        // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
+        // instead use the first parameter of the execute_data (which is also the request object)
+        let zf1_request_zval: &mut ZVal = if retval.get_type_info() == phper::types::TypeInfo::NULL {
+            let exec_data_ref = &mut *exec_data;
+            exec_data_ref.get_mut_parameter(0)
+        } else {
+            retval
+        };
+
+        if let Some(zf1_request_obj) = zf1_request_zval.as_mut_z_obj() {
+            tracing::debug!("Auto::Zf1::converted zf1_request_obj to ZObj");
             let method = zf1_request_obj
                 .call("getMethod", [])
                 .ok()

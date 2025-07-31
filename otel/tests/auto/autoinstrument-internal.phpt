@@ -8,8 +8,8 @@ otel.cli.enable=1
 OTEL_TRACES_EXPORTER=console
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80000) {
-    die("skip requires PHP 8.0");
+if (PHP_VERSION_ID < 80200) {
+    die("skip requires PHP 8.2");
 }
 --FILE--
 <?php

@@ -204,7 +204,12 @@ pub fn shutdown() {
         let context_id = context_id.unwrap();
         let is_http_request = sapi != "cli";
         tracing::debug!("RSHUTDOWN::auto-closing root span...");
-        let ctx = storage::get_context_instance(context_id).unwrap();
+        let ctx = storage::get_context_instance(context_id);
+        if ctx.is_none() {
+            tracing::warn!("RSHUTDOWN::no context found for id {}", context_id);
+            return;
+        }
+        let ctx = ctx.unwrap();
         let span = ctx.span();
         if span.span_context().is_valid() {
             if is_http_request {

@@ -9,7 +9,7 @@ RUN groupadd -g 1000 php-rust \
   && useradd -g 1000 --create-home php-rust
 
 RUN apt-get update \
-  && apt-get install -y llvm-dev libclang-dev gdb valgrind netcat-traditional vim less wget gnupg curl
+  && apt-get install -y llvm-dev libclang-dev gdb valgrind netcat-traditional vim less wget gnupg curl procps strace unzip
 
 RUN apt-get update && apt-get install -y lsb-release apt-transport-https ca-certificates \
   && echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list \
@@ -33,9 +33,6 @@ RUN apt-get update \
     php${PHP_VERSION}-cli \
     php${PHP_VERSION}-cli-dbgsym \
     php${PHP_VERSION}-common-dbgsym \
-    procps \
-    strace \
-    unzip \
   && apt-get install -y php${PHP_VERSION}-dev \
   && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so \
   && find /usr/lib/php/ -type f -name run-tests.php -exec cp {} /home/php-rust \;
