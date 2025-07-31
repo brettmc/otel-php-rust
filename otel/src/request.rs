@@ -62,10 +62,11 @@ pub fn process_dotenv() {
                 }
                 if let Some(resource_attributes) = resource_attributes {
                     //merge with original env var, if it exists
-                    let mut merged = HashMap::new();
-                    if let Some(existing) = std::env::var("OTEL_RESOURCE_ATTRIBUTES").ok() {
-                        merged = parse_resource_attributes(&existing);
-                    }
+                    let mut merged = if let Some(existing) = std::env::var("OTEL_RESOURCE_ATTRIBUTES").ok() {
+                        parse_resource_attributes(&existing)
+                    } else {
+                        HashMap::new()
+                    };
 
                     // Overwrite with values from dotenv
                     for (k, v) in parse_resource_attributes(&resource_attributes) {
