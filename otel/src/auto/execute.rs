@@ -69,7 +69,7 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
     let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
     let observer = plugin_manager.get_function_observer(exec_data);
     OBSERVER_MAP.with(|map| {
-        map.borrow_mut().insert(key.clone(), observer.is_some()); //observer was found
+        map.borrow_mut().insert(key.clone(), observer.is_some()); //observer was found?
     });
 
     //run pre hooks

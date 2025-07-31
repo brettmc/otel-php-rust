@@ -12,6 +12,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fs,
+    path::{Path, PathBuf},
     sync::Arc,
     sync::Mutex,
 };
@@ -39,40 +40,72 @@ static REQUEST_ENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::n
 pub fn process_dotenv() {
     let per_request_dotenv = ini_get::<bool>("otel.dotenv.per_request");
     if per_request_dotenv {
-        if let Some(script_filename) = get_server_var("SCRIPT_FILENAME") {
-            if let Some(cwd) = std::path::Path::new(&script_filename).parent() {
-                let env_path = cwd.join(".env");
-                if fs::metadata(&env_path).is_ok() {
-                    let mut service_name = None;
-                    let mut resource_attributes = None;
-                    if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
-                        for item in iter.flatten() {
-                            match item.0.as_str() {
-                                "OTEL_SERVICE_NAME" => service_name = Some(item.1),
-                                "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
-                                _ => {}
-                            }
-                            if service_name.is_some() && resource_attributes.is_some() {
-                                break;
-                            }
-                        }
-                        //now we _might_ have service name and resource attributes
-                        let mut env = HashMap::new();
-                        if let Some(service_name) = service_name {
-                            env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
-                        }
-                        if let Some(resource_attributes) = resource_attributes {
-                            env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), resource_attributes);
-                        }
-                        set_request_env(env);
+        if let Some(env_path) = find_dotenv() {
+            tracing::debug!("Discovered .env path: {:?}", env_path);
+            let mut service_name = None;
+            let mut resource_attributes = None;
+            if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
+                for item in iter.flatten() {
+                    tracing::debug!("{} = {}", item.0, item.1);
+                    match item.0.as_str() {
+                        "OTEL_SERVICE_NAME" => service_name = Some(item.1),
+                        "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
+                        _ => {}
                     }
-                } else {
-                    tracing::warn!("No .env file found in {:?}", cwd);
+                    if service_name.is_some() && resource_attributes.is_some() {
+                        break;
+                    }
                 }
+                //now we _might_ have service name and resource attributes
+                let mut env = HashMap::new();
+                if let Some(service_name) = service_name {
+                    env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
+                }
+                if let Some(resource_attributes) = resource_attributes {
+                    env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), resource_attributes);
+                }
+                set_request_env(env);
             }
         } else {
-            tracing::debug!("No SCRIPT_FILENAME found, skipping loading .env");
+            tracing::warn!("No .env file found between SCRIPT_FILENAME and DOCUMENT_ROOT");
         }
+    }
+}
+
+// Find the nearest .env file starting from the script's directory, finishing at DOCUMENT_ROOT.
+// If DOCUMENT_ROOT is not set, it will only look in the script's directory.
+fn find_dotenv() -> Option<PathBuf> {
+    let script_filename = get_server_var("SCRIPT_FILENAME")?;
+    let script_dir = Path::new(&script_filename).parent()?;
+    let env_in_dir = |dir: &Path| {
+        let env_path = dir.join(".env");
+        fs::metadata(&env_path).ok().map(|_| env_path)
+    };
+
+    match get_server_var("DOCUMENT_ROOT") {
+        Some(document_root) => {
+            let docroot = match Path::new(&document_root).canonicalize() {
+                Ok(path) => path,
+                Err(_) => return env_in_dir(script_dir),
+            };
+            let mut current = match script_dir.canonicalize() {
+                Ok(path) => path,
+                Err(_) => return None,
+            };
+            loop {
+                if let Some(env_path) = env_in_dir(&current) {
+                    return Some(env_path);
+                }
+                if current == docroot {
+                    break;
+                }
+                if !current.pop() {
+                    break;
+                }
+            }
+            None
+        }
+        None => env_in_dir(script_dir),
     }
 }
 
