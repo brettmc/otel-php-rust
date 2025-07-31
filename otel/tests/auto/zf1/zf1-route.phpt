@@ -23,7 +23,6 @@ $spans = Memory::getSpans();
 $one = $spans[0];
 $attributes = $one['attributes'];
 var_dump($attributes);
-//assert($one['name'] === 'manual-span');
 ?>
 --EXPECTF--
 %A
