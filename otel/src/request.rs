@@ -336,7 +336,7 @@ fn parse_resource_attributes(s: &str) -> HashMap<String, String> {
         .filter_map(|pair| {
             let mut parts = pair.splitn(2, '=');
             match (parts.next(), parts.next()) {
-                (Some(key), Some(value)) if !key.is_empty() => Some((key.trim().to_string(), value.trim().to_string())),
+                (Some(key), Some(value)) if !key.is_empty() && !value.is_empty() => Some((key.trim().to_string(), value.trim().to_string())),
                 _ => None,
             }
         })
