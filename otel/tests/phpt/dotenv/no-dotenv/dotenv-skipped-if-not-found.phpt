@@ -17,5 +17,5 @@ Globals::tracerProvider()->getTracer('my_tracer')->spanBuilder('root')->startSpa
 ?>
 --EXPECTF--
 %A
-[%s] [WARN] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=No .env file found in "/usr/src/myapp/tests/phpt/dotenv/no-dotenv"
+[%s] [WARN] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=No .env file found between SCRIPT_FILENAME and DOCUMENT_ROOT
 %A
