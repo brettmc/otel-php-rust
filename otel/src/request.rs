@@ -61,7 +61,29 @@ pub fn process_dotenv() {
                     env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
                 }
                 if let Some(resource_attributes) = resource_attributes {
-                    env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), resource_attributes);
+                    //merge with original env var, if it exists
+                    let mut merged = HashMap::new();
+                    if let Some(existing) = std::env::var("OTEL_RESOURCE_ATTRIBUTES").ok() {
+                        merged = parse_resource_attributes(&existing);
+                    }
+
+                    // Overwrite with values from dotenv
+                    for (k, v) in parse_resource_attributes(&resource_attributes) {
+                        merged.insert(k, v);
+                    }
+
+                    // Serialize back to comma-separated key=value pairs
+                    let merged_str = {
+                        let mut items: Vec<_> = merged.into_iter().collect();
+                        items.sort_by(|a, b| a.0.cmp(&b.0));
+                        items
+                            .into_iter()
+                            .map(|(k, v)| format!("{}={}", k, v))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    };
+
+                    env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), merged_str);
                 }
                 set_request_env(env);
             }
@@ -305,6 +327,19 @@ pub fn z_val_to_string(zv: &ZVal) -> Option<String> {
 
 fn get_response_status_code() -> i32 {
     unsafe { sg!(sapi_headers).http_response_code }
+}
+
+// Parse a comma-separated key=value string into a HashMap
+fn parse_resource_attributes(s: &str) -> HashMap<String, String> {
+    s.split(',')
+        .filter_map(|pair| {
+            let mut parts = pair.splitn(2, '=');
+            match (parts.next(), parts.next()) {
+                (Some(key), Some(value)) if !key.is_empty() => Some((key.trim().to_string(), value.trim().to_string())),
+                _ => None,
+            }
+        })
+        .collect()
 }
 
 pub fn get_propagated_context() -> Context {
