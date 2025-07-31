@@ -46,7 +46,6 @@ pub fn process_dotenv() {
             let mut resource_attributes = None;
             if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
                 for item in iter.flatten() {
-                    tracing::debug!("{} = {}", item.0, item.1);
                     match item.0.as_str() {
                         "OTEL_SERVICE_NAME" => service_name = Some(item.1),
                         "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
@@ -86,7 +85,10 @@ fn find_dotenv() -> Option<PathBuf> {
         Some(document_root) => {
             let docroot = match Path::new(&document_root).canonicalize() {
                 Ok(path) => path,
-                Err(_) => return env_in_dir(script_dir),
+                Err(err) => {
+                    tracing::warn!("Failed to canonicalize DOCUMENT_ROOT '{}': {}", document_root, err);
+                    return env_in_dir(script_dir);
+                },
             };
             let mut current = match script_dir.canonicalize() {
                 Ok(path) => path,
