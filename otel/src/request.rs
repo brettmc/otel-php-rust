@@ -44,21 +44,23 @@ pub fn process_dotenv() {
             tracing::debug!("Discovered .env path: {:?}", env_path);
             let mut service_name = None;
             let mut resource_attributes = None;
+            let mut otel_disabled = None;
             if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
                 for item in iter.flatten() {
                     match item.0.as_str() {
                         "OTEL_SERVICE_NAME" => service_name = Some(item.1),
                         "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
+                        "OTEL_DISABLED" => otel_disabled = Some(item.1),
                         _ => {}
-                    }
-                    if service_name.is_some() && resource_attributes.is_some() {
-                        break;
                     }
                 }
                 //now we _might_ have service name and resource attributes
                 let mut env = HashMap::new();
                 if let Some(service_name) = service_name {
                     env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
+                }
+                if let Some(otel_disabled) = otel_disabled {
+                    env.insert("OTEL_DISABLED".to_string(), otel_disabled);
                 }
                 if let Some(resource_attributes) = resource_attributes {
                     //merge with original env var, if it exists

@@ -11,7 +11,7 @@ if (PHP_VERSION_ID < 70200) {
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
-otel.cli.enable=1
+otel.cli.enabled=1
 otel.log.level="warn"
 --FILE--
 <?php

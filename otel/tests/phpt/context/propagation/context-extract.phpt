@@ -3,7 +3,7 @@ Extract context
 --EXTENSIONS--
 otel
 --INI--
-otel.cli.enable=1
+otel.cli.enabled=1
 --ENV--
 OTEL_TRACES_EXPORTER=console
 --FILE--

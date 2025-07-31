@@ -7,7 +7,7 @@ OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.log.level=warn
-otel.cli.enable=On
+otel.cli.enabled=On
 otel.cli.create_root_span=On
 --FILE--
 <?php

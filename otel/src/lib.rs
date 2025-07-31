@@ -117,10 +117,11 @@ pub fn get_module() -> Module {
     module.add_info("auto-instrumentation", "observer_api");
     #[cfg(otel_observer_not_supported)]
     module.add_info("auto-instrumentation", "zend_execute_ex");
+    module.add_ini("otel.enabled", true, Policy::All);
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
     module.add_ini("otel.cli.create_root_span", false, Policy::All);
-    module.add_ini("otel.cli.enable", false, Policy::All);
+    module.add_ini("otel.cli.enabled", false, Policy::All);
     module.add_ini("otel.dotenv.per_request", false, Policy::All);
     module.add_ini("otel.auto.disabled_plugins", "".to_string(), Policy::All);
     //which auto-instrumentation mechanism is enabled
@@ -171,12 +172,13 @@ pub fn get_module() -> Module {
 
     module.on_module_init(|| {
         logging::init_once(); //from here on we can use tracing macros
-        let cli_enabled = ini_get::<bool>("otel.cli.enable");
+        let cli_enabled = ini_get::<bool>("otel.cli.enabled");
+        let ini_enabled = ini_get::<bool>("otel.enabled");
         let sapi = get_sapi_module_name();
-        let disabled = sapi == "cli" && !cli_enabled;
+        let disabled = !ini_enabled || (sapi == "cli" && !cli_enabled);
         DISABLED.set(disabled).ok();
         if disabled {
-            tracing::debug!("OpenTelemetry::MINIT disabled for cli");
+            tracing::debug!("OpenTelemetry::MINIT disabled");
             return;
         }
         tracing::debug!("OpenTelemetry::MINIT");
@@ -205,6 +207,16 @@ pub fn get_module() -> Module {
         }
         logging::init_once(); //we maybe need to initialize logging for each worker (apache, fpm)
         tracing::debug!("OpenTelemetry::RINIT");
+        request::process_dotenv();
+
+        // check OTEL_DISABLED env var (which may have come from dotenv), and return early if "true"
+        let env = request::get_request_env().unwrap_or_default();
+        let otel_disabled = env.get("OTEL_DISABLED").cloned().unwrap_or_default();
+
+        if (otel_disabled == "true") || std::env::var("OTEL_DISABLED").map_or(false, |v| v == "true") {
+            tracing::debug!("OpenTelemetry::RINIT: OTEL_DISABLED is set to true, skipping initialization");
+            return;
+        }
 
         if TOKIO_RUNTIME.get().is_none() {
             tracing::debug!("OpenTelemetry::RINIT::Creating tokio runtime");
@@ -213,8 +225,6 @@ pub fn get_module() -> Module {
             TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
             tracing::debug!("OpenTelemetry::RINIT::tokio runtime initialized");
         }
-
-        request::process_dotenv();
 
         tracer_provider::init_once();
         global::set_text_map_propagator(TraceContextPropagator::new());

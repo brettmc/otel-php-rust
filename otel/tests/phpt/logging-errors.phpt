@@ -7,7 +7,7 @@ otel
 --INI--
 otel.log.level="warn"
 otel.log.file="/dev/stdout"
-otel.cli.enable=1
+otel.cli.enabled=1
 --ENV--
 OTEL_EXPORTER_OTLP_ENDPOINT=http://does-not-exist:4318
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf

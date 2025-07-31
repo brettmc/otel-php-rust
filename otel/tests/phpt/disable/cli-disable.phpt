@@ -19,7 +19,7 @@ var_dump(Memory::count());
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::MINIT disabled for cli
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::MINIT disabled
 %A
 int(0)%A
 int(0)

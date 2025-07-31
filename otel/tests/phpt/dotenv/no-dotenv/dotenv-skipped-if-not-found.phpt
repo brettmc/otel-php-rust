@@ -3,7 +3,7 @@ dotenv skipped if not found
 --EXTENSIONS--
 otel
 --INI--
-otel.cli.enable=On
+otel.cli.enabled=On
 otel.dotenv.per_request=On
 otel.log.level=debug
 --ENV--
