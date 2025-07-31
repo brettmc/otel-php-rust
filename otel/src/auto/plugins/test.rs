@@ -1,4 +1,4 @@
-// A test plugin which implements two handlers:
+// A test plugin which implements three handlers:
 // - DemoHandler: observes a handful of classes and functions with a pre and post callback
 // - DemoFunctionHandler: observes a specific function with a different pre and post callback
 use crate::auto::{
@@ -35,6 +35,7 @@ impl TestPlugin {
             handlers: vec![
                 Arc::new(DemoHandler),
                 Arc::new(DemoFunctionHandler),
+                Arc::new(TestClassHandler),
             ],
         }
     }
@@ -163,5 +164,45 @@ impl DemoFunctionHandler {
             tracing::warn!("DemoFunctionHandler: No context guard found for post callback");
             return;
         }
+    }
+}
+
+pub struct TestClassHandler;
+impl Handler for TestClassHandler {
+    fn get_functions(&self) -> Vec<String> {
+        vec![
+        ]
+    }
+    fn get_interfaces(&self) -> Vec<String> {
+        vec![
+            r"OpenTelemetry\Test\ITestClass::getString".to_string(),
+            r"OpenTelemetry\Test\ITestClass::throwException".to_string(),
+        ]
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
+        }
+    }
+}
+
+impl TestClassHandler {
+    unsafe extern "C" fn pre_callback(_exec_data: *mut ExecuteData) {
+        tracing::debug!("TestClassHandler: pre_callback called");
+    }
+
+    unsafe extern "C" fn post_callback(
+        _exec_data: *mut ExecuteData,
+        retval: &mut ZVal,
+        exception: Option<&mut ZObj>
+    ) {
+        tracing::debug!("TestClassHandler: post_callback called");
+        tracing::debug!("retval type: {:?}", retval.get_type_info());
+        tracing::debug!("exception: {:?}", exception);
     }
 }

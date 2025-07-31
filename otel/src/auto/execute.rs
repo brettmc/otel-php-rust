@@ -85,6 +85,8 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
 
     //run post hooks
     if let Some(ref obs) = observer {
+        // WARNING: if the return value is not used by the calling code (eg assigned to a variable),
+        // it may be optimized away and not available in the post hooks :(
         let retval_ptr: *mut sys::zval = unsafe { (*execute_data).return_value };
         let retval = if retval_ptr.is_null() {
             &mut ZVal::from(())

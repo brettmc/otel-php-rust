@@ -1,0 +1,12 @@
+{
+    "name": "root/zf1",
+    "type": "project",
+    "require": {
+        "zf1s/zf1": "^1.15"
+    },
+    "autoload": {
+        "psr-4": {
+            "Root\\Zf1\\": "src/"
+        }
+    }
+}
