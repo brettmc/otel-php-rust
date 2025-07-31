@@ -3,7 +3,7 @@ Store span in context (contrib auto-instrumentation method)
 --EXTENSIONS--
 otel
 --INI--
-otel.cli.enable=1
+otel.cli.enabled=1
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple

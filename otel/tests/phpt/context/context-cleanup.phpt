@@ -7,7 +7,7 @@ OTEL_TRACES_EXPORTER=none
 --INI--
 otel.log.level="trace"
 otel.log.file="/dev/stdout"
-otel.cli.enable=1
+otel.cli.enabled=1
 --FILE--
 <?php
 use OpenTelemetry\Context\Context;
