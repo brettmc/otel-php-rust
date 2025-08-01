@@ -18,7 +18,6 @@ otel.auto.disabled_plugins => no value => no value
 otel.cli.create_root_span => 0 => 0
 otel.cli.enabled => 0 => 0
 otel.dotenv.per_request => 0 => 0
-otel.enabled => 1 => 1
 otel.log.file => %s => %s
 otel.log.level => error => error
 %A

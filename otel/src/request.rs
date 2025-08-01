@@ -108,6 +108,9 @@ fn find_dotenv() -> Option<PathBuf> {
 
     match get_server_var("DOCUMENT_ROOT") {
         Some(document_root) => {
+            if document_root.is_empty() {
+                return env_in_dir(script_dir);
+            }
             let docroot = match Path::new(&document_root).canonicalize() {
                 Ok(path) => path,
                 Err(err) => {
@@ -376,4 +379,19 @@ pub fn get_request_env() -> Option<HashMap<String, String>> {
 pub fn clear_request_env() {
     let pid = std::process::id();
     REQUEST_ENV.lock().unwrap().remove(&pid);
+}
+
+/// Check if OpenTelemetry is disabled for the current request (by env or .env)
+pub fn is_disabled() -> bool {
+    // Check .env first
+    if let Some(env) = get_request_env() {
+        if let Some(val) = env.get("OTEL_DISABLED") {
+            return val == "true";
+        }
+    }
+    // Fallback to process environment
+    match std::env::var("OTEL_DISABLED") {
+        Ok(val) => val == "true",
+        Err(_) => false,
+    }
 }
