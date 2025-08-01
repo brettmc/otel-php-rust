@@ -51,7 +51,7 @@ There's a bunch of logging from the extension and the underlying opentelemetry-r
 
 If you really want to see what's going on, set the log level to `trace` and you'll get a lot of logs.
 
-In PHP 7.x, logging to stdout/stderr during MSHUTDOWN doesn't work in PHP 7.x, so you will need to set `otel.log.file`
+In PHP 7.x, logging to stdout/stderr during MSHUTDOWN doesn't work, so you will need to set `otel.log.file`
 to a file location if you want to see the logs.
 
 ## SAPI support
