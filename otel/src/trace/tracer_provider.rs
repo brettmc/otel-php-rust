@@ -42,6 +42,12 @@ const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvide
 pub type TracerProviderClass = StateClass<()>;
 
 static TRACER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
+    Arc::new(SdkTracerProvider::builder()
+        .with_resource(Resource::builder_empty().build())
+        .with_sampler(AlwaysOff)
+        .build())
+});
 
 //tracer provider per (service_name, resource_attributes) pair (from .env, if enabled)
 fn get_tracer_provider_key() -> (u32, String) {
@@ -157,17 +163,17 @@ pub fn init_once() {
 }
 
 pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
+    if request::is_disabled() {
+        tracing::debug!("OpenTelemetry is disabled for this request, returning no-op tracer provider");
+        return NOOP_TRACER_PROVIDER.clone();
+    }
     let providers = TRACER_PROVIDERS.lock().unwrap();
     let key = get_tracer_provider_key();
     if let Some(provider) = providers.get(&key) {
         return provider.clone();
     } else {
         tracing::warn!("no tracer provider initialized for key {:?}, using no-op", key);
-        Arc::new(SdkTracerProvider::builder()
-            .with_resource(Resource::builder_empty().build())
-            .with_sampler(AlwaysOff)
-            .build()
-        )
+        NOOP_TRACER_PROVIDER.clone()
     }
 }
 

@@ -117,7 +117,6 @@ pub fn get_module() -> Module {
     module.add_info("auto-instrumentation", "observer_api");
     #[cfg(otel_observer_not_supported)]
     module.add_info("auto-instrumentation", "zend_execute_ex");
-    module.add_ini("otel.enabled", true, Policy::All);
     module.add_ini("otel.log.level", "error".to_string(), Policy::All);
     module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
     module.add_ini("otel.cli.create_root_span", false, Policy::All);
@@ -173,9 +172,8 @@ pub fn get_module() -> Module {
     module.on_module_init(|| {
         logging::init_once(); //from here on we can use tracing macros
         let cli_enabled = ini_get::<bool>("otel.cli.enabled");
-        let ini_enabled = ini_get::<bool>("otel.enabled");
         let sapi = get_sapi_module_name();
-        let disabled = !ini_enabled || (sapi == "cli" && !cli_enabled);
+        let disabled = sapi == "cli" && !cli_enabled;
         DISABLED.set(disabled).ok();
         if disabled {
             tracing::debug!("OpenTelemetry::MINIT disabled");
@@ -209,11 +207,7 @@ pub fn get_module() -> Module {
         tracing::debug!("OpenTelemetry::RINIT");
         request::process_dotenv();
 
-        // check OTEL_DISABLED env var (which may have come from dotenv), and return early if "true"
-        let env = request::get_request_env().unwrap_or_default();
-        let otel_disabled = env.get("OTEL_DISABLED").cloned().unwrap_or_default();
-
-        if (otel_disabled == "true") || std::env::var("OTEL_DISABLED").map_or(false, |v| v == "true") {
+        if request::is_disabled() {
             tracing::debug!("OpenTelemetry::RINIT: OTEL_DISABLED is set to true, skipping initialization");
             return;
         }
