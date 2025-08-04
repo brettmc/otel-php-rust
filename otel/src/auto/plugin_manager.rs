@@ -101,14 +101,14 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], plugin_name:
     };
     let parts: Vec<&str> = function_name_str.split("::").collect();
     let is_method = parts.len() == 2;
-    let name_pair = if is_method {
+    let observed_name_pair = if is_method {
         (Some(parts[0].to_string()), parts[1].to_string())
     } else {
         (None, function_name_str.to_string())
     };
 
     tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
-    if targets.iter().any(|target| target == &name_pair) {
+    if targets.iter().any(|target| target == &observed_name_pair) {
         //tracing::trace!("should_trace:: {:?} matches on name_pair", name_pair);
         return true;
     } else {
@@ -120,8 +120,6 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], plugin_name:
         //tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
         return false;
     }
-    let _observed_class_name = parts[0];
-    let observed_method_name = parts[1];
 
     let ce = match func.get_class() {
         Some(class_entry) => class_entry,
@@ -132,7 +130,7 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], plugin_name:
             // Only check if the observed class is an instance of the interface
             match ClassEntry::from_globals(interface_name.to_string()) {
                 Ok(iface_ce) => {
-                    if ce.is_instance_of(&iface_ce) && observed_method_name == target_method_name {
+                    if ce.is_instance_of(&iface_ce) && &observed_name_pair.1 == target_method_name {
                         return true;
                     }
                 }
