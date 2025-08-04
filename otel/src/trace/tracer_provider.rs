@@ -86,10 +86,10 @@ pub fn init_once() {
         .collect::<HashMap<_, _>>();
     if let Some(env_map) = request::get_request_env() {
         if let Some(val) = env_map.get("OTEL_SERVICE_NAME") {
-            env::set_var("OTEL_SERVICE_NAME", val);
+            unsafe{env::set_var("OTEL_SERVICE_NAME", val)};
         }
         if let Some(val) = env_map.get("OTEL_RESOURCE_ATTRIBUTES") {
-            env::set_var("OTEL_RESOURCE_ATTRIBUTES", val);
+            unsafe{env::set_var("OTEL_RESOURCE_ATTRIBUTES", val)};
         }
     }
 
@@ -106,7 +106,7 @@ pub fn init_once() {
     // restore environment variables
     for (k, v) in env_backup {
         tracing::debug!("Restoring environment variable {}={}", k, v);
-        env::set_var(k, v);
+        unsafe{env::set_var(k, v)};
     }
 
     let mut builder = SdkTracerProvider::builder();

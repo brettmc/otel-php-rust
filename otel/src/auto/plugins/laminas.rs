@@ -76,7 +76,7 @@ impl LaminasRouteHandler {
             }
         };
         ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "laminas"));
-        let exec_data_ref = &mut *exec_data;
+        let exec_data_ref = unsafe {&mut *exec_data};
         let route_match_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         let request = get_request_details();
 
