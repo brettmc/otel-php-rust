@@ -1,15 +1,17 @@
 use crate::config;
-use phper::ini::{ini_get};
+use phper::ini::ini_get;
 use tracing::{Event, Subscriber, field::{Visit, Field}};
 use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
-use std::collections::HashMap;
-use std::ffi::{CStr};
-use std::fmt::{self, Write};
-use std::fs::OpenOptions;
-use std::io::{Write as _};
-use std::sync::{LazyLock, Mutex, OnceLock};
-use std::process;
-use std::thread;
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    fmt::{self, Write},
+    fs::OpenOptions,
+    io::{Write as _},
+    process,
+    sync::{LazyLock, Mutex, OnceLock},
+    thread,
+};
 use chrono::Utc;
 
 static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
