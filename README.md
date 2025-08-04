@@ -105,13 +105,9 @@ As above
 All official OpenTelemetry [SDK configuration](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.46.0/specification/configuration/sdk-environment-variables.md#general-sdk-configuration)
 environment variables understood by [opentelemetry-rust](https://github.com/open-telemetry/opentelemetry-rust).
 
-Also:
-
-* `OTEL_DISABLED` - soft-disable the extension. Use this in a .env file to disable OpenTelemetry for a specific application.
-  If set to `true`, the extension will not create any spans or export data.
 ### .env files
 
-`OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_DISABLED` can be set in a `.env` file. Other variables should be
+`OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SDK_DISABLED` can be set in a `.env` file. Other variables should be
 set in the environment (todo: could be relaxed to allow setting all OpenTelemetry SDK configuration variables in the `.env` file).
 
 ## Usage

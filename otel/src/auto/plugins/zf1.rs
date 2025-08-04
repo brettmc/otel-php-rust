@@ -1,5 +1,8 @@
-use crate::auto::{
-    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+use crate::{
+    auto::{
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+    },
+    config::trace_attributes,
 };
 use crate::{
     trace::local_root_span::get_local_root_span_context,
@@ -78,7 +81,7 @@ impl Zf1RouteHandler {
                 return;
             }
         };
-        ctx.span().set_attribute(KeyValue::new("php.framework.name", "zf1"));
+        ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "zf1"));
 
         // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
         // instead use the first parameter of the execute_data (which is also the request object)
@@ -123,13 +126,13 @@ impl Zf1RouteHandler {
             tracing::debug!("Auto::Zf1::updateName (Router_Interface::route)");
             ctx.span().update_name(span_name);
             if let Some(module) = &module {
-                ctx.span().set_attribute(KeyValue::new("php.framework.module.name", module.clone()));
+                ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_MODULE_NAME, module.clone()));
             }
             if let Some(controller) = &controller {
-                ctx.span().set_attribute(KeyValue::new("php.framework.controller.name", controller.clone()));
+                ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_CONTROLLER_NAME, controller.clone()));
             }
             if let Some(action) = &action {
-                ctx.span().set_attribute(KeyValue::new("php.framework.action.name", action.clone()));
+                ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_ACTION_NAME, action.clone()));
             }
         }
     }

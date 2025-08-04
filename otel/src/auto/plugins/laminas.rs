@@ -1,5 +1,8 @@
-use crate::auto::{
-    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+use crate::{
+    auto::{
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+    },
+    config::trace_attributes,
 };
 use crate::{
     request::get_request_details,
@@ -72,6 +75,7 @@ impl LaminasRouteHandler {
                 return;
             }
         };
+        ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "laminas"));
         let exec_data_ref = &mut *exec_data;
         let route_match_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         let request = get_request_details();
@@ -96,12 +100,12 @@ impl LaminasRouteHandler {
                 let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
                 tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
                 ctx.span().update_name(name);
-                ctx.span().set_attribute(KeyValue::new("php.framework.name", "laminas"));
+
                 if let Some(controller) = &controller {
-                    ctx.span().set_attribute(KeyValue::new("php.framework.controller.name", controller.clone()));
+                    ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_CONTROLLER_NAME, controller.clone()));
                 }
                 if let Some(action) = &action {
-                    ctx.span().set_attribute(KeyValue::new("php.framework.action.name", action.clone()));
+                    ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_ACTION_NAME, action.clone()));
                 }
             }
         }

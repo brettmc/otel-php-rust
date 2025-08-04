@@ -77,6 +77,7 @@ pub mod trace{
 }
 pub mod config{
     pub mod ini;
+    pub mod trace_attributes;
 }
 pub mod globals;
 pub mod request;
