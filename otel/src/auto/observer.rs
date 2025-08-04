@@ -37,7 +37,7 @@ pub fn init(plugin_manager: PluginManager) {
 }
 
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
-    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+    if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         let fqn = get_fqn(exec_data);
         //tracing::trace!("observer::observer_instrument checking: {}", fqn);
         let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
@@ -62,9 +62,9 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_execute_data) {
-    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+    if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         let fqn = get_fqn(exec_data);
 
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
@@ -80,9 +80,9 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, retval: *mut sys::zval) {
-    if let Some(exec_data) = ExecuteData::try_from_mut_ptr(execute_data) {
+    if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         let fqn = get_fqn(exec_data);
 
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
             let retval = if retval.is_null() {
                 &mut ZVal::from(())
             } else {
-                (retval as *mut ZVal).as_mut().unwrap()
+                unsafe{(retval as *mut ZVal).as_mut().unwrap()}
             };
 
             for hook in observer.post_hooks() {

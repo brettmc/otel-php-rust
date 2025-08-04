@@ -77,8 +77,9 @@ impl Handler for DemoHandler {
 impl DemoHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php-auto-instrumentation"); //TODO: store tracer in a static variable
-        let attributes = get_default_attributes(&*exec_data);
-        let name = get_fqn(&*exec_data);
+        let exec_data_ref = unsafe { &*exec_data };
+        let attributes = get_default_attributes(exec_data_ref);
+        let name = get_fqn(exec_data_ref);
 
         let span_builder = tracer.span_builder(name)
             .with_attributes(attributes);
@@ -126,7 +127,7 @@ impl Handler for DemoFunctionHandler {
 impl DemoFunctionHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php-auto-instrumentation"); //TODO: store tracer in a static variable
-        let mut attributes = get_default_attributes(&*exec_data);
+        let mut attributes = get_default_attributes(unsafe{&*exec_data});
         attributes.push(KeyValue::new("my-attribute", "my-value".to_string()));
 
         let span_builder = tracer.span_builder("demo-function".to_string())

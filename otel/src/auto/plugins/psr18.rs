@@ -75,9 +75,9 @@ impl Psr18SendRequestHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("psr18"); //TODO: store tracer in a static variable
         let mut name = "psr18.request".to_string();
-        let mut attributes = get_default_attributes(&*exec_data);
 
-        let exec_data_ref = &mut *exec_data;
+        let exec_data_ref = unsafe {&mut *exec_data};
+        let mut attributes = get_default_attributes(exec_data_ref);
         let request_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
 
         //TODO add more SemConv attributes...

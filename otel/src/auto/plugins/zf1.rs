@@ -86,7 +86,7 @@ impl Zf1RouteHandler {
         // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
         // instead use the first parameter of the execute_data (which is also the request object)
         let zf1_request_zval: &mut ZVal = if retval.get_type_info() == phper::types::TypeInfo::NULL {
-            let exec_data_ref = &mut *exec_data;
+            let exec_data_ref = unsafe {&mut *exec_data};
             exec_data_ref.get_mut_parameter(0)
         } else {
             retval

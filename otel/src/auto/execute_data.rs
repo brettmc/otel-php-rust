@@ -48,35 +48,36 @@ pub unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u
         return None;
     }
 
-    let func = (*zend_execute_data).func;
+    let func = unsafe{(*zend_execute_data).func};
     if func.is_null() {
         return None;
     }
 
-    let func = &*func;
+    let func = unsafe{&*func};
 
     // Ensure it's a user-defined function before accessing op_array
-    if func.type_ as u32 != sys::ZEND_USER_FUNCTION {
+    if unsafe{func.type_} as u32 != sys::ZEND_USER_FUNCTION {
         return None; // Not a user-defined function, no file/line info available
     }
 
-    let op_array = &func.op_array;
+    let op_array = unsafe{&func.op_array};
 
     let file_name = if !op_array.filename.is_null() {
-        let zend_filename = &*op_array.filename;
-        let c_str = std::ffi::CStr::from_ptr(zend_filename.val.as_ptr());
+        let zend_filename = unsafe{&*op_array.filename};
+        let c_str = unsafe{std::ffi::CStr::from_ptr(zend_filename.val.as_ptr())};
         c_str.to_string_lossy().into_owned()
     } else {
         "<unknown>".to_string()
     };
 
-    let line_number = if !(*zend_execute_data).opline.is_null() {
-        (*(*zend_execute_data).opline).lineno
-    } else {
-        0
-    };
-
-    Some((file_name, line_number))
+    unsafe {
+        let line_number = if !(*zend_execute_data).opline.is_null() {
+            (*(*zend_execute_data).opline).lineno
+        } else {
+            0
+        };
+        Some((file_name, line_number))
+    }
 }
 
 pub fn get_global_exception() -> Option<&'static mut ZObj> {
