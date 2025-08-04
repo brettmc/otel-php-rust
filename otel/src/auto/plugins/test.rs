@@ -53,17 +53,13 @@ impl Plugin for TestPlugin {
 pub struct DemoHandler;
 
 impl Handler for DemoHandler {
-    fn get_functions(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            "DemoClass::test".to_string(),
-            "DemoClass::inner".to_string(),
-            "phpversion".to_string(),
-        ]
-    }
-    fn get_interfaces(&self) -> Vec<String> {
-        vec![
-            "IDemo::foo".to_string(),
-            "IDemo::bar".to_string(),
+            (Some("DemoClass".to_string()), "test".to_string()),
+            (Some("DemoClass".to_string()), "inner".to_string()),
+            (None, "phpversion".to_string()),
+            (Some("IDemo".to_string()), "foo".to_string()),
+            (Some("IDemo".to_string()), "bar".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -109,14 +105,12 @@ impl DemoHandler {
 pub struct DemoFunctionHandler;
 
 impl Handler for DemoFunctionHandler {
-    fn get_functions(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            "demoFunction".to_string(),
+            (None, "demoFunction".to_string()),
         ]
     }
-    fn get_interfaces(&self) -> Vec<String> {
-        vec![]
-    }
+
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
             pre_observe: Some(Box::new(|exec_data| unsafe {
@@ -169,14 +163,10 @@ impl DemoFunctionHandler {
 
 pub struct TestClassHandler;
 impl Handler for TestClassHandler {
-    fn get_functions(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-        ]
-    }
-    fn get_interfaces(&self) -> Vec<String> {
-        vec![
-            r"OpenTelemetry\Test\ITestClass::getString".to_string(),
-            r"OpenTelemetry\Test\ITestClass::throwException".to_string(),
+            (Some(r"OpenTelemetry\Test\ITestClass".to_string()), "getString".to_string()),
+            (Some(r"OpenTelemetry\Test\ITestClass".to_string()), "throwException".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {

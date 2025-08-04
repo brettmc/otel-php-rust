@@ -54,12 +54,9 @@ impl Plugin for Psr18Plugin {
 pub struct Psr18SendRequestHandler;
 
 impl Handler for Psr18SendRequestHandler {
-    fn get_functions(&self) -> Vec<String> {
-        vec![]
-    }
-    fn get_interfaces(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            r"Psr\Http\Client\ClientInterface::sendRequest".to_string(),
+            (Some(r"Psr\Http\Client\ClientInterface".to_string()), "sendRequest".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {

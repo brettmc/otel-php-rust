@@ -11,8 +11,7 @@ pub trait Plugin: Send + Sync {
 
 pub trait Handler: Send + Sync {
     /// Should the function in execute data be observed by this plugin?
-    fn get_functions(&self) -> Vec<String>;
-    fn get_interfaces(&self) -> Vec<String>;
+    fn get_targets(&self) -> Vec<(Option<String>, String)>;
     fn get_callbacks(&self) -> HandlerCallbacks;
 }
 

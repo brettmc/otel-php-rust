@@ -47,12 +47,9 @@ impl Plugin for LaminasPlugin {
 pub struct LaminasRouteHandler;
 
 impl Handler for LaminasRouteHandler {
-    fn get_functions(&self) -> Vec<String> {
-        vec![]
-    }
-    fn get_interfaces(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            r"Laminas\Mvc\MvcEvent::setRouteMatch".to_string(),
+            (Some(r"Laminas\Mvc\MvcEvent".to_string()), "setRouteMatch".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {

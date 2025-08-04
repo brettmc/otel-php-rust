@@ -49,12 +49,9 @@ impl Plugin for Zf1Plugin {
 pub struct Zf1RouteHandler;
 
 impl Handler for Zf1RouteHandler {
-    fn get_functions(&self) -> Vec<String> {
-        vec![]
-    }
-    fn get_interfaces(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            r"Zend_Controller_Router_Interface::route".to_string(),
+            (Some("Zend_Controller_Router_Interface".to_string()), "route".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -140,12 +137,9 @@ impl Zf1RouteHandler {
 
 pub struct Zf1SendResponseHandler;
 impl Handler for Zf1SendResponseHandler {
-    fn get_functions(&self) -> Vec<String> {
-        vec![]
-    }
-    fn get_interfaces(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            r"Zend_Controller_Response_Abstract::sendResponse".to_string(),
+            (Some("Zend_Controller_Response_Abstract".to_string()), "sendResponse".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
