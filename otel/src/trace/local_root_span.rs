@@ -6,6 +6,7 @@ use phper::{
 use std::{
     cell::RefCell,
     convert::Infallible,
+    sync::Arc,
 };
 use crate::{
     context::{
@@ -16,6 +17,7 @@ use crate::{
         span::SpanClass,
     },
 };
+use opentelemetry::Context;
 
 const LOCAL_ROOT_SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\LocalRootSpan";
 
@@ -36,7 +38,7 @@ pub fn make_local_root_span_class(
 
     class
         .add_static_method("current", Visibility::Public, move |_| {
-            if let Some(instance_id) = get_local_root_span() {
+            if let Some(instance_id) = get_local_root_span_instance_id() {
                 let mut object = span_class.clone().init_object()?;
                 *object.as_mut_state() = None;
                 object.set_property("context_id", instance_id as i64);
@@ -58,8 +60,20 @@ pub fn store_local_root_span(context_id: u64) {
     LOCAL_ROOT_SPAN_ID.with(|cell| *cell.borrow_mut() = Some(context_id));
 }
 
-pub fn get_local_root_span() -> Option<u64> {
+/// Retrieves the stored context instance ID containing the local root span, if it exists.
+fn get_local_root_span_instance_id() -> Option<u64> {
     LOCAL_ROOT_SPAN_ID.with(|cell| *cell.borrow())
+}
+
+/// Retrieves the context containing the local root span, if it exists.
+pub fn get_local_root_span_context() -> Option<Arc<Context>> {
+    LOCAL_ROOT_SPAN_ID.with(|cell| {
+        if let Some(context_id) = *cell.borrow() {
+            storage::get_context_instance(context_id)
+        } else {
+            None
+        }
+    })
 }
 
 pub fn maybe_remove_local_root_span(context_id: u64) {

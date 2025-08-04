@@ -2,9 +2,8 @@ use crate::auto::{
     plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
 };
 use crate::{
-    trace::local_root_span::get_local_root_span,
+    trace::local_root_span::get_local_root_span_context,
 };
-use crate::context::storage;
 use opentelemetry::{
     KeyValue,
     trace::TraceContextExt,
@@ -75,15 +74,10 @@ impl Zf1RouteHandler {
         _exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Zf1::post (Router_Interface::route)");
-        let instance_id = get_local_root_span().unwrap_or(0);
-        if instance_id == 0 {
-            tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no local root span found, skipping");
-            return;
-        }
-        let ctx = match storage::get_context_instance(instance_id as u64) {
+        let ctx = match get_local_root_span_context() {
             Some(ctx) => ctx,
             None => {
-                tracing::warn!("Auto::Zf1::post (Router_Interface::route) - no context found for instance id {}", instance_id);
+                tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no local root span found, skipping");
                 return;
             }
         };
@@ -179,11 +173,7 @@ impl Zf1SendResponseHandler {
                 .and_then(|zv| zv.as_bool())
                 .unwrap_or(false);
             if is_exception {
-                let instance_id = get_local_root_span().unwrap_or(0);
-                if instance_id == 0 {
-                    return;
-                }
-                let ctx = match storage::get_context_instance(instance_id as u64) {
+                let ctx = match get_local_root_span_context() {
                     Some(ctx) => ctx,
                     None => {
                         return;

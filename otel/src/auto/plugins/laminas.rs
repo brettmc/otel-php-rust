@@ -3,9 +3,10 @@ use crate::auto::{
 };
 use crate::{
     request::get_request_details,
-    trace::local_root_span::get_local_root_span,
+    trace::local_root_span::{
+        get_local_root_span_context,
+    },
 };
-use crate::context::storage;
 use opentelemetry::{
     KeyValue,
     trace::TraceContextExt,
@@ -67,15 +68,10 @@ impl Handler for LaminasRouteHandler {
 impl LaminasRouteHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch)");
-        let instance_id = get_local_root_span().unwrap_or(0);
-        if instance_id == 0 {
-            tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no local root span found, skipping");
-            return;
-        }
-        let ctx = match storage::get_context_instance(instance_id as u64) {
+        let ctx = match get_local_root_span_context() {
             Some(ctx) => ctx,
             None => {
-                tracing::warn!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no context found for instance id {}", instance_id);
+                tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no local root span/context found, skipping");
                 return;
             }
         };
