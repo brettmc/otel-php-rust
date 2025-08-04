@@ -1,5 +1,5 @@
 --TEST--
-disable otel for request via OTEL_DISABLED .env and try to create spans
+disable otel for request via OTEL_SDK_DISABLED .env and try to create spans
 --EXTENSIONS--
 otel
 --INI--

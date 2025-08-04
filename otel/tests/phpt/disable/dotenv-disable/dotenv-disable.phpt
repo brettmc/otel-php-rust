@@ -1,5 +1,5 @@
 --TEST--
-disable otel via OTEL_DISABLED in .env file
+disable otel via OTEL_SDK_DISABLED in .env file
 --EXTENSIONS--
 otel
 --INI--
@@ -11,5 +11,5 @@ otel.log.level=debug
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RINIT: OTEL_DISABLED is set to true, skipping initialization
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization
 %A

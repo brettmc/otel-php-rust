@@ -75,6 +75,9 @@ pub mod trace{
         pub mod trace_context_propagator;
     }
 }
+pub mod config{
+    pub mod ini;
+}
 pub mod globals;
 pub mod request;
 pub mod logging;
@@ -117,12 +120,12 @@ pub fn get_module() -> Module {
     module.add_info("auto-instrumentation", "observer_api");
     #[cfg(otel_observer_not_supported)]
     module.add_info("auto-instrumentation", "zend_execute_ex");
-    module.add_ini("otel.log.level", "error".to_string(), Policy::All);
-    module.add_ini("otel.log.file", "/dev/stderr".to_string(), Policy::All);
-    module.add_ini("otel.cli.create_root_span", false, Policy::All);
-    module.add_ini("otel.cli.enabled", false, Policy::All);
-    module.add_ini("otel.dotenv.per_request", false, Policy::All);
-    module.add_ini("otel.auto.disabled_plugins", "".to_string(), Policy::All);
+    module.add_ini(config::ini::OTEL_LOG_LEVEL, "error".to_string(), Policy::All);
+    module.add_ini(config::ini::OTEL_LOG_FILE, "/dev/stderr".to_string(), Policy::All);
+    module.add_ini(config::ini::OTEL_CLI_CREATE_ROOT_SPAN, false, Policy::All);
+    module.add_ini(config::ini::OTEL_CLI_ENABLED, false, Policy::All);
+    module.add_ini(config::ini::OTEL_DOTENV_PER_REQUEST, false, Policy::All);
+    module.add_ini(config::ini::OTEL_AUTO_DISABLED_PLUGINS, "".to_string(), Policy::All);
     //which auto-instrumentation mechanism is enabled
     #[cfg(otel_observer_supported)]
     {
@@ -171,7 +174,7 @@ pub fn get_module() -> Module {
 
     module.on_module_init(|| {
         logging::init_once(); //from here on we can use tracing macros
-        let cli_enabled = ini_get::<bool>("otel.cli.enabled");
+        let cli_enabled = ini_get::<bool>(config::ini::OTEL_CLI_ENABLED);
         let sapi = get_sapi_module_name();
         let disabled = sapi == "cli" && !cli_enabled;
         DISABLED.set(disabled).ok();
@@ -208,7 +211,7 @@ pub fn get_module() -> Module {
         request::process_dotenv();
 
         if request::is_disabled() {
-            tracing::debug!("OpenTelemetry::RINIT: OTEL_DISABLED is set to true, skipping initialization");
+            tracing::debug!("OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization");
             return;
         }
 

@@ -1,8 +1,13 @@
-use crate::auto::plugin::{FunctionObserver, Plugin};
-use crate::auto::plugins::{
-    laminas::LaminasPlugin,
-    psr18::Psr18Plugin,
-    zf1::Zf1Plugin,
+use crate::{
+    auto::{
+        plugin::{FunctionObserver, Plugin},
+        plugins::{
+            laminas::LaminasPlugin,
+            psr18::Psr18Plugin,
+            zf1::Zf1Plugin,
+        },
+    },
+    config,
 };
 use phper::{
     classes::ClassEntry,
@@ -83,7 +88,7 @@ impl PluginManager {
 }
 
 fn get_disabled_plugins() -> HashSet<String> {
-    let value = ini_get::<Option<&CStr>>("otel.auto.disabled_plugins")
+    let value = ini_get::<Option<&CStr>>(config::ini::OTEL_AUTO_DISABLED_PLUGINS)
         .and_then(|cstr| cstr.to_str().ok())
         .unwrap_or("");
     value
@@ -93,7 +98,7 @@ fn get_disabled_plugins() -> HashSet<String> {
         .collect()
 }
 
-fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], plugin_name: &str) -> bool {
+fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name: &str) -> bool {
     let function_name: ZString = func.get_function_or_method_name();
     let function_name_str = match function_name.to_str() {
         Ok(name) => name,
@@ -107,7 +112,7 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], plugin_name:
         (None, function_name_str.to_string())
     };
 
-    tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
+    //tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
     if targets.iter().any(|target| target == &observed_name_pair) {
         //tracing::trace!("should_trace:: {:?} matches on name_pair", name_pair);
         return true;

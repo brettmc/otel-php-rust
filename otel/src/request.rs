@@ -25,6 +25,7 @@ use opentelemetry::{
 };
 use opentelemetry_semantic_conventions as SemConv;
 use crate::{
+    config,
     context::storage,
     trace::{local_root_span, tracer_provider},
     util::{get_sapi_module_name},
@@ -38,7 +39,7 @@ thread_local! {
 static REQUEST_ENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn process_dotenv() {
-    let per_request_dotenv = ini_get::<bool>("otel.dotenv.per_request");
+    let per_request_dotenv = ini_get::<bool>(config::ini::OTEL_DOTENV_PER_REQUEST);
     if per_request_dotenv {
         if let Some(env_path) = find_dotenv() {
             tracing::debug!("Discovered .env path: {:?}", env_path);
@@ -50,7 +51,7 @@ pub fn process_dotenv() {
                     match item.0.as_str() {
                         "OTEL_SERVICE_NAME" => service_name = Some(item.1),
                         "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
-                        "OTEL_DISABLED" => otel_disabled = Some(item.1),
+                        "OTEL_SDK_DISABLED" => otel_disabled = Some(item.1),
                         _ => {}
                     }
                 }
@@ -60,7 +61,7 @@ pub fn process_dotenv() {
                     env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
                 }
                 if let Some(otel_disabled) = otel_disabled {
-                    env.insert("OTEL_DISABLED".to_string(), otel_disabled);
+                    env.insert("OTEL_SDK_DISABLED".to_string(), otel_disabled);
                 }
                 if let Some(resource_attributes) = resource_attributes {
                     //merge with original env var, if it exists
@@ -150,7 +151,7 @@ pub fn init() {
     tracing::debug!("RINIT::sapi module name is: {}", sapi.clone());
     let mut span_name: Option<String> = None;
     if sapi == "cli" {
-        let trace_cli = ini_get::<bool>("otel.cli.create_root_span");
+        let trace_cli = ini_get::<bool>(config::ini::OTEL_CLI_CREATE_ROOT_SPAN);
         if trace_cli {
             tracing::debug!("RINIT::tracing cli enabled by ini");
             span_name = Some("php:cli".to_string());
@@ -285,7 +286,7 @@ pub struct RequestDetails {
 
 // @see https://github.com/apache/skywalking-php/blob/v0.8.0/src/request.rs#L152
 #[allow(static_mut_refs)]
-pub fn get_request_server<'a>() -> anyhow::Result<&'a ZArr> {
+fn get_request_server<'a>() -> anyhow::Result<&'a ZArr> {
     unsafe {
         // Ensure $_SERVER is initialized
         let mut server = "_SERVER".to_string();
@@ -299,14 +300,14 @@ pub fn get_request_server<'a>() -> anyhow::Result<&'a ZArr> {
     }
 }
 
-pub fn get_server_var(key: &str) -> Option<String> {
+fn get_server_var(key: &str) -> Option<String> {
     get_request_server()
         .ok()
         .and_then(|server| server.get(key))
         .and_then(|zv| z_val_to_string(zv))
 }
 
-pub fn extract_request_headers(server: &ZArr) -> HashMap<String, String> {
+fn extract_request_headers(server: &ZArr) -> HashMap<String, String> {
     let mut headers = HashMap::new();
 
     for (key, value) in server.iter() {
@@ -330,7 +331,7 @@ pub fn extract_request_headers(server: &ZArr) -> HashMap<String, String> {
     headers
 }
 
-pub fn z_val_to_string(zv: &ZVal) -> Option<String> {
+fn z_val_to_string(zv: &ZVal) -> Option<String> {
     zv.as_z_str()
         .and_then(|zs| zs.to_str().ok())
         .map(|s| s.to_string())
@@ -353,7 +354,7 @@ fn parse_resource_attributes(s: &str) -> HashMap<String, String> {
         .collect()
 }
 
-pub fn get_propagated_context() -> Context {
+fn get_propagated_context() -> Context {
     let server = match get_request_server() {
         Ok(server) => server,
         Err(_) => return Context::current(),
@@ -385,12 +386,12 @@ pub fn clear_request_env() {
 pub fn is_disabled() -> bool {
     // Check .env first
     if let Some(env) = get_request_env() {
-        if let Some(val) = env.get("OTEL_DISABLED") {
+        if let Some(val) = env.get("OTEL_SDK_DISABLED") {
             return val == "true";
         }
     }
     // Fallback to process environment
-    match std::env::var("OTEL_DISABLED") {
+    match std::env::var("OTEL_SDK_DISABLED") {
         Ok(val) => val == "true",
         Err(_) => false,
     }
