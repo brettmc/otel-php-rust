@@ -1,11 +1,11 @@
 --TEST--
-disable otel via OTEL_DISABLED
+disable otel via OTEL_SDK_DISABLED
 --EXTENSIONS--
 otel
 --INI--
 otel.log.level=debug
 --ENV--
-OTEL_DISABLED=true
+OTEL_SDK_DISABLED=true
 --FILE--
 <?php
 ?>

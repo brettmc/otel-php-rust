@@ -1,12 +1,12 @@
 --TEST--
-disable otel via OTEL_DISABLED env var and try to create spans
+disable otel via OTEL_SDK_DISABLED env var and try to create spans
 --EXTENSIONS--
 otel
 --INI--
 otel.log.level=debug
 otel.cli.enabled=1
 --ENV--
-OTEL_DISABLED=true
+OTEL_SDK_DISABLED=true
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --FILE--

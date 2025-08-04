@@ -1,14 +1,17 @@
-use phper::ini::{ini_get};
+use crate::config;
+use phper::ini::ini_get;
 use tracing::{Event, Subscriber, field::{Visit, Field}};
 use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
-use std::collections::HashMap;
-use std::ffi::{CStr};
-use std::fmt::{self, Write};
-use std::fs::OpenOptions;
-use std::io::{Write as _};
-use std::sync::{LazyLock, Mutex, OnceLock};
-use std::process;
-use std::thread;
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    fmt::{self, Write},
+    fs::OpenOptions,
+    io::{Write as _},
+    process,
+    sync::{LazyLock, Mutex, OnceLock},
+    thread,
+};
 use chrono::Utc;
 
 static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
@@ -23,7 +26,7 @@ pub fn init_once() {
         return;
     }
 
-    let log_level = ini_get::<Option<&CStr>>("otel.log.level")
+    let log_level = ini_get::<Option<&CStr>>(config::ini::OTEL_LOG_LEVEL)
         .and_then(|cstr| cstr.to_str().ok())
         .unwrap_or("none");
 
@@ -48,7 +51,7 @@ pub fn init_once() {
 
 fn log_message(message: &str) {
     let log_file = LOG_FILE_PATH.get_or_init(|| {
-        ini_get::<Option<&CStr>>("otel.log.file")
+        ini_get::<Option<&CStr>>(config::ini::OTEL_LOG_FILE)
             .and_then(|cstr| cstr.to_str().ok())
             .map(|s| s.to_string())
             .unwrap_or_else(|| "/dev/stderr".to_string())

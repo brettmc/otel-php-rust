@@ -1,11 +1,15 @@
-use crate::auto::{
-    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+use crate::{
+    auto::{
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+    },
+    config::trace_attributes,
 };
 use crate::{
     request::get_request_details,
-    trace::local_root_span::get_local_root_span,
+    trace::local_root_span::{
+        get_local_root_span_context,
+    },
 };
-use crate::context::storage;
 use opentelemetry::{
     KeyValue,
     trace::TraceContextExt,
@@ -46,12 +50,9 @@ impl Plugin for LaminasPlugin {
 pub struct LaminasRouteHandler;
 
 impl Handler for LaminasRouteHandler {
-    fn get_functions(&self) -> Vec<String> {
-        vec![]
-    }
-    fn get_interfaces(&self) -> Vec<String> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            r"Laminas\Mvc\MvcEvent::setRouteMatch".to_string(),
+            (Some(r"Laminas\Mvc\MvcEvent".to_string()), "setRouteMatch".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -67,18 +68,14 @@ impl Handler for LaminasRouteHandler {
 impl LaminasRouteHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch)");
-        let instance_id = get_local_root_span().unwrap_or(0);
-        if instance_id == 0 {
-            tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no local root span found, skipping");
-            return;
-        }
-        let ctx = match storage::get_context_instance(instance_id as u64) {
+        let ctx = match get_local_root_span_context() {
             Some(ctx) => ctx,
             None => {
-                tracing::warn!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no context found for instance id {}", instance_id);
+                tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch) - no local root span/context found, skipping");
                 return;
             }
         };
+        ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "laminas"));
         let exec_data_ref = &mut *exec_data;
         let route_match_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         let request = get_request_details();
@@ -103,12 +100,12 @@ impl LaminasRouteHandler {
                 let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
                 tracing::debug!("Auto::Laminas::updateName (MvcEvent::setRouteMatch)");
                 ctx.span().update_name(name);
-                ctx.span().set_attribute(KeyValue::new("php.framework.name", "laminas"));
+
                 if let Some(controller) = &controller {
-                    ctx.span().set_attribute(KeyValue::new("php.framework.controller.name", controller.clone()));
+                    ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_CONTROLLER_NAME, controller.clone()));
                 }
                 if let Some(action) = &action {
-                    ctx.span().set_attribute(KeyValue::new("php.framework.action.name", action.clone()));
+                    ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_ACTION_NAME, action.clone()));
                 }
             }
         }
