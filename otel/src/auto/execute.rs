@@ -40,7 +40,7 @@ pub fn init(plugin_manager: PluginManager) {
 // This is our exec function that wraps the upstream PHP one.
 // This allows us to execute plugins before&after.
 unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
-    let exec_data = match ExecuteData::try_from_mut_ptr(execute_data) {
+    let exec_data = match unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         Some(execute_data) => execute_data,
         None => {
             upstream_execute_ex(None);
