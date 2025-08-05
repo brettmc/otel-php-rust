@@ -24,7 +24,7 @@ use Nyholm\Psr7\Request;
 use Nyholm\Psr7\Response;
 use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
-require 'vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
 class MockHttpClient implements ClientInterface
 {

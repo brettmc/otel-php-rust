@@ -35,6 +35,17 @@ jobs:
           cargo build --features test
           sudo cp target/debug/libotel.so $(php-config --extension-dir)/otel.so
 
+      - name: Install dependencies
+        working-directory: otel
+        run: |
+          pushd . && cd tests/zf1 && composer update && popd
+
+      - name: Install dependencies (7.2+)
+        working-directory: otel
+        if: matrix.php-version != '7.0' && matrix.php-version != '7.1'
+        run: |
+          pushd . && cd tests/auto/psr18 && composer update && popd
+
       - name: Run tests
         working-directory: otel
         run: php run-tests.php -q --show-diff tests/auto tests/http tests/phpt

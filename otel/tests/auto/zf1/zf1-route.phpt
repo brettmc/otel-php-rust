@@ -14,7 +14,7 @@ otel.cli.create_root_span=On
 use OpenTelemetry\API\Trace\SpanExporter\Memory;
 use OpenTelemetry\API\Trace\LocalRootSpan;
 
-include 'public/index.php';
+include __DIR__ . '/public/index.php';
 
 $localRoot = LocalRootSpan::current();
 $localRoot->end();
