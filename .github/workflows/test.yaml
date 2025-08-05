@@ -1,0 +1,36 @@
+name: Build PHP Extension
+
+on:
+  push:
+    branches: [main, gh-action]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: [7.0, 7.4, 8.0, 8.4]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+
+      - name: Install build dependencies
+        run: apt-get install -y php${{ matrix.php-version }}-dev build-essential
+
+      - name: Check
+        working-directory: otel
+        run: cargo check
+
+      - name: Build
+        working-directory: otel
+        run: cargo build --release
