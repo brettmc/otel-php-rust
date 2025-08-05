@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         working-directory: otel
         run: |
-          pushd . && cd tests/zf1 && composer update && popd
+          pushd . && cd tests/auto/zf1 && composer update && popd
 
       - name: Install dependencies (7.2+)
         working-directory: otel
