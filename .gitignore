@@ -4,7 +4,7 @@
 vendor/
 otel/demo/
 composer.lock
-.env
+/.env
 otel/Makefile.global
 otel/acinclude.m4
 otel/aclocal.m4
