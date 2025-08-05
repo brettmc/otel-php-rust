@@ -32,7 +32,7 @@ jobs:
         run: |
           phpize
           cargo build --features test
-          cp target/debug/otel.so $(php-config --extension-dir)/otel.so
+          cp target/debug/libotel.so $(php-config --extension-dir)/otel.so
 
       - name: Run tests
         working-directory: otel
