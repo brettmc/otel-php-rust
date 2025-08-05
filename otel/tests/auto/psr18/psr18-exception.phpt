@@ -5,6 +5,7 @@ otel
 --SKIPIF--
 <?php
 if (PHP_VERSION_ID < 70200) {
+    // ignored as psr18 not installable on PHP < 7.2
     die("skip requires PHP 7.2+");
 }
 --ENV--

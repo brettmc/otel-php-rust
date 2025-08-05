@@ -5,6 +5,7 @@ otel
 --SKIPIF--
 <?php
 if (PHP_VERSION_ID < 70200) {
+    // ignored as psr18 not installable on PHP < 7.2
     die("skip requires PHP 7.2+");
 }
 --ENV--
@@ -75,7 +76,7 @@ array(10) {
   ["code.function.name"]=>
   string(27) "MockHttpClient::sendRequest"
   ["code.file.path"]=>
-  string(48) "/usr/src/myapp/tests/auto/psr18/psr18-inject.php"
+  string(%d) "%s/tests/auto/psr18/psr18-inject.php"
   ["code.line.number"]=>
   int(%d)
   ["url.full"]=>
