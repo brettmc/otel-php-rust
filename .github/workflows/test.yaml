@@ -24,11 +24,14 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
 
+      - name: Copy run-tests.php
+        run: RUN cp $(php-config --extension-dir)/build/run-tests.php ~
+
       - name: Build
         working-directory: otel
         run: make build-test
 
       - name: Run tests
         working-directory: otel
-        run: find / -name run-tests.php
+        run: php run-tests.php -q --show-diff tests/auto tests/http tests/phpt
 
