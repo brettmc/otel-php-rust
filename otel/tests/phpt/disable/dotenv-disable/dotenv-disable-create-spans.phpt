@@ -6,6 +6,8 @@ otel
 otel.dotenv.per_request=On
 otel.cli.enabled=On
 otel.log.level=debug
+--ENV--
+OTEL_TRACES_EXPORTER=memory
 --FILE--
 <?php
 use OpenTelemetry\API\Globals;

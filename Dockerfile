@@ -34,7 +34,8 @@ RUN apt-get update \
     php${PHP_VERSION}-cli-dbgsym \
     php${PHP_VERSION}-common-dbgsym \
   && apt-get install -y php${PHP_VERSION}-dev \
-  && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so \
-  && find /usr/lib/php/ -type f -name run-tests.php -exec cp {} /home/php-rust \;
+  && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so
+
+RUN cp $(php-config --extension-dir)/build/run-tests.php /home/php-rust/
 
 USER php-rust

@@ -1,0 +1,54 @@
+name: Build PHP Extension
+
+on:
+  push:
+    branches: [main, gh-action]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        php-version: ['7.0', '7.4', '8.0', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+
+      - name: Set TEST_PHP_EXECUTABLE environment variable
+        run: echo "TEST_PHP_EXECUTABLE=$(which php)" >> $GITHUB_ENV
+
+      - name: Build
+        working-directory: otel
+        run: |
+          phpize
+          cargo build --features test
+          sudo cp target/debug/libotel.so $(php-config --extension-dir)/otel.so
+
+      - name: Install dependencies
+        working-directory: otel
+        run: |
+          pushd . && cd tests/auto/zf1 && composer update && popd
+
+      - name: Install dependencies (7.2+)
+        working-directory: otel
+        if: matrix.php-version != '7.0' && matrix.php-version != '7.1'
+        run: |
+          pushd . && cd tests/auto/psr18 && composer update && popd
+
+      - name: Run tests
+        working-directory: otel
+        run: php run-tests.php -q --show-diff tests/auto tests/http tests/phpt
+
