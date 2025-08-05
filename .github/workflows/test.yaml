@@ -25,7 +25,7 @@ jobs:
           php-version: ${{ matrix.php-version }}
 
       - name: Install build dependencies
-        run: apt-get install -y php${{ matrix.php-version }}-dev build-essential
+        run: sudo apt-get install -y php${{ matrix.php-version }}-dev build-essential
 
       - name: Check
         working-directory: otel
