@@ -30,7 +30,9 @@ jobs:
       - name: Build
         working-directory: otel
         run: |
-          make build-test
+          phpize
+          cargo build --features test
+          cp target/debug/otel.so $(php-config --extension-dir)/otel.so
 
       - name: Run tests
         working-directory: otel
