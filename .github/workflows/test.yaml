@@ -24,6 +24,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
+          coverage: none
 
       - name: Set TEST_PHP_EXECUTABLE environment variable
         run: echo "TEST_PHP_EXECUTABLE=$(which php)" >> $GITHUB_ENV
