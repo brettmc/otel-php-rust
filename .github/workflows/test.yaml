@@ -25,7 +25,7 @@ jobs:
           php-version: ${{ matrix.php-version }}
 
       - name: Copy run-tests.php
-        run: RUN cp $(php-config --extension-dir)/build/run-tests.php ~
+        run: cp $(php-config --extension-dir)/build/run-tests.php ~
 
       - name: Build
         working-directory: otel
