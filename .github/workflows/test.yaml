@@ -24,6 +24,9 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
 
+      - name: Set TEST_PHP_EXECUTABLE environment variable
+        run: echo "TEST_PHP_EXECUTABLE=$(which php)" >> $GITHUB_ENV
+
       - name: Build
         working-directory: otel
         run: |
