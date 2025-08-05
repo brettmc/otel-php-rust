@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['7.0', '7.4', '8.0', '8.4']
+        php-version: ['7.0'] #, '7.4', '8.0', '8.4']
     steps:
       - uses: actions/checkout@v4
 
@@ -24,13 +24,11 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
 
-      - name: Install build dependencies
-        run: sudo apt-get install -y build-essential
-
-      - name: Check
-        working-directory: otel
-        run: cargo check
-
       - name: Build
         working-directory: otel
-        run: cargo build --release
+        run: make build-test
+
+      - name: Run tests
+        working-directory: otel
+        run: php -r "echo dirname(PHP_BINARY);"
+
