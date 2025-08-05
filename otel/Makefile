@@ -8,8 +8,8 @@ build:
 	@echo "Building..."
 	cargo build --release
 	cp target/release/libotel.so modules/otel.so
-# NB phpize is only required to provide run-tests.php
 build-test:
+	# phpize is only required to provide run-tests.php
 	@echo "Building for test..."
 	phpize
 	cargo build --features test
