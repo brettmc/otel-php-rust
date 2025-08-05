@@ -4,6 +4,9 @@
 build-image:
 	@echo "Building image..."
 	docker compose build
+orphans:
+	@echo "Cleaning up orphaned containers..."
+	docker compose down --remove-orphans
 build:
 	@echo "Building extension..."
 	docker compose run --rm php make build-test
