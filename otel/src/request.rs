@@ -36,7 +36,7 @@ thread_local! {
     static OTEL_CONTEXT_ID: RefCell<Option<u64>> = RefCell::new(None);
 }
 //store .env resource attributes for request duration
-static REQUEST_ENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static REQUEST_DOTENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn process_dotenv() {
     let per_request_dotenv = ini_get::<bool>(config::ini::OTEL_DOTENV_PER_REQUEST);
@@ -89,7 +89,7 @@ pub fn process_dotenv() {
 
                     env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), merged_str);
                 }
-                set_request_env(env);
+                set_request_dotenv(env);
             }
         } else {
             tracing::warn!("No .env file found between SCRIPT_FILENAME and DOCUMENT_ROOT");
@@ -170,14 +170,14 @@ pub fn init() {
 
     tracing::debug!("RINIT::otel request is being traced, name={}", span_name.clone().unwrap_or("unknown".to_string()));
     let tracer_provider = tracer_provider::get_tracer_provider();
-    let scope = InstrumentationScope::builder("php_request").build();
+    let scope = InstrumentationScope::builder("php:rinit").build();
     let tracer = tracer_provider.tracer_with_scope(scope);
     let span_builder = tracer.span_builder(span_name.unwrap_or("unknown".to_string()));
     let mut attributes = span_builder.attributes.clone().unwrap_or_default();
     attributes.push(KeyValue::new(SemConv::trace::URL_FULL, request_details.uri.unwrap_or_default()));
     attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, request_details.method.unwrap_or_default()));
-    //attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_BODY_SIZE, request_details.body_length.unwrap_or_default()));
-    // TODO set other span attributes from request
+    //attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_BODY_SIZE, request_details.body_length.unwrap_or_default())); //experimental
+    // TODO other HTTP attributes are experimental
 
     let mut span_builder = span_builder.clone().with_attributes(attributes);
     span_builder.span_kind = Some(SpanKind::Server);
@@ -205,10 +205,9 @@ pub fn init() {
 pub fn shutdown() {
     let context_id = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take());
     let is_tracing = context_id.is_some();
-    let sapi = get_sapi_module_name();
     if is_tracing {
         let context_id = context_id.unwrap();
-        let is_http_request = sapi != "cli";
+        let is_http_request = get_sapi_module_name() != "cli";
         tracing::debug!("RSHUTDOWN::auto-closing root span...");
         let ctx = storage::get_context_instance(context_id);
         if ctx.is_none() {
@@ -244,7 +243,7 @@ pub fn shutdown() {
     } else {
         tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
     }
-    clear_request_env();
+    clear_request_dotenv();
 }
 
 pub fn get_request_details() -> RequestDetails {
@@ -367,25 +366,25 @@ fn get_propagated_context() -> Context {
 }
 
 //per-request .env support
-pub fn set_request_env(env: HashMap<String, String>) {
+pub fn set_request_dotenv(env: HashMap<String, String>) {
     let pid = std::process::id();
-    REQUEST_ENV.lock().unwrap().insert(pid, env);
+    REQUEST_DOTENV.lock().unwrap().insert(pid, env);
 }
 
-pub fn get_request_env() -> Option<HashMap<String, String>> {
+pub fn get_request_dotenv() -> Option<HashMap<String, String>> {
     let pid = std::process::id();
-    REQUEST_ENV.lock().unwrap().get(&pid).cloned()
+    REQUEST_DOTENV.lock().unwrap().get(&pid).cloned()
 }
 
-pub fn clear_request_env() {
+pub fn clear_request_dotenv() {
     let pid = std::process::id();
-    REQUEST_ENV.lock().unwrap().remove(&pid);
+    REQUEST_DOTENV.lock().unwrap().remove(&pid);
 }
 
 /// Check if OpenTelemetry is disabled for the current request (by env or .env)
 pub fn is_disabled() -> bool {
     // Check .env first
-    if let Some(env) = get_request_env() {
+    if let Some(env) = get_request_dotenv() {
         if let Some(val) = env.get("OTEL_SDK_DISABLED") {
             return val == "true";
         }

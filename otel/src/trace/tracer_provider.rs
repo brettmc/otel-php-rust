@@ -52,7 +52,7 @@ static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
 //tracer provider per (service_name, resource_attributes) pair (from .env, if enabled)
 fn get_tracer_provider_key() -> (u32, String) {
     let pid = process::id();
-    let env = request::get_request_env().unwrap_or_default();
+    let env = request::get_request_dotenv().unwrap_or_default();
     let service_name = env.get("OTEL_SERVICE_NAME").cloned().unwrap_or_default();
     let resource_attrs = env.get("OTEL_RESOURCE_ATTRIBUTES").cloned().unwrap_or_default();
     let key = format!("{}:{}", service_name, resource_attrs);
@@ -84,7 +84,7 @@ pub fn init_once() {
     let env_backup = env::vars()
         .filter(|(k, _)| otel_vars.iter().any(|&v| v == k))
         .collect::<HashMap<_, _>>();
-    if let Some(env_map) = request::get_request_env() {
+    if let Some(env_map) = request::get_request_dotenv() {
         if let Some(val) = env_map.get("OTEL_SERVICE_NAME") {
             unsafe{env::set_var("OTEL_SERVICE_NAME", val)};
         }

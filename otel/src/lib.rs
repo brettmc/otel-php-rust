@@ -44,6 +44,7 @@ use opentelemetry::{
 use opentelemetry_sdk::{
     propagation::TraceContextPropagator,
 };
+use std::env;
 use tokio::runtime::Runtime;
 use once_cell::sync::OnceCell;
 
@@ -126,6 +127,7 @@ pub fn get_module() -> Module {
     module.add_ini(config::ini::OTEL_CLI_CREATE_ROOT_SPAN, false, Policy::All);
     module.add_ini(config::ini::OTEL_CLI_ENABLED, false, Policy::All);
     module.add_ini(config::ini::OTEL_DOTENV_PER_REQUEST, false, Policy::All);
+    module.add_ini(config::ini::OTEL_AUTO_ENABLED, true, Policy::All);
     module.add_ini(config::ini::OTEL_AUTO_DISABLED_PLUGINS, "".to_string(), Policy::All);
     //which auto-instrumentation mechanism is enabled
     #[cfg(otel_observer_supported)]
@@ -184,15 +186,21 @@ pub fn get_module() -> Module {
             return;
         }
         tracing::debug!("OpenTelemetry::MINIT");
-        let plugin_manager = PluginManager::new();
 
-        #[cfg(otel_observer_supported)]
-        {
-            crate::auto::observer::init(plugin_manager);
-        }
-        #[cfg(otel_observer_not_supported)]
-        {
-            crate::auto::execute::init(plugin_manager);
+        let auto_enabled = ini_get::<bool>(config::ini::OTEL_AUTO_ENABLED);
+        if auto_enabled {
+            let plugin_manager = PluginManager::new();
+
+            #[cfg(otel_observer_supported)]
+            {
+                crate::auto::observer::init(plugin_manager);
+            }
+            #[cfg(otel_observer_not_supported)]
+            {
+                crate::auto::execute::init(plugin_manager);
+            }
+        } else {
+            tracing::debug!("OpenTelemetry::MINIT auto-instrumentation disabled");
         }
     });
     module.on_module_shutdown(|| {
@@ -216,12 +224,16 @@ pub fn get_module() -> Module {
             return;
         }
 
-        if TOKIO_RUNTIME.get().is_none() {
-            tracing::debug!("OpenTelemetry::RINIT::Creating tokio runtime");
-            //TODO don't create runtime unless using grpc
-            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-            TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
-            tracing::debug!("OpenTelemetry::RINIT::tokio runtime initialized");
+        let protocol = env::var("OTEL_EXPORTER_OTLP_PROTOCOL").unwrap_or("grpc".to_string());
+        if protocol == "grpc" {
+            if TOKIO_RUNTIME.get().is_none() {
+                tracing::debug!("OpenTelemetry::RINIT::Creating tokio runtime");
+                let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+                TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
+                tracing::debug!("OpenTelemetry::RINIT::tokio runtime initialized");
+            }
+        } else {
+            tracing::debug!("OpenTelemetry::RINIT not creating tokio runtime for non-gRPC exporter");
         }
 
         tracer_provider::init_once();
