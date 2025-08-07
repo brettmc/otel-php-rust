@@ -372,7 +372,7 @@ fn get_propagated_context() -> Context {
 //per-request .env support
 pub fn set_request_dotenv(env: HashMap<String, String>) {
     for (k, v) in env {
-        unsafe{std::env::set_var(&k, &v)};
+        unsafe { std::env::set_var(&k, &v) };
         tracing::debug!("Set environment variable {}={}", k, v);
     }
 }
@@ -405,7 +405,7 @@ pub fn restore_otel_env() {
     if let Some(backup) = ENV_BACKUP.lock().unwrap().remove(&pid) {
         for (k, v) in backup {
             tracing::debug!("Restoring environment variable {}={}", k, v);
-            unsafe { env::set_var(k, v) };
+            unsafe{ env::set_var(k, v) };
         }
     }
 }
