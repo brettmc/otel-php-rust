@@ -98,6 +98,7 @@ As above
 | otel.cli.create_root_span | false          | Whether to create a root span for CLI requests |
 | otel.cli.enabled | false          | Whether to enable OpenTelemetry for CLI requests |
 | otel.dotenv.per_request | false          | Whether to load .env files per request |
+| otel.auto.enabled | true | Auto-instrumentation enabled |
 | otel.auto.disabled_plugins | _empty string_ | A list of auto-instrumentation plugins to disable, comma-separated |
 
 ### Environment variables

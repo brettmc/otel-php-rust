@@ -41,7 +41,7 @@ pub fn get_fqn(execute_data: &ExecuteData) -> String {
 }
 
 //TODO get these through ExecuteData?
-pub unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
+unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     let zend_execute_data = execute_data.as_ptr();
 
     if zend_execute_data.is_null() {

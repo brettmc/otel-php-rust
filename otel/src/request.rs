@@ -11,6 +11,7 @@ use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     collections::HashMap,
+    env,
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -35,8 +36,8 @@ thread_local! {
     static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = RefCell::new(None);
     static OTEL_CONTEXT_ID: RefCell<Option<u64>> = RefCell::new(None);
 }
-//store .env resource attributes for request duration
-static REQUEST_ENV: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+//backup mutating environment variables for request duration
+static ENV_BACKUP: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn process_dotenv() {
     let per_request_dotenv = ini_get::<bool>(config::ini::OTEL_DOTENV_PER_REQUEST);
@@ -89,7 +90,10 @@ pub fn process_dotenv() {
 
                     env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), merged_str);
                 }
-                set_request_env(env);
+                let modified_keys: Vec<String> = env.keys().cloned().collect();
+                backup_otel_env(&modified_keys);
+                set_request_dotenv(env);
+
             }
         } else {
             tracing::warn!("No .env file found between SCRIPT_FILENAME and DOCUMENT_ROOT");
@@ -170,14 +174,14 @@ pub fn init() {
 
     tracing::debug!("RINIT::otel request is being traced, name={}", span_name.clone().unwrap_or("unknown".to_string()));
     let tracer_provider = tracer_provider::get_tracer_provider();
-    let scope = InstrumentationScope::builder("php_request").build();
+    let scope = InstrumentationScope::builder("php:rinit").build();
     let tracer = tracer_provider.tracer_with_scope(scope);
     let span_builder = tracer.span_builder(span_name.unwrap_or("unknown".to_string()));
     let mut attributes = span_builder.attributes.clone().unwrap_or_default();
     attributes.push(KeyValue::new(SemConv::trace::URL_FULL, request_details.uri.unwrap_or_default()));
     attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, request_details.method.unwrap_or_default()));
-    //attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_BODY_SIZE, request_details.body_length.unwrap_or_default()));
-    // TODO set other span attributes from request
+    //attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_BODY_SIZE, request_details.body_length.unwrap_or_default())); //experimental
+    // TODO other HTTP attributes are experimental
 
     let mut span_builder = span_builder.clone().with_attributes(attributes);
     span_builder.span_kind = Some(SpanKind::Server);
@@ -203,12 +207,12 @@ pub fn init() {
 }
 
 pub fn shutdown() {
+    restore_otel_env();
     let context_id = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take());
     let is_tracing = context_id.is_some();
-    let sapi = get_sapi_module_name();
     if is_tracing {
         let context_id = context_id.unwrap();
-        let is_http_request = sapi != "cli";
+        let is_http_request = get_sapi_module_name() != "cli";
         tracing::debug!("RSHUTDOWN::auto-closing root span...");
         let ctx = storage::get_context_instance(context_id);
         if ctx.is_none() {
@@ -244,7 +248,6 @@ pub fn shutdown() {
     } else {
         tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
     }
-    clear_request_env();
 }
 
 pub fn get_request_details() -> RequestDetails {
@@ -367,32 +370,42 @@ fn get_propagated_context() -> Context {
 }
 
 //per-request .env support
-pub fn set_request_env(env: HashMap<String, String>) {
-    let pid = std::process::id();
-    REQUEST_ENV.lock().unwrap().insert(pid, env);
-}
-
-pub fn get_request_env() -> Option<HashMap<String, String>> {
-    let pid = std::process::id();
-    REQUEST_ENV.lock().unwrap().get(&pid).cloned()
-}
-
-pub fn clear_request_env() {
-    let pid = std::process::id();
-    REQUEST_ENV.lock().unwrap().remove(&pid);
+pub fn set_request_dotenv(env: HashMap<String, String>) {
+    for (k, v) in env {
+        unsafe { std::env::set_var(&k, &v) };
+        tracing::debug!("Set environment variable {}={}", k, v);
+    }
 }
 
 /// Check if OpenTelemetry is disabled for the current request (by env or .env)
 pub fn is_disabled() -> bool {
-    // Check .env first
-    if let Some(env) = get_request_env() {
-        if let Some(val) = env.get("OTEL_SDK_DISABLED") {
-            return val == "true";
-        }
-    }
-    // Fallback to process environment
     match std::env::var("OTEL_SDK_DISABLED") {
         Ok(val) => val == "true",
         Err(_) => false,
+    }
+}
+
+/// backup OTEL_* variables that are about to be modified from .env file
+pub fn backup_otel_env(keys: &[String]) {
+    let backup = env::vars()
+        .filter(|(k, _)| keys.contains(k))
+        .collect::<HashMap<_, _>>();
+    tracing::debug!("Backing up environment variables: {:?}", backup);
+    let pid = std::process::id();
+    ENV_BACKUP.lock().unwrap().insert(pid, backup);
+}
+
+pub fn restore_otel_env() {
+    let per_request_dotenv = ini_get::<bool>(config::ini::OTEL_DOTENV_PER_REQUEST);
+    if !per_request_dotenv {
+        return;
+    }
+    tracing::debug!("Restoring environment variables from backup");
+    let pid = std::process::id();
+    if let Some(backup) = ENV_BACKUP.lock().unwrap().remove(&pid) {
+        for (k, v) in backup {
+            tracing::debug!("Restoring environment variable {}={}", k, v);
+            unsafe{ env::set_var(k, v) };
+        }
     }
 }

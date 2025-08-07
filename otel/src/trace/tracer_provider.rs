@@ -52,9 +52,8 @@ static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
 //tracer provider per (service_name, resource_attributes) pair (from .env, if enabled)
 fn get_tracer_provider_key() -> (u32, String) {
     let pid = process::id();
-    let env = request::get_request_env().unwrap_or_default();
-    let service_name = env.get("OTEL_SERVICE_NAME").cloned().unwrap_or_default();
-    let resource_attrs = env.get("OTEL_RESOURCE_ATTRIBUTES").cloned().unwrap_or_default();
+    let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_default();
+    let resource_attrs = env::var("OTEL_RESOURCE_ATTRIBUTES").unwrap_or_default();
     let key = format!("{}:{}", service_name, resource_attrs);
     (pid, key)
 }
@@ -78,20 +77,6 @@ pub fn init_once() {
         providers.insert(key, Arc::new(provider.clone()));
         return;
     }
-    // set some allowed environment variables from .env so that the builder will pick them up
-    // save current env values
-    let otel_vars = ["OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES"];
-    let env_backup = env::vars()
-        .filter(|(k, _)| otel_vars.iter().any(|&v| v == k))
-        .collect::<HashMap<_, _>>();
-    if let Some(env_map) = request::get_request_env() {
-        if let Some(val) = env_map.get("OTEL_SERVICE_NAME") {
-            unsafe{env::set_var("OTEL_SERVICE_NAME", val)};
-        }
-        if let Some(val) = env_map.get("OTEL_RESOURCE_ATTRIBUTES") {
-            unsafe{env::set_var("OTEL_RESOURCE_ATTRIBUTES", val)};
-        }
-    }
 
     let resource = Resource::builder()
         .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
@@ -102,12 +87,6 @@ pub fn init_once() {
         .with_attribute(KeyValue::new("process.pid", process::id().to_string()))
         .with_attribute(KeyValue::new("host.name", hostname::get().unwrap_or_default().to_string_lossy().to_string()))
         .build();
-
-    // restore environment variables
-    for (k, v) in env_backup {
-        tracing::debug!("Restoring environment variable {}={}", k, v);
-        unsafe{env::set_var(k, v)};
-    }
 
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
