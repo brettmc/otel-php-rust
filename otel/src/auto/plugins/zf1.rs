@@ -33,6 +33,11 @@ use phper::{
     },
 };
 
+/// Zend Framework 1 (ZF1) plugin for OpenTelemetry PHP auto-instrumentation.
+/// db connections are not tracked, as the _connect method is called before every db operation,
+/// which uses internal functions (can not be instrumented with php <8.2)
+/// TODO span links between prepare+execute
+
 pub struct Zf1Plugin {
     handlers: HandlerList,
 }

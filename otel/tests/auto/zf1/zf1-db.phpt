@@ -46,6 +46,7 @@ assert($execute_span['span_context']['trace_id'] === $root_span['span_context'][
 assert($prepare_span['parent_span_id'] === $root_span['span_context']['span_id']);
 assert($execute_span['parent_span_id'] === $root_span['span_context']['span_id']);
 var_dump($execute_span['attributes']);
+//@todo link between execute and prepare
 var_dump($prepare_span['attributes']);
 ?>
 --EXPECTF--
@@ -58,11 +59,13 @@ array(3) {
   ["code.line.number"]=>
   int(%d)
 }
-array(3) {
+array(4) {
   ["code.function.name"]=>
   string(37) "Zend_Db_Adapter_Pdo_Abstract::prepare"
   ["code.file.path"]=>
   string(%d) "%s/Zend/Db/Adapter/Pdo/Abstract.php"
   ["code.line.number"]=>
   int(%d)
+  ["db.query.text"]=>
+  string(19) "select * from users"
 }
