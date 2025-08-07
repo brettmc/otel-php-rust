@@ -1,6 +1,6 @@
 <?php
 
-function run_server(string $file, array $options): void {
+function run_server(string $file, array $options, string $path = '') {
     $host = '127.0.0.1';
     $port = 8080;
     $docRoot = __DIR__;
@@ -23,7 +23,7 @@ function run_server(string $file, array $options): void {
     usleep(500000); // Wait for server to start
 
     // Make an HTTP request to the server
-    $url = "http://$host:$port/";
+    $url = "http://$host:$port/$path";
 
     // Create context with options
     $context = stream_context_create($options);

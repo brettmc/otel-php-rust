@@ -17,4 +17,16 @@ class IndexController extends Zend_Controller_Action
         echo 'Module: ' . htmlspecialchars($module) . '<br>';
         var_dump(get_class($request));
     }
+
+    public function queryAction()
+    {
+         var_dump('controller=index');
+         var_dump('action=query');
+         $dbname = APPLICATION_PATH . '/../data/test.sqlite';
+         $db = new Zend_Db_Adapter_Pdo_Sqlite(array('dbname' => $dbname));
+         $stmt = $db->prepare('select * from users');
+         $stmt->execute();
+         $result = $stmt->fetchAll();
+         var_dump(count($result));
+    }
 }

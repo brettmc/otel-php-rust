@@ -5,17 +5,27 @@ use crate::{
     config::trace_attributes,
 };
 use crate::{
+    auto::execute_data::get_default_attributes,
+    context::storage::{store_guard, take_guard},
     trace::local_root_span::get_local_root_span_context,
+    tracer_provider,
 };
 use opentelemetry::{
+    Context,
     KeyValue,
-    trace::TraceContextExt,
+    trace::{
+        TraceContextExt,
+        Tracer,
+        TracerProvider,
+    },
 };
+use opentelemetry_semantic_conventions as SemConv;
 use std::{
     sync::Arc,
 };
 use phper::{
     alloc::ToRefOwned,
+    errors::ThrowObject,
     objects::ZObj,
     values::{
         ExecuteData,
@@ -33,6 +43,8 @@ impl Zf1Plugin {
             handlers: vec![
                 Arc::new(Zf1RouteHandler),
                 Arc::new(Zf1SendResponseHandler),
+                Arc::new(Zf1StatementPrepareHandler),
+                Arc::new(Zf1StatementExecuteHandler),
             ],
         }
     }
@@ -196,6 +208,125 @@ impl Zf1SendResponseHandler {
                 }
                 ctx.span().set_status(opentelemetry::trace::Status::error(status_description));
             }
+        }
+    }
+}
+
+pub struct Zf1StatementPrepareHandler;
+
+impl Handler for Zf1StatementPrepareHandler {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
+        vec![
+            (Some("Zend_Db_Adapter_Abstract".to_string()), "prepare".to_string()),
+        ]
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
+        }
+    }
+}
+
+impl Zf1StatementPrepareHandler {
+    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1");
+        let exec_data_ref = unsafe {&mut *exec_data};
+        let mut attributes = get_default_attributes(exec_data_ref);
+        let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
+        if let Some(sql_str) = sql_zval.as_z_str() {
+            if let Ok(sql) = sql_str.to_str() {
+                // Add SQL query as an attribute
+                attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
+            }
+        } else {
+            tracing::warn!("Zf1StatementPrepareHandler: SQL parameter is not a string");
+        }
+        let name = "Statement::prepare".to_string();
+
+        let span_builder = tracer.span_builder(name)
+            .with_kind(opentelemetry::trace::SpanKind::Client)
+            .with_attributes(attributes);
+        let span = tracer.build_with_context(span_builder, &Context::current());
+        let ctx = Context::current_with_span(span);
+        let guard = ctx.attach();
+        store_guard(exec_data, guard);
+    }
+    unsafe extern "C" fn post_callback(
+        exec_data: *mut ExecuteData,
+        _retval: &mut ZVal,
+        exception: Option<&mut ZObj>
+    ) {
+        if let Some(exception) = exception {
+            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
+                let context = opentelemetry::Context::current();
+                context.span().record_error(&throwable);
+            }
+        }
+        if let Some(_guard) = take_guard(exec_data) {
+            //do nothing, _guard will go out of scope at end of function
+        } else {
+            tracing::warn!("Statement::execute No context guard found for post callback");
+            return;
+        }
+    }
+}
+
+pub struct Zf1StatementExecuteHandler;
+
+impl Handler for Zf1StatementExecuteHandler {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
+        vec![
+            (Some("Zend_Db_Statement_Interface".to_string()), "execute".to_string()),
+        ]
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: Some(Box::new(|exec_data| unsafe {
+                Self::pre_callback(exec_data)
+            })),
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
+        }
+    }
+}
+
+impl Zf1StatementExecuteHandler {
+    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1");
+        let exec_data_ref = unsafe { &*exec_data };
+        let attributes = get_default_attributes(exec_data_ref);
+        let name = "Statement::execute".to_string();
+
+        let span_builder = tracer.span_builder(name)
+            .with_kind(opentelemetry::trace::SpanKind::Client)
+            .with_attributes(attributes);
+        let span = tracer.build_with_context(span_builder, &Context::current());
+        let ctx = Context::current_with_span(span);
+        let guard = ctx.attach();
+        store_guard(exec_data, guard);
+    }
+    unsafe extern "C" fn post_callback(
+        exec_data: *mut ExecuteData,
+        _retval: &mut ZVal,
+        exception: Option<&mut ZObj>
+    ) {
+        if let Some(exception) = exception {
+            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
+                let context = opentelemetry::Context::current();
+                context.span().record_error(&throwable);
+            }
+        }
+        if let Some(_guard) = take_guard(exec_data) {
+            //do nothing, _guard will go out of scope at end of function
+        } else {
+            tracing::warn!("Statement::execute No context guard found for post callback");
+            return;
         }
     }
 }
