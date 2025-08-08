@@ -3,7 +3,7 @@ OTEL_SDK_DISABLED=true in env, =false in .env file
 --EXTENSIONS--
 otel
 --INI--
-otel.dotenv.per_request=On
+otel.env.dotenv.enabled=On
 otel.cli.enabled=On
 otel.log.level=error
 --ENV--

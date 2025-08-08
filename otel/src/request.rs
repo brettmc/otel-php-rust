@@ -40,16 +40,16 @@ thread_local! {
 static ENV_BACKUP: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn init_environment() {
-    let per_request_dotenv = ini_get::<bool>(config::ini::OTEL_DOTENV_PER_REQUEST);
+    let dotenv_enabled = ini_get::<bool>(config::ini::OTEL_ENV_DOTENV_ENABLED);
     let env_from_server = ini_get::<bool>(config::ini::OTEL_ENV_SET_FROM_SERVER);
 
-    if per_request_dotenv || env_from_server {
+    if dotenv_enabled || env_from_server {
         backup_env();
     }
     if env_from_server {
         set_env_from_server();
     }
-    if per_request_dotenv {
+    if dotenv_enabled {
         process_dotenv();
     }
 }
@@ -65,6 +65,9 @@ fn set_env_from_server() {
     }
 }
 
+/// Process the .env file found between SCRIPT_FILENAME and DOCUMENT_ROOT, setting select OTEL_*
+/// variables found there into the process environment (OTEL_SERVICE_NAME,
+/// OTEL_RESOURCE_ATTRIBUTES, OTEL_SDK_DISABLED).
 fn process_dotenv() {
     if let Some(env_path) = find_dotenv() {
         tracing::debug!("Discovered .env path: {:?}", env_path);
@@ -121,8 +124,8 @@ fn process_dotenv() {
     }
 }
 
-// Find the nearest .env file starting from the script's directory, finishing at DOCUMENT_ROOT.
-// If DOCUMENT_ROOT is not set, it will only look in the script's directory.
+/// Find the nearest .env file starting from the script's directory, finishing at DOCUMENT_ROOT.
+/// If DOCUMENT_ROOT is not set, it will only look in the script's directory.
 fn find_dotenv() -> Option<PathBuf> {
     let script_filename = get_server_var("SCRIPT_FILENAME")?;
     let script_dir = Path::new(&script_filename).parent()?;
@@ -164,6 +167,7 @@ fn find_dotenv() -> Option<PathBuf> {
     }
 }
 
+/// Initialize the request handler, creating a root span if necessary.
 pub fn init() {
     tracing::debug!("RINIT::initializing request handler");
     unsafe {
@@ -226,6 +230,8 @@ pub fn init() {
     tracing::debug!("RINIT::request initialized");
 }
 
+/// Shutdown the request handler, closing the root span if it exists.
+/// Restore the environment variables to their original state.
 pub fn shutdown() {
     restore_env();
     let context_id = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take());

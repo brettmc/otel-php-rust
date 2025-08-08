@@ -126,7 +126,7 @@ pub fn get_module() -> Module {
     module.add_ini(config::ini::OTEL_LOG_FILE, "/dev/stderr".to_string(), Policy::All);
     module.add_ini(config::ini::OTEL_CLI_CREATE_ROOT_SPAN, false, Policy::All);
     module.add_ini(config::ini::OTEL_CLI_ENABLED, false, Policy::All);
-    module.add_ini(config::ini::OTEL_DOTENV_PER_REQUEST, false, Policy::All);
+    module.add_ini(config::ini::OTEL_ENV_DOTENV_ENABLED, false, Policy::All);
     module.add_ini(config::ini::OTEL_ENV_SET_FROM_SERVER, false, Policy::All);
     module.add_ini(config::ini::OTEL_AUTO_ENABLED, true, Policy::All);
     module.add_ini(config::ini::OTEL_AUTO_DISABLED_PLUGINS, "".to_string(), Policy::All);
