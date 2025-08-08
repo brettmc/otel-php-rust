@@ -61,7 +61,7 @@ fn set_env_from_server() {
     let otel_vars = get_server_vars_with_prefix("OTEL_");
     for (k, v) in otel_vars {
         unsafe { std::env::set_var(&k, &v) };
-        tracing::debug!("Set environment variable {}={}", k, v);
+        tracing::debug!("Set environment variable from $_SERVER: {}={}", k, v);
     }
 }
 
