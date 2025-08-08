@@ -21,7 +21,7 @@ OTEL_SDK_DISABLED=to-restore
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Backing up environment variables
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Backing up OTEL_* environment variables
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Discovered .env path: "%s/dotenv-restore/.env"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Set environment variable from .env OTEL_%s=%Sfrom-dotenv
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Set environment variable from .env OTEL_%s=%Sfrom-dotenv

@@ -435,8 +435,10 @@ pub fn is_disabled() -> bool {
 }
 
 fn backup_env() {
-    tracing::debug!("Backing up environment variables");
-    let env = env::vars().collect::<HashMap<_, _>>();
+    tracing::debug!("Backing up OTEL_* environment variables");
+    let env = env::vars()
+        .filter(|(k, _)| k.starts_with("OTEL_"))
+        .collect::<HashMap<_, _>>();
     let pid = std::process::id();
     ENV_BACKUP.lock().unwrap().insert(pid, env);
 }
@@ -447,7 +449,7 @@ fn restore_env() {
     if let Some(backup) = ENV_BACKUP.lock().unwrap().remove(&pid) {
         // Remove any new env vars not in the backup
         for (k, _) in env::vars() {
-            if !backup.contains_key(&k) {
+            if !backup.contains_key(&k) && k.starts_with("OTEL_") {
                 tracing::debug!("Removing added environment variable {}", k);
                 unsafe { env::remove_var(&k) };
             }

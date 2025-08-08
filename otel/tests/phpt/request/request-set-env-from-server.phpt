@@ -24,7 +24,7 @@ var_dump(getenv('MY_FOO'));
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Backing up environment variables%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Backing up OTEL_* environment variables%A
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Set environment variable from $_SERVER: OTEL_TRACES_EXPORTER=memory
 %A
 string(6) "memory"
