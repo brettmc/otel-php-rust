@@ -1,0 +1,31 @@
+--TEST--
+dotenv modified vars are restored on request shutdown
+--EXTENSIONS--
+otel
+--INI--
+otel.cli.enabled=On
+otel.env.dotenv.enabled=On
+otel.log.level=debug
+--ENV--
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
+OTEL_SERVICE_NAME=to-restore
+OTEL_RESOURCE_ATTRIBUTES=service.namespace=to-restore
+OTEL_SDK_DISABLED=to-restore
+--FILE--
+<?php
+//do nothing
+/*
+
+*/
+?>
+--EXPECTF--
+%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Backing up OTEL_* environment variables
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Discovered .env path: "%s/dotenv-restore/.env"
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Set environment variable from .env OTEL_%s=%Sfrom-dotenv
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Set environment variable from .env OTEL_%s=%Sfrom-dotenv
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Set environment variable from .env OTEL_%s=%Sfrom-dotenv
+%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=Restoring environment variables from backup
+%A

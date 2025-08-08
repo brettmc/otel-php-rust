@@ -2,7 +2,7 @@ PHP_ARG_ENABLE(otel, whether to enable otel, [ --enable-otel Enable otel])
 
 if test "$PHP_OTEL" != "no"; then
   AC_MSG_CHECKING([for libclang shared libraries])
-  # TODO: libclang must be >= v5
+  # TODO: libclang must be >= v9
   LIBCLANG_PATH=$(find /usr/lib /usr/lib64 /usr/local/lib /lib /opt/homebrew/lib -name "libclang.so*" 2>/dev/null | head -n1)
   if test -z "$LIBCLANG_PATH"; then
     AC_MSG_ERROR([libclang.so not found])

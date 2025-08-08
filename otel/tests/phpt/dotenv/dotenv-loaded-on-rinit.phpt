@@ -4,7 +4,7 @@ dotenv support enabled
 otel
 --INI--
 otel.cli.enabled=On
-otel.dotenv.per_request=On
+otel.env.dotenv.enabled=On
 otel.log.level=debug
 --ENV--
 OTEL_TRACES_EXPORTER=console
