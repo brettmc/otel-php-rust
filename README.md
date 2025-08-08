@@ -37,7 +37,7 @@ and OTLP exporting works as expected.
 
 ### PIE (PHP Installer for Extensions)
 
-Requires `llvm-dev`, `libclang-dev`, rust compiler and cargo.
+Requires `llvm-dev`, `libclang-dev` (at least 9.0), rust compiler and cargo.
 
 `php pie.phar install brettmc/otel-php-rust:<version>`
 
@@ -52,23 +52,16 @@ There's a bunch of logging from the extension and the underlying opentelemetry-r
 If you really want to see what's going on, set the log level to `trace` and you'll get a lot of logs.
 
 In PHP 7.x, logging to stdout/stderr during MSHUTDOWN doesn't work, so you will need to set `otel.log.file`
-to a file location if you want to see the logs.
+to a file location if you want to see logs from shutdown phase.
 
 ## SAPI support
 
+Tested against `cli-server`, `apache2handler`, `cgi-fcgi` and `cli`.
+
 ### `cli`
-http + grpc exporters work. Use .ini `otel.cli.create_root_span` to create a root span for this SAPI.
+Does not auto-create a root span by default, use .ini `otel.cli.create_root_span` to enable.
 
 This should cover cli-based PHP runtimes (roadrunner, react, etc.), but has only been tested against RoadRunner.
-
-### `cli-server`
-http + grpc exporter works. Creates root span on RINIT.
-
-### `apache2handler`
-As above
-
-### `cgi-fcgi`
-As above
 
 ## Features
 
@@ -86,7 +79,7 @@ As above
 * Support for shared hosting (ie one apache/fpm server with multiple sites), via `.env` files and `otel.dotenv.per_request` ini setting
 * Disabling of auto-instrumentation via `.ini` setting `otel.auto.disabled_plugins`
   - eg `otel.auto.disabled_plugins=laminas,psr18`
-* Configure OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES and OTEL_DISABLED via .env or environment variables (for multiple applications on the same host)
+* Configure OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES and OTEL_DISABLED via .env (for multiple applications on the same host, you can override the general server environment variables)
 
 ## Configuration
 
@@ -117,8 +110,9 @@ set in the environment (todo: could be relaxed to allow setting all OpenTelemetr
 
 By installing the extension and providing the basic [SDK configuration](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.46.0/specification/configuration/sdk-environment-variables.md#general-sdk-configuration)
 that opentelemetry expects, each HTTP request will generate an HTTP server root span. There are some initial
-auto-instrumentation plugins for some legacy frameworks, which will add some extra attributes to the root span.
-I've kept things very basic for now: one span per request.
+auto-instrumentation plugins for some legacy frameworks.
+
+I've kept things pretty basic for now: one span per request.
 
 ### Manual instrumentation
 
@@ -151,7 +145,7 @@ $scope->detach();
 
 ## Plugins
 
-Mostly the framework plugins hook in to routing mechanism of that framework, and update
+Mostly the framework plugins hook in to routing mechanism of that framework, update
 the root span's name to something more meaningful, and add some attributes.
 
 A couple of non-standard attributes are added if the data is available:
@@ -167,6 +161,8 @@ module, controller and action names.
 
 Hooks `Zend_Controller_Router_Interface::route`. Sets framework name, and uses the
 `Zend_Controller_Request_Abstract` to set module, controller and action names.
+
+Hooks some Zend_Db methods to create CLIENT spans for database queries.
 
 ### Psr-18
 
@@ -190,7 +186,7 @@ For example (untested):
 
 If you cannot modify vhost config, you can also use the `.env` file support described below.
 
-### No vhosts
+### No vhosts or multiple applications per vhost
 
 If you have multiple sites on a single host (for example each application is a subdirectory of the web root), you can
 use the `.env` file support to set the environment variables for each site. The extension will look for a `.env` file
@@ -214,3 +210,4 @@ for each application you want to disable observability for.
 
 - Context storage - otel-rust doesn't support storing non-simple values, and context keys are created at compile time.
 This will probably never work like opentelemetry-php.
+- It could use more interfaces to align with the official OpenTelemetry PHP API
