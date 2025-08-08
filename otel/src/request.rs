@@ -39,65 +39,85 @@ thread_local! {
 //backup mutating environment variables for request duration
 static ENV_BACKUP: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn process_dotenv() {
+pub fn init_environment() {
     let per_request_dotenv = ini_get::<bool>(config::ini::OTEL_DOTENV_PER_REQUEST);
+    let env_from_server = ini_get::<bool>(config::ini::OTEL_ENV_SET_FROM_SERVER);
+
+    if per_request_dotenv || env_from_server {
+        backup_env();
+    }
+    if env_from_server {
+        set_env_from_server();
+    }
     if per_request_dotenv {
-        if let Some(env_path) = find_dotenv() {
-            tracing::debug!("Discovered .env path: {:?}", env_path);
-            let mut service_name = None;
-            let mut resource_attributes = None;
-            let mut otel_disabled = None;
-            if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
-                for item in iter.flatten() {
-                    match item.0.as_str() {
-                        "OTEL_SERVICE_NAME" => service_name = Some(item.1),
-                        "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
-                        "OTEL_SDK_DISABLED" => otel_disabled = Some(item.1),
-                        _ => {}
-                    }
-                }
-                //now we _might_ have service name and resource attributes
-                let mut env = HashMap::new();
-                if let Some(service_name) = service_name {
-                    env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
-                }
-                if let Some(otel_disabled) = otel_disabled {
-                    env.insert("OTEL_SDK_DISABLED".to_string(), otel_disabled);
-                }
-                if let Some(resource_attributes) = resource_attributes {
-                    //merge with original env var, if it exists
-                    let mut merged = if let Some(existing) = std::env::var("OTEL_RESOURCE_ATTRIBUTES").ok() {
-                        parse_resource_attributes(&existing)
-                    } else {
-                        HashMap::new()
-                    };
+        process_dotenv();
+    }
+}
 
-                    // Overwrite with values from dotenv
-                    for (k, v) in parse_resource_attributes(&resource_attributes) {
-                        merged.insert(k, v);
-                    }
+/// set OTEL_* variables from $_SERVER into process environment
+/// This is useful for SAPI modules like Apache, where environment variables are set by SetEnv or
+/// similar directives, and are not available in the process environment by default.
+fn set_env_from_server() {
+    let otel_vars = get_server_vars_with_prefix("OTEL_");
+    for (k, v) in otel_vars {
+        unsafe { std::env::set_var(&k, &v) };
+        tracing::debug!("Set environment variable {}={}", k, v);
+    }
+}
 
-                    // Serialize back to comma-separated key=value pairs
-                    let merged_str = {
-                        let mut items: Vec<_> = merged.into_iter().collect();
-                        items.sort_by(|a, b| a.0.cmp(&b.0));
-                        items
-                            .into_iter()
-                            .map(|(k, v)| format!("{}={}", k, v))
-                            .collect::<Vec<_>>()
-                            .join(",")
-                    };
-
-                    env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), merged_str);
+fn process_dotenv() {
+    if let Some(env_path) = find_dotenv() {
+        tracing::debug!("Discovered .env path: {:?}", env_path);
+        let mut service_name = None;
+        let mut resource_attributes = None;
+        let mut otel_disabled = None;
+        if let Ok(iter) = dotenvy::from_path_iter(&env_path) {
+            for item in iter.flatten() {
+                match item.0.as_str() {
+                    "OTEL_SERVICE_NAME" => service_name = Some(item.1),
+                    "OTEL_RESOURCE_ATTRIBUTES" => resource_attributes = Some(item.1),
+                    "OTEL_SDK_DISABLED" => otel_disabled = Some(item.1),
+                    _ => {}
                 }
-                let modified_keys: Vec<String> = env.keys().cloned().collect();
-                backup_otel_env(&modified_keys);
-                set_request_dotenv(env);
-
             }
-        } else {
-            tracing::warn!("No .env file found between SCRIPT_FILENAME and DOCUMENT_ROOT");
+            //now we _might_ have service name and resource attributes
+            let mut env = HashMap::new();
+            if let Some(service_name) = service_name {
+                env.insert("OTEL_SERVICE_NAME".to_string(), service_name);
+            }
+            if let Some(otel_disabled) = otel_disabled {
+                env.insert("OTEL_SDK_DISABLED".to_string(), otel_disabled);
+            }
+            if let Some(resource_attributes) = resource_attributes {
+                //merge with original env var, if it exists
+                let mut merged = if let Some(existing) = std::env::var("OTEL_RESOURCE_ATTRIBUTES").ok() {
+                    parse_resource_attributes(&existing)
+                } else {
+                    HashMap::new()
+                };
+
+                // Overwrite with values from dotenv
+                for (k, v) in parse_resource_attributes(&resource_attributes) {
+                    merged.insert(k, v);
+                }
+
+                // Serialize back to comma-separated key=value pairs
+                let merged_str = {
+                    let mut items: Vec<_> = merged.into_iter().collect();
+                    items.sort_by(|a, b| a.0.cmp(&b.0));
+                    items
+                        .into_iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                };
+
+                env.insert("OTEL_RESOURCE_ATTRIBUTES".to_string(), merged_str);
+            }
+            set_request_dotenv(env);
         }
+    } else {
+        tracing::warn!("No .env file found between SCRIPT_FILENAME and DOCUMENT_ROOT");
     }
 }
 
@@ -207,7 +227,7 @@ pub fn init() {
 }
 
 pub fn shutdown() {
-    restore_otel_env();
+    restore_env();
     let context_id = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take());
     let is_tracing = context_id.is_some();
     if is_tracing {
@@ -303,6 +323,29 @@ fn get_request_server<'a>() -> anyhow::Result<&'a ZArr> {
     }
 }
 
+fn get_server_vars_with_prefix(prefix: &str) -> HashMap<String, String> {
+    get_request_server()
+        .ok()
+        .map(|server| {
+            server
+                .iter()
+                .filter_map(|(key, value)| {
+                    if let IterKey::ZStr(zstr) = key {
+                        if let Ok(key_str) = zstr.to_str() {
+                            if key_str.starts_with(prefix) {
+                                if let Some(value_str) = z_val_to_string(value) {
+                                    return Some((key_str.to_string(), value_str));
+                                }
+                            }
+                        }
+                    }
+                    None
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn get_server_var(key: &str) -> Option<String> {
     get_request_server()
         .ok()
@@ -373,7 +416,7 @@ fn get_propagated_context() -> Context {
 pub fn set_request_dotenv(env: HashMap<String, String>) {
     for (k, v) in env {
         unsafe { std::env::set_var(&k, &v) };
-        tracing::debug!("Set environment variable {}={}", k, v);
+        tracing::debug!("Set environment variable from .env {}={}", k, v);
     }
 }
 
@@ -385,27 +428,27 @@ pub fn is_disabled() -> bool {
     }
 }
 
-/// backup OTEL_* variables that are about to be modified from .env file
-pub fn backup_otel_env(keys: &[String]) {
-    let backup = env::vars()
-        .filter(|(k, _)| keys.contains(k))
-        .collect::<HashMap<_, _>>();
-    tracing::debug!("Backing up environment variables: {:?}", backup);
+fn backup_env() {
+    tracing::debug!("Backing up environment variables");
+    let env = env::vars().collect::<HashMap<_, _>>();
     let pid = std::process::id();
-    ENV_BACKUP.lock().unwrap().insert(pid, backup);
+    ENV_BACKUP.lock().unwrap().insert(pid, env);
 }
 
-pub fn restore_otel_env() {
-    let per_request_dotenv = ini_get::<bool>(config::ini::OTEL_DOTENV_PER_REQUEST);
-    if !per_request_dotenv {
-        return;
-    }
+fn restore_env() {
     tracing::debug!("Restoring environment variables from backup");
     let pid = std::process::id();
     if let Some(backup) = ENV_BACKUP.lock().unwrap().remove(&pid) {
+        // Remove any new env vars not in the backup
+        for (k, _) in env::vars() {
+            if !backup.contains_key(&k) {
+                tracing::debug!("Removing added environment variable {}", k);
+                unsafe { env::remove_var(&k) };
+            }
+        }
+        // Restore all backed up vars
         for (k, v) in backup {
-            tracing::debug!("Restoring environment variable {}={}", k, v);
-            unsafe{ env::set_var(k, v) };
+            unsafe { env::set_var(k, v) };
         }
     }
 }

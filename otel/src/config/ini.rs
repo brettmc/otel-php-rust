@@ -5,3 +5,4 @@ pub const OTEL_CLI_ENABLED: &str = "otel.cli.enabled";
 pub const OTEL_DOTENV_PER_REQUEST: &str = "otel.dotenv.per_request";
 pub const OTEL_AUTO_ENABLED: &str = "otel.auto.enabled";
 pub const OTEL_AUTO_DISABLED_PLUGINS: &str = "otel.auto.disabled_plugins";
+pub const OTEL_ENV_SET_FROM_SERVER: &str = "otel.env.set_from_server";
