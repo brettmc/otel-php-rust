@@ -189,10 +189,16 @@ If you cannot modify vhost config, you can also use the `.env` file support desc
 ### No vhosts or multiple applications per vhost
 
 If you have multiple sites on a single host (for example each application is a subdirectory of the web root), you can
-use the `.env` file support to set the environment variables for each site. The extension will look for a `.env` file
-for each request in the directory of the processed .php file (eg `/var/www/site1/public/index.php` -> `/var/www/site1/public/.env`). The .env files will be
-checked for `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` variables, and if they are set, they will be used to
-configure the tracer.
+use the `.env` file support to set the environment variables for each site.
+
+During request startup (RINIT), the extension will look for a `.env` file in the directory of the
+processed .php file (eg `/var/www/site1/public/index.php` -> `/var/www/site1/public/.env`),
+and traverse up until `DOCUMENT_ROOT` is reached. If a .env file is found, it will be checked for
+`OTEL_SDK_DISABLED`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` variables, and if they are set,
+they will be set in the current environment, and the original values restored at RSHUTDOWN.
+
+NB that the  modified environment variables may not be reflected in `$_SERVER`, but should be visible via
+`getenv()`.
 
 ### Opt-in or opt-out
 
