@@ -2,6 +2,12 @@
 Test laminas 200 ok
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 70100) {
+    die('skip requires PHP 7.1 or higher');
+}
+?>
 --FILE--
 <?php
 include dirname(__DIR__, 2) . '/run-server.php';
@@ -16,11 +22,8 @@ run_server('auto/laminas/public/index.php', $options);
 ?>
 --EXPECTF--
 ==== Response ====
-%A
-        <title>Laminas MVC Skeleton</title>
-%A
+%A<title>Laminas MVC Skeleton</title>%A
 ==== Server Output ====
-%A
 Spans
 Resource
 %A
@@ -61,5 +64,4 @@ Span #0
 		 ->  php.framework.name: String(Static("laminas"))
 		 ->  php.framework.controller.name: String(Owned("Application\\Controller\\IndexController"))
 		 ->  php.framework.action.name: String(Owned("index"))
-		 ->  http.response.status_code: I64(200)
-%A
+		 ->  http.response.status_code: I64(200)%A

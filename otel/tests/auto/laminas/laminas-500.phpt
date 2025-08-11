@@ -2,6 +2,12 @@
 Test laminas 500 error
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 70100) {
+    die('skip requires PHP 7.1 or higher');
+}
+?>
 --FILE--
 <?php
 include dirname(__DIR__, 2) . '/run-server.php';
@@ -19,7 +25,6 @@ Warning: file_get_contents(%stick/tick): failed to open stream: HTTP request fai
  in %s
 ==== Response ====
 ==== Server Output ====
-%A
 Spans
 Resource
 %A
@@ -69,4 +74,3 @@ Span #0
 		 ->  php.framework.controller.name: String(Owned("Application\\Controller\\ThrowsErrorController"))
 		 ->  php.framework.action.name: String(Owned("boom"))
 		 ->  http.response.status_code: I64(500)
-%A
