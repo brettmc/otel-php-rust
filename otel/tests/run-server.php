@@ -1,6 +1,10 @@
 <?php
 
-function run_server(string $file, array $options): void {
+/**
+ * Run the PHP built-in web server in a shell, send an HTTP request to it.
+ * The server output and response are captured and printed.
+ */
+function run_server(string $file, array $options, string $path = ''): void {
     $host = '127.0.0.1';
     $port = 8080;
     $docRoot = __DIR__;
@@ -23,7 +27,7 @@ function run_server(string $file, array $options): void {
     usleep(500000); // Wait for server to start
 
     // Make an HTTP request to the server
-    $url = "http://$host:$port/";
+    $url = "http://$host:$port/$path";
 
     // Create context with options
     $context = stream_context_create($options);

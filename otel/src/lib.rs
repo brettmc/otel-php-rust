@@ -80,6 +80,7 @@ pub mod config{
     pub mod ini;
     pub mod trace_attributes;
 }
+pub mod error;
 pub mod globals;
 pub mod request;
 pub mod logging;

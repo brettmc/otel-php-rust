@@ -12,6 +12,9 @@ test = []
 name = "otel"
 crate-type = ["cdylib"]
 
+[profile.release]
+strip = "debuginfo"
+
 [dependencies]
 phper = "0.17.0"
 #phper = { git = "https://github.com/phper-framework/phper.git", rev = "ba3e1d4" }

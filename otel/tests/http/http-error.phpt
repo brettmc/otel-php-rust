@@ -1,11 +1,5 @@
 --TEST--
-Test HTTP span with POST
---SKIPIF--
-<?php
-if (PHP_SAPI !== 'cli') {
-    die('skip: Not running in CLI mode');
-}
-?>
+Test HTTP span with 500 error response
 --EXTENSIONS--
 otel
 --FILE--
@@ -14,15 +8,16 @@ include dirname(__DIR__) . '/run-server.php';
 
 $options = [
     "http" => [
-        "method" => "POST",
+        "method" => "GET",
     ]
 ];
 
-run_server('http/server-post.php', $options);
+run_server('http/server-error.php', $options);
 ?>
 --EXPECTF--
-==== Response ====
-string(4) "POST"
+Warning: %S HTTP request failed! HTTP/%s 500 Internal Server Error
+ in %s/run-server.php on line %d
+==== Response ====%A
 ==== Server Output ====%A
 Spans
 Resource
@@ -30,7 +25,7 @@ Resource
 Span #0
 	Instrumentation Scope
 %A
-	Name        : POST
+	Name        : GET
 	TraceId     : %s
 	SpanId      : %s
 	TraceFlags  : TraceFlags(1)
@@ -38,8 +33,8 @@ Span #0
 	Kind        : Server
 	Start time: %s
 	End time: %s
-	Status: Unset
+	Status: Error { description: "" }
 	Attributes:
 		 ->  url.full: String(Owned("/"))
-		 ->  http.request.method: String(Owned("POST"))
-		 ->  http.response.status_code: I64(201)%A
+		 ->  http.request.method: String(Owned("GET"))
+		 ->  http.response.status_code: I64(500)%A

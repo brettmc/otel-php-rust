@@ -251,6 +251,10 @@ pub fn shutdown() {
             if is_http_request {
                 let response_code = get_response_status_code();
                 span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
+                if response_code >= 500 {
+                    // https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+                    span.set_status(opentelemetry::trace::Status::error(""));
+                }
             }
             span.end();
             tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
