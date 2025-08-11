@@ -35,7 +35,7 @@ Span #0
 	Kind        : Internal
 	Start time: %s
 	End time: %s
-	Status: Unset
+	Status: Error { description: "error-router-no-match" }
 	Attributes:
 		 ->  code.function.name: String(Owned("Laminas\\Mvc\\Application::run"))
 		 ->  code.file.path: String(Owned("%s/laminas/laminas-mvc/src/Application.php"))

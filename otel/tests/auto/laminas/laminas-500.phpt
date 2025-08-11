@@ -35,7 +35,7 @@ Span #0
 	Kind        : Internal
 	Start time: %s
 	End time: %s
-	Status: Unset
+	Status: Error { description: "" }
 	Attributes:
 		 ->  code.function.name: String(Owned("Laminas\\Mvc\\Application::run"))
 		 ->  code.file.path: String(Owned("%s/laminas/laminas-mvc/src/Application.php"))
@@ -61,7 +61,7 @@ Span #0
 	Kind        : Server
 	Start time: %s
 	End time: %s
-	Status: Unset
+	Status: Error { description: "" }
 	Attributes:
 		 ->  url.full: String(Owned("/tick/tick"))
 		 ->  http.request.method: String(Owned("GET"))

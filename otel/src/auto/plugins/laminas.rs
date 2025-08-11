@@ -18,6 +18,7 @@ use opentelemetry::{
     Context,
     KeyValue,
     trace::{
+        Status,
         TraceContextExt,
         Tracer,
         TracerProvider,
@@ -141,6 +142,7 @@ impl LaminasCompleteRequestHandler {
         //get the first argument from exec_data, which is an MvcEvent
         let exec_data_ref = unsafe { &mut *exec_data };
         let mvc_event_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
+        // see https://opentelemetry.io/docs/specs/otel/trace/exceptions/#recording-an-exception
         if let Some(mvc_event_obj) = mvc_event_zval.as_mut_z_obj() {
             let is_error = mvc_event_obj
                 .call("isError", [])
@@ -159,6 +161,7 @@ impl LaminasCompleteRequestHandler {
                     tracing::error!("Auto::Laminas::pre (MvcEvent::completeRequest) - exception found");
                     let attributes = crate::error::php_exception_to_attributes(&mut exception.unwrap());
                     span_ref.add_event("exception", attributes);
+                    span_ref.set_status(Status::error(""));
                 } else {
                     let error_str = mvc_event_obj
                         .call("getError", [])
@@ -168,7 +171,9 @@ impl LaminasCompleteRequestHandler {
 
                     let error = StringError(error_str.to_string());
                     span_ref.record_error(&error);
+                    span_ref.set_status(Status::error(error_str));
                 }
+
             }
         }
     }
