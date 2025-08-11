@@ -21,7 +21,7 @@ $options = [
 run_server('auto/laminas/public/index.php', $options, 'tick/tick');
 ?>
 --EXPECTF--
-Warning: file_get_contents(%stick/tick): failed to open stream: HTTP request failed! HTTP/%s 500 Internal Server Error
+Warning: %s HTTP request failed! HTTP/%s 500 Internal Server Error
  in %s
 ==== Response ====
 ==== Server Output ====%A

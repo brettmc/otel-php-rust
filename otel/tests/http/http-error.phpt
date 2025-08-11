@@ -15,9 +15,9 @@ $options = [
 run_server('http/server-error.php', $options);
 ?>
 --EXPECTF--
-Warning: file_get_contents(%s): failed to open stream: HTTP request failed! HTTP/%s 500 Internal Server Error
+Warning: %S HTTP request failed! HTTP/%s 500 Internal Server Error
  in %s/run-server.php on line %d
-==== Response ====
+==== Response ====%A
 ==== Server Output ====%A
 Spans
 Resource

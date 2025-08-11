@@ -21,7 +21,7 @@ $options = [
 run_server('auto/laminas/public/index.php', $options, 'does-not-exist');
 ?>
 --EXPECTF--
-Warning: file_get_contents(%s: failed to open stream: HTTP request failed! HTTP/%s 404 Not Found
+Warning: %s HTTP request failed! HTTP/%s 404 Not Found
  in %s
 ==== Response ====
 ==== Server Output ====%A
