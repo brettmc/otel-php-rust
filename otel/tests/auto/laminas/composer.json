@@ -1,0 +1,59 @@
+{
+    "name": "laminas/laminas-mvc-skeleton",
+    "description": "Laminas MVC Skeleton Application",
+    "type": "project",
+    "license": "BSD-3-Clause",
+    "keywords": [
+        "laminas",
+        "mvc",
+        "skeleton",
+        "framework"
+    ],
+    "require": {
+        "php": "^7 || ^8",
+        "laminas/laminas-component-installer": "^2.8 || ^3",
+        "laminas/laminas-mvc": "^2.7 || ^3",
+        "laminas/laminas-modulemanager": "^2 || ^3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Application\\": "module/Application/src/"
+        }
+    },
+    "scripts": {
+        "clear-config-cache": "php bin/clear-config-cache.php",
+        "cs-check": "vendor/bin/phpcs",
+        "cs-fix": "vendor/bin/phpcbf",
+        "post-create-project-cmd": [
+            "php bin/update-gitignore.php",
+            "php -r 'if (file_exists(\"bin/remove-package-artifacts.php\")) include \"bin/remove-package-artifacts.php\";'"
+        ],
+        "post-install-cmd": "@clear-config-cache",
+        "post-update-cmd": "@clear-config-cache",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "php -S 0.0.0.0:8080 -t public"
+        ],
+        "test": "vendor/bin/phpunit",
+        "static-analysis": "vendor/bin/psalm --stats"
+    },
+    "scripts-descriptions": {
+        "clear-config-cache": "Clears merged config cache. Required for config changes to be applied.",
+        "cs-check": "Run coding standards checks.",
+        "cs-fix": "Automatically fix coding standard issues.",
+        "development-disable": "Disable development mode.",
+        "development-enable": "Enable development mode.",
+        "development-status": "Detail whether or not the application is in development mode.",
+        "serve": "Start the built-in PHP web server and serve the application.",
+        "static-analysis": "Run static analysis tool Psalm.",
+        "test": "Run unit tests."
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "laminas/laminas-component-installer": true,
+            "laminas/laminas-skeleton-installer": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}
