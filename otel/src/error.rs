@@ -38,22 +38,3 @@ pub fn php_exception_to_attributes(exception: &mut ZObj) -> Vec<KeyValue> {
     }
     attributes
 }
-
-
-//if let Some(mut exception_obj) = exception {
-//                         tracing::error!("Auto::Laminas::pre (MvcEvent::completeRequest) - exception found: {:?}", exception_obj);
-//                         //rather than record_error, which is limited, use span_ref.add_event with extra attributes
-//                         let attributes = vec![
-//                             KeyValue::new("exception.message", exception_obj.call("getMessage", [])
-//                                 .ok()
-//                                 .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-//                                 .unwrap_or_else(|| "Unknown exception".to_string())
-//                             ),
-//                             KeyValue::new("exception.type", exception_obj.get_class().get_name().to_str().unwrap_or("Unknown").to_owned()),
-//                             KeyValue::new("exception.stacktrace", exception_obj.call("getTraceAsString", [])
-//                                 .ok()
-//                                 .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-//                                 .unwrap_or_else(|| "No stack trace".to_string())),
-//                         ];
-//                         span_ref.add_event("exception", attributes);
-//                     }

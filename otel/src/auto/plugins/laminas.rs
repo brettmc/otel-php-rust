@@ -107,14 +107,7 @@ impl LaminasApplicationRunHandler {
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
-        let context = opentelemetry::Context::current();
-        let span_ref = context.span();
-        if let Some(exception) = exception {
-            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
-                span_ref.record_error(&throwable);
-            }
-        }
-        take_guard(exec_data); //immediately detach the scope guard
+        take_guard(exec_data);
     }
 }
 
@@ -158,7 +151,7 @@ impl LaminasCompleteRequestHandler {
                         .ok()
                         .and_then(|mut zv| zv.as_mut_z_obj().map(|obj| obj.to_ref_owned()));
                 if exception.is_some() {
-                    tracing::error!("Auto::Laminas::pre (MvcEvent::completeRequest) - exception found");
+                    tracing::debug!("Auto::Laminas::pre (MvcEvent::completeRequest) - exception found");
                     let attributes = crate::error::php_exception_to_attributes(&mut exception.unwrap());
                     span_ref.add_event("exception", attributes);
                     span_ref.set_status(Status::error(""));
