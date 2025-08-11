@@ -29,7 +29,6 @@ use std::{
 };
 use phper::{
     alloc::ToRefOwned,
-    errors::ThrowObject,
     objects::ZObj,
     values::{
         ExecuteData,
@@ -105,7 +104,7 @@ impl LaminasApplicationRunHandler {
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
-        exception: Option<&mut ZObj>
+        _exception: Option<&mut ZObj>
     ) {
         take_guard(exec_data);
     }
