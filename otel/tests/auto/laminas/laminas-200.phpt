@@ -23,7 +23,7 @@ run_server('auto/laminas/public/index.php', $options);
 --EXPECTF--
 ==== Response ====
 %A<title>Laminas MVC Skeleton</title>%A
-==== Server Output ====
+==== Server Output ====%A
 Spans
 Resource
 %A

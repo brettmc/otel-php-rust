@@ -24,7 +24,7 @@ run_server('auto/laminas/public/index.php', $options, 'does-not-exist');
 Warning: file_get_contents(%s: failed to open stream: HTTP request failed! HTTP/%s 404 Not Found
  in %s
 ==== Response ====
-==== Server Output ====
+==== Server Output ====%A
 Spans
 Resource
 %A
@@ -69,4 +69,4 @@ Span #0
 		 ->  url.full: String(Owned("/does-not-exist"))
 		 ->  http.request.method: String(Owned("GET"))
 		 ->  php.framework.name: String(Static("laminas"))
-		 ->  http.response.status_code: I64(404)
+		 ->  http.response.status_code: I64(404)%A

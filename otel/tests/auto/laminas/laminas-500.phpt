@@ -24,7 +24,7 @@ run_server('auto/laminas/public/index.php', $options, 'tick/tick');
 Warning: file_get_contents(%stick/tick): failed to open stream: HTTP request failed! HTTP/%s 500 Internal Server Error
  in %s
 ==== Response ====
-==== Server Output ====
+==== Server Output ====%A
 Spans
 Resource
 %A
@@ -73,4 +73,4 @@ Span #0
 		 ->  php.framework.name: String(Static("laminas"))
 		 ->  php.framework.controller.name: String(Owned("Application\\Controller\\ThrowsErrorController"))
 		 ->  php.framework.action.name: String(Owned("boom"))
-		 ->  http.response.status_code: I64(500)
+		 ->  http.response.status_code: I64(500)%A
