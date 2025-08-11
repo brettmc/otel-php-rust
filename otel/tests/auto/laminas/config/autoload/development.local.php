@@ -1,1 +1,0 @@
-development.local.php.dist
