@@ -31,6 +31,7 @@ ARG PHP_VERSION=8.4
 RUN apt-get update \
   && apt-get install -y \
     php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-curl \
     php${PHP_VERSION}-cli-dbgsym \
     php${PHP_VERSION}-common-dbgsym \
   && apt-get install -y php${PHP_VERSION}-dev \
