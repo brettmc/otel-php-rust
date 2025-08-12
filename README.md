@@ -169,6 +169,8 @@ module, controller and action names.
 Hooks `Zend_Controller_Router_Interface::route`. Sets framework name, and uses the
 `Zend_Controller_Request_Abstract` to set module, controller and action names.
 
+Hooks some Zend_Db methods to create CLIENT spans for database queries.
+
 ### Psr-18
 
 Hooks `Psr\Http\Client\ClientInterface::sendRequest`, creates a CLIENT span and
@@ -220,5 +222,5 @@ for each application you want to disable observability for.
 ## What doesn't work or isn't implemented?
 
 - Context storage - otel-rust doesn't support storing non-simple values, and context keys are created at compile time.
-  This will probably never work like opentelemetry-php.
+ This will probably never work like opentelemetry-php.
 - It could use more interfaces to align with the official OpenTelemetry PHP API

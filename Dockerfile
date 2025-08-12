@@ -31,8 +31,11 @@ ARG PHP_VERSION=8.4
 RUN apt-get update \
   && apt-get install -y \
     php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-curl \
     php${PHP_VERSION}-cli-dbgsym \
     php${PHP_VERSION}-common-dbgsym \
+    php${PHP_VERSION}-sqlite3 \
+    sqlite3 \
   && apt-get install -y php${PHP_VERSION}-dev \
   && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so
 
