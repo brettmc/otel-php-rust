@@ -282,12 +282,7 @@ impl Zf1StatementPrepareHandler {
                 .unwrap_or_default();
             context.span().set_status(opentelemetry::trace::Status::error(message));
         }
-        if let Some(_guard) = take_guard(exec_data) {
-            //do nothing, _guard will go out of scope at end of function
-        } else {
-            tracing::warn!("Statement::execute No context guard found for post callback");
-            return;
-        }
+        take_guard(exec_data);
     }
 }
 
@@ -337,11 +332,6 @@ impl Zf1StatementExecuteHandler {
                 context.span().record_error(&throwable);
             }
         }
-        if let Some(_guard) = take_guard(exec_data) {
-            //do nothing, _guard will go out of scope at end of function
-        } else {
-            tracing::warn!("Statement::execute No context guard found for post callback");
-            return;
-        }
+        take_guard(exec_data);
     }
 }

@@ -4,7 +4,6 @@ Test zf1 200 ok
 otel
 --FILE--
 <?php
-// TODO this is a placeholder for Zend_Db tests, which are not yet implemented
 include dirname(__DIR__, 2) . '/run-server.php';
 
 $options = [
