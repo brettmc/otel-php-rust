@@ -7,14 +7,8 @@ class IndexController extends Zend_Controller_Action
         echo "IndexController::indexAction";
     }
 
-    public function fooAction()
+    public function explodeAction()
     {
-        echo "IndexController::fooAction";
-        $request = $this->getRequest();
-        $controller = $request->getControllerName();
-        $module = $request->getModuleName();
-        echo 'Controller: ' . htmlspecialchars($controller) . '<br>';
-        echo 'Module: ' . htmlspecialchars($module) . '<br>';
-        var_dump(get_class($request));
+        throw new \RuntimeException('something bad happened');
     }
 }
