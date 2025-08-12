@@ -80,6 +80,7 @@ pub mod config{
     pub mod ini;
     pub mod trace_attributes;
 }
+pub mod error;
 pub mod globals;
 pub mod request;
 pub mod logging;
@@ -126,7 +127,8 @@ pub fn get_module() -> Module {
     module.add_ini(config::ini::OTEL_LOG_FILE, "/dev/stderr".to_string(), Policy::All);
     module.add_ini(config::ini::OTEL_CLI_CREATE_ROOT_SPAN, false, Policy::All);
     module.add_ini(config::ini::OTEL_CLI_ENABLED, false, Policy::All);
-    module.add_ini(config::ini::OTEL_DOTENV_PER_REQUEST, false, Policy::All);
+    module.add_ini(config::ini::OTEL_ENV_DOTENV_ENABLED, false, Policy::All);
+    module.add_ini(config::ini::OTEL_ENV_SET_FROM_SERVER, false, Policy::All);
     module.add_ini(config::ini::OTEL_AUTO_ENABLED, true, Policy::All);
     module.add_ini(config::ini::OTEL_AUTO_DISABLED_PLUGINS, "".to_string(), Policy::All);
     //which auto-instrumentation mechanism is enabled
@@ -217,7 +219,7 @@ pub fn get_module() -> Module {
         }
         logging::init_once(); //we maybe need to initialize logging for each worker (apache, fpm)
         tracing::debug!("OpenTelemetry::RINIT");
-        request::process_dotenv();
+        request::init_environment();
 
         if request::is_disabled() {
             tracing::debug!("OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization");

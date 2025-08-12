@@ -84,20 +84,27 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc.), but has only
 ## Configuration
 
 ### .ini
-| Name | Default        | Description |
-| ---- |----------------| ----------- |
-| otel.log.level | error          | Log level: error, warn, debug, trace |
-| otel.log.file | /dev/stderr    | Log destination: file or stdout/stderr |
-| otel.cli.create_root_span | false          | Whether to create a root span for CLI requests |
-| otel.cli.enabled | false          | Whether to enable OpenTelemetry for CLI requests |
-| otel.dotenv.per_request | false          | Whether to load .env files per request |
-| otel.auto.enabled | true | Auto-instrumentation enabled |
+| Name                       | Default        | Description |
+|----------------------------|----------------| ----------- |
+| otel.log.level             | error          | Log level: error, warn, debug, trace |
+| otel.log.file              | /dev/stderr    | Log destination: file or stdout/stderr |
+| otel.cli.create_root_span  | false          | Whether to create a root span for CLI requests |
+| otel.cli.enabled           | false          | Whether to enable OpenTelemetry for CLI requests |
+| otel.env.set_from_server | false | Whether to set OTEL_* environment variables into the environment |
+| otel.env.dotenv.enabled    | false          | Whether to load .env files per request |
+| otel.auto.enabled          | true | Auto-instrumentation enabled |
 | otel.auto.disabled_plugins | _empty string_ | A list of auto-instrumentation plugins to disable, comma-separated |
+
+If either `otel.env.set_from_server` or `otel.env.dotenv.enabled` is set to true, the extension will back up the current
+environment variables on RINIT, and restore them on RSHUTDOWN.
 
 ### Environment variables
 
 All official OpenTelemetry [SDK configuration](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.46.0/specification/configuration/sdk-environment-variables.md#general-sdk-configuration)
 environment variables understood by [opentelemetry-rust](https://github.com/open-telemetry/opentelemetry-rust).
+
+If variables are not set in the process environment (eg via apache [SetEnv](https://httpd.apache.org/docs/current/env.html)),
+then set `otel.env.set_from_server` via php.ini, and `OTEL_*` variables from `$_SERVER` will be set in the environment.
 
 ### .env files
 
@@ -215,5 +222,5 @@ for each application you want to disable observability for.
 ## What doesn't work or isn't implemented?
 
 - Context storage - otel-rust doesn't support storing non-simple values, and context keys are created at compile time.
-This will probably never work like opentelemetry-php.
+ This will probably never work like opentelemetry-php.
 - It could use more interfaces to align with the official OpenTelemetry PHP API

@@ -3,7 +3,7 @@ disable otel for request via OTEL_SDK_DISABLED .env and try to create spans
 --EXTENSIONS--
 otel
 --INI--
-otel.dotenv.per_request=On
+otel.env.dotenv.enabled=On
 otel.cli.enabled=On
 otel.log.level=debug
 --ENV--

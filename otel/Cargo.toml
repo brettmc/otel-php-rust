@@ -1,6 +1,6 @@
 [package]
 name = "otel"
-version = "0.10.0"
+version = "0.12.0"
 edition = "2024"
 publish = false
 build = "build.rs"
@@ -11,6 +11,9 @@ test = []
 [lib]
 name = "otel"
 crate-type = ["cdylib"]
+
+[profile.release]
+strip = "debuginfo"
 
 [dependencies]
 phper = "0.17.0"

@@ -3,7 +3,7 @@ disable otel via OTEL_SDK_DISABLED in .env file is more powerful than env
 --EXTENSIONS--
 otel
 --INI--
-otel.dotenv.per_request=On
+otel.env.dotenv.enabled=On
 otel.cli.enabled=On
 otel.log.level=debug
 --ENV--

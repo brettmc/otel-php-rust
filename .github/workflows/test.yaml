@@ -42,6 +42,12 @@ jobs:
         run: |
           pushd . && cd tests/auto/zf1 && composer update && popd
 
+      - name: Install dependencies (7.1+)
+        working-directory: otel
+        if: matrix.php-version != '7.0'
+        run: |
+          pushd . && cd tests/auto/laminas && composer update && popd
+
       - name: Install dependencies (7.2+)
         working-directory: otel
         if: matrix.php-version != '7.0' && matrix.php-version != '7.1'

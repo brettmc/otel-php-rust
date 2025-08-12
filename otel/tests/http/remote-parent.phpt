@@ -10,7 +10,7 @@ if (PHP_SAPI !== 'cli') {
 otel
 --FILE--
 <?php
-include 'run-server.php';
+include dirname(__DIR__) . '/run-server.php';
 
 $options = [
     "http" => [
@@ -19,7 +19,7 @@ $options = [
     ]
 ];
 
-run_server('server-remote-parent.php', $options);
+run_server('http/server-remote-parent.php', $options);
 ?>
 --EXPECTF--
 ==== Response ====
