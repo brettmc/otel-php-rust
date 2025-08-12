@@ -240,3 +240,9 @@ pub fn take_guard(exec_data: *mut ExecuteData) -> Option<ContextGuard> {
     let key = exec_data as *const ExecuteData as usize;
     CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().remove(&key))
 }
+
+pub fn clear_context_storage() {
+    CONTEXT_STORAGE.with(|storage| storage.borrow_mut().clear());
+    GUARD_STACK.with(|stack| stack.borrow_mut().clear());
+    CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().clear());
+}

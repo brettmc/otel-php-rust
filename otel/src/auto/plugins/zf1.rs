@@ -25,7 +25,7 @@ use std::{
 };
 use phper::{
     alloc::ToRefOwned,
-    errors::ThrowObject,
+    errors::{ThrowObject},
     objects::ZObj,
     values::{
         ExecuteData,
@@ -178,10 +178,14 @@ impl Zf1SendResponseHandler {
         _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
-        tracing::debug!("Auto::Zf1::post (Zend_Controller_Request_Abstract::sendResponse)");
+        tracing::debug!("Auto::Zf1::post (Zend_Controller_Response_Abstract::sendResponse)");
 
         let exec_data_ref = unsafe { &mut *exec_data };
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
+            let http_response_code = this_obj.call("getHttpResponseCode", [])
+                .ok()
+                .and_then(|zv| zv.as_long())
+                .unwrap_or(200);
             let is_exception = this_obj.call("isException", [])
                 .ok()
                 .and_then(|zv| zv.as_bool())
@@ -211,7 +215,9 @@ impl Zf1SendResponseHandler {
                             .unwrap_or(status_description);
                     }
                 }
-                ctx.span().set_status(opentelemetry::trace::Status::error(status_description));
+                if http_response_code >= 500 {
+                    ctx.span().set_status(opentelemetry::trace::Status::error(status_description));
+                }
             }
         }
     }
@@ -267,10 +273,14 @@ impl Zf1StatementPrepareHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
-                let context = opentelemetry::Context::current();
-                context.span().record_error(&throwable);
-            }
+            let attributes = crate::error::php_exception_to_attributes(exception);
+            let context = opentelemetry::Context::current();
+            context.span().add_event("exception", attributes);
+            let message = exception.call("getMessage", [])
+                .ok()
+                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
+                .unwrap_or_default();
+            context.span().set_status(opentelemetry::trace::Status::error(message));
         }
         if let Some(_guard) = take_guard(exec_data) {
             //do nothing, _guard will go out of scope at end of function

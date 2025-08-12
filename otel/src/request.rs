@@ -28,6 +28,7 @@ use opentelemetry_semantic_conventions as SemConv;
 use crate::{
     config,
     context::storage,
+    error::php_error_to_attributes,
     trace::{local_root_span, tracer_provider},
     util::{get_sapi_module_name},
 };
@@ -252,6 +253,16 @@ pub fn shutdown() {
                 let response_code = get_response_status_code();
                 span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
                 if response_code >= 500 {
+                    let mut func = ZVal::from("error_get_last");
+                    let mut args: Vec<ZVal> = Vec::new();
+                    let error = ZVal::call(&mut func, &mut args).ok();
+                    if let Some(error) = error {
+                        if error.get_type_info().is_array() {
+                            tracing::debug!("RSHUTDOWN::HTTP error detected: {:?}", error);
+                            let attributes = php_error_to_attributes(&error);
+                            span.add_event("exception", attributes);
+                        }
+                    }
                     // https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
                     span.set_status(opentelemetry::trace::Status::error(""));
                 }
@@ -278,6 +289,7 @@ pub fn shutdown() {
     } else {
         tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
     }
+    storage::clear_context_storage();
 }
 
 pub fn get_request_details() -> RequestDetails {
