@@ -34,6 +34,8 @@ RUN apt-get update \
     php${PHP_VERSION}-curl \
     php${PHP_VERSION}-cli-dbgsym \
     php${PHP_VERSION}-common-dbgsym \
+    php${PHP_VERSION}-sqlite3 \
+    sqlite3 \
   && apt-get install -y php${PHP_VERSION}-dev \
   && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so
 
