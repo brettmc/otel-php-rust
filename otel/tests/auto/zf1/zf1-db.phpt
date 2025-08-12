@@ -50,7 +50,7 @@ var_dump($execute_span['attributes']);
 var_dump($prepare_span['attributes']);
 ?>
 --EXPECTF--
-string(21) "Zend_Db_Statement_Pdo"
+%Astring(21) "Zend_Db_Statement_Pdo"
 array(3) {
   ["code.function.name"]=>
   string(26) "Zend_Db_Statement::execute"
