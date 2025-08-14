@@ -5,7 +5,7 @@ otel
 --ENV--
 OTEL_TRACES_EXPORTER=none
 --INI--
-otel.log.level="trace"
+otel.log.level=debug
 otel.log.file="/dev/stdout"
 otel.cli.enabled=1
 --FILE--

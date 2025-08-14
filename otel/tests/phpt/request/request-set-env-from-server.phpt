@@ -8,7 +8,7 @@ OTEL_SDK_DISABLED=true
 OTEL_SERVICE_NAME=php-test
 MY_FOO=bar
 --INI--
-otel.log.level="trace"
+otel.log.level=debug
 otel.log.file="/dev/stdout"
 otel.env.set_from_server=On
 otel.cli.enabled=On
