@@ -245,7 +245,7 @@ impl Handler for Zf1StatementPrepareHandler {
 
 impl Zf1StatementPrepareHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1");
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1.db");
         let exec_data_ref = unsafe {&mut *exec_data};
         let mut attributes = get_default_attributes(exec_data_ref);
         let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
@@ -308,7 +308,7 @@ impl Handler for Zf1StatementExecuteHandler {
 
 impl Zf1StatementExecuteHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1");
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1.db");
         let exec_data_ref = unsafe { &*exec_data };
         let attributes = get_default_attributes(exec_data_ref);
         let name = "Statement::execute".to_string();

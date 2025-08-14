@@ -21,6 +21,7 @@ pub struct HandlerCallbacks {
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData) + Send + Sync>;
+// TODO Option<ZVal) for return value
 pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &mut ZVal, Option<&mut ZObj>) + Send + Sync>;
 pub type HandlerList = Vec<Arc<dyn Handler + Send + Sync>>;
 pub type HandlerSlice = [Arc<dyn Handler + Send + Sync>];

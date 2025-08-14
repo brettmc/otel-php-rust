@@ -1,78 +1,69 @@
 --TEST--
-Test zf1 Zend_Db error
+Test zf1 Zend_Db query error
 --EXTENSIONS--
 otel
+--ENV--
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
+--INI--
+otel.log.level="warn"
+otel.log.file="/dev/stdout"
+otel.cli.enabled=1
 --FILE--
 <?php
-include dirname(__DIR__, 2) . '/run-server.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
-$options = [
-    "http" => [
-        "method" => "GET",
-    ]
-];
+use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
-run_server('auto/zf1/public/index.php', $options, 'users/broken');
+$tracer = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url');
+$root = $tracer->spanBuilder('root')->startSpan();
+$scope = $root->activate();
+
+$dbname = __DIR__ . '/data/test.sqlite';
+$db = new Zend_Db_Adapter_Pdo_Sqlite(array('dbname' => $dbname));
+try {
+    $stmt = $db->prepare('select * from foo');
+    $stmt->execute();
+} catch (Exception $e) {
+    // do nothing
+}
+
+$root->end();
+$scope->detach();
+
+var_dump(Memory::count());
+$spans = Memory::getSpans();
+$prepareSpan = $spans[0];
+var_dump($prepareSpan['name']);
+var_dump($prepareSpan['status']);
+var_dump($prepareSpan['attributes']);
+var_dump($prepareSpan['events']);
 ?>
 --EXPECTF--
-Warning: %s HTTP/1.1 500
- in %s
-==== Response ====
-==== Server Output ====%A
-Spans
-Resource
+int(2)
+string(%d) "Statement::prepare"
+string(%d) "Error { description: "SQLSTATE[HY000]: General error: 1 no such table: foo" }"
+array(%d) {
 %A
-Span #0
-	Instrumentation Scope
-		Name         : "php.otel.zf1"
-
-	Name        : Statement::prepare
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Client
-	Start time: %s
-	End time: %s
-	Status: Error { description: "The ibm driver is not currently installed" }
-	Attributes:
-		 ->  code.function.name: String(Owned("Zend_Db_Adapter_Pdo_Ibm::prepare"))
-		 ->  code.file.path: String(Owned("%s/zend-db/library/Zend/Db/Adapter/Pdo/Ibm.php"))
-		 ->  code.line.number: I64(%d)
-		 ->  db.query.text: String(Owned("select * from users"))
-	Events:
-	Event #0
-	Name      : exception
-	Timestamp : %s
-	Attributes:
-		 ->  exception.message: String(Owned("The ibm driver is not currently installed"))
-		 ->  exception.type: String(Owned("Zend_Db_Adapter_Exception"))
-		 ->  exception.stacktrace: String(Owned("%s"))
-Spans
-Span #0
-	Instrumentation Scope
-		Name         : "php:rinit"
-
-	Name        : GET default/users/broken
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Server
-	Start time: %s
-	End time: %s
-	Status: Error { description: "The ibm driver is not currently installed" }
-	Attributes:
-		 ->  url.full: String(Owned("/users/broken"))
-		 ->  http.request.method: String(Owned("GET"))
-		 ->  php.framework.name: String(Static("zf1"))
-		 ->  php.framework.module.name: String(Owned("default"))
-		 ->  php.framework.controller.name: String(Owned("users"))
-		 ->  php.framework.action.name: String(Owned("broken"))
-		 ->  http.response.status_code: I64(500)
-	Events:
-	Event #0
-	Name      : exception
-	Timestamp : %s
-	Attributes:
-		 ->  exception.message: String(Owned("The ibm driver is not currently installed"))%A
+  ["db.query.text"]=>
+  string(17) "select * from foo"
+}
+array(1) {
+  [0]=>
+  array(3) {
+    ["name"]=>
+    string(9) "exception"
+    ["timestamp"]=>
+    int(%d)
+    ["attributes"]=>
+    array(3) {
+      ["exception.message"]=>
+      string(52) "SQLSTATE[HY000]: General error: 1 no such table: foo"
+      ["exception.type"]=>
+      string(27) "Zend_Db_Statement_Exception"
+      ["exception.stacktrace"]=>
+      string(%d) "%A"
+    }
+  }
+}
