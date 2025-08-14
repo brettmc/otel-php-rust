@@ -350,17 +350,6 @@ impl LaminasSqlPrepareHandler {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db");
         let exec_data_ref = unsafe {&mut *exec_data};
         let attributes = get_default_attributes(exec_data_ref);
-        //let statement_container_zval: &mut ZVal = exec_data_ref.get_mut_parameter(1);
-
-        //TODO sql statement available in post
-        /*if let Some(statement_container_obj) = statement_container_zval.as_mut_z_obj() {
-            if let Some(sql) = statement_container_obj.call("getSql", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned()))) {
-                attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql));
-            }
-        }*/
-
         let name = "Sql::prepare".to_string();
 
         let span_builder = tracer.span_builder(name)
