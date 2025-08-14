@@ -32,12 +32,22 @@ return [
                 ],
             ],
             'ticktick' => [
-                'type'  => Segment::class,
+                'type'  => Literal::class,
                 'options' => [
                     'route' => '/tick/tick',
                     'defaults' => [
                         'controller' => Controller\ThrowsErrorController::class,
                         'action'     => 'boom',
+                    ],
+                ],
+            ],
+            'users' => [
+                'type'    => Segment::class,
+                'options' => [
+                    'route'    => '/users[/:action]',
+                    'defaults' => [
+                        'controller' => Controller\UserController::class,
+                        'action'     => 'list',
                     ],
                 ],
             ],
@@ -47,6 +57,7 @@ return [
         'factories' => [
             Controller\IndexController::class => InvokableFactory::class,
             Controller\ThrowsErrorController::class => InvokableFactory::class,
+            Controller\UserController::class => InvokableFactory::class,
         ],
     ],
     'view_manager' => [

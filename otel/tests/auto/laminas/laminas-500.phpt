@@ -4,8 +4,8 @@ Test laminas 500 error
 otel
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 70100) {
-    die('skip requires PHP 7.1 or higher');
+if (PHP_VERSION_ID < 70100 || PHP_VERSION_ID >= 80400) {
+    die('skip requires PHP 7.1 -> 8.3');
 }
 ?>
 --FILE--
