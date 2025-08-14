@@ -93,10 +93,12 @@ where
     }
 
     // Destructure return_value before moving it
-    let mut fallback = ZVal::from(());
-    let retval = match return_value {
-        Some(rv) => rv,
-        None => &mut fallback,
+    let retval: &mut ZVal = if let Some(rv) = return_value {
+        rv
+    } else {
+        let fallback = ZVal::from(());
+        // Use Box to extend the lifetime so retval can be returned
+        Box::leak(Box::new(fallback))
     };
 
     upstream(Some(exec_data), Some(retval));
