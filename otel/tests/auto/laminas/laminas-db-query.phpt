@@ -43,7 +43,6 @@ $scope->detach();
 
 var_dump(Memory::count());
 $spans = Memory::getSpans();
-//var_dump(Memory::getSpans());
 $connectSpan = $spans[0];
 $prepareSpan = $spans[1];
 $executeSpan = $spans[2];
