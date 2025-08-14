@@ -20,7 +20,6 @@ run_server('http/server-fatal.php', $options);
 ==== Response ====
 ==== Server Output ====%A
 [%s] PHP Fatal error:  Uncaught Error: Call to undefined function undefined_function() in %s
-Stack trace:
 %A
 Spans
 Resource
@@ -49,5 +48,4 @@ Span #0
 	Attributes:
 		 ->  exception.type: String(Owned("PHP fatal error"))
 		 ->  exception.message: String(Owned("Uncaught Error: Call to undefined function undefined_function() in %s"))
-		 ->  exception.stacktrace: String(Owned("%stests/http/server-fatal.php:%d"))
-%A
+		 ->  exception.stacktrace: String(Owned("%stests/http/server-fatal.php:%d"))%A
