@@ -8,6 +8,11 @@ otel.log.level=warn
 --ENV--
 OTEL_TRACES_EXPORTER=console
 OTEL_SPAN_PROCESSOR=simple
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID >= 80000 && PHP_VERSION_ID < 80200) {
+    die('skip: PHP 8.1 + 8.2 cannot observe internal functions');
+}
 --FILE--
 <?php
 var_dump(extension_loaded('otel'));
