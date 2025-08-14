@@ -33,7 +33,6 @@ $spans = Memory::getSpans();
 $prepareSpan = $spans[0];
 var_dump($prepareSpan['name']);
 var_dump($prepareSpan['attributes']);
-//var_dump($spans);
 ?>
 --EXPECTF--
 %Aint(3)
