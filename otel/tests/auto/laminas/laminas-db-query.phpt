@@ -2,6 +2,12 @@
 Test laminas db prepare and execute query
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 70100 || PHP_VERSION_ID >= 80400) {
+    die('skip requires PHP 7.1 -> 8.3');
+}
+?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
