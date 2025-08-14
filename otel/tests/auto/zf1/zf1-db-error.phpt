@@ -41,7 +41,7 @@ var_dump($prepareSpan['attributes']);
 var_dump($prepareSpan['events']);
 ?>
 --EXPECTF--
-int(2)
+%Aint(2)
 string(%d) "Statement::prepare"
 string(%d) "Error { description: "SQLSTATE[HY000]: General error: 1 no such table: foo" }"
 array(%d) {

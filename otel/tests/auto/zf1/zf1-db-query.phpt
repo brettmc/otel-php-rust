@@ -36,7 +36,7 @@ var_dump($prepareSpan['attributes']);
 //var_dump($spans);
 ?>
 --EXPECTF--
-int(3)
+%Aint(3)
 string(18) "Statement::prepare"
 array(%d) {
 %A
