@@ -280,17 +280,11 @@ impl LaminasDbConnectHandler {
                                 .to_string()
                         ));
                     }
-                    if let Some(system) = arr.get("driver") {
-                        tracing::debug!("Driver: {:?}", system);
-                        //TODO convert driver name to SemConv-approved: https://opentelemetry.io/docs/specs/semconv/database/database-spans/
-                        attributes.push(KeyValue::new(
-                            SemConv::trace::DB_SYSTEM_NAME,
-                            system.as_z_str()
-                                .and_then(|s| s.to_str().ok())
-                                .unwrap_or_default()
-                                .to_string()
-                        ));
-                    }
+                    let system = arr.get("driver")
+                        .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok()))
+                        .map(|driver| map_laminas_driver_to_semconv(driver))
+                        .unwrap_or_default();
+                    attributes.push(KeyValue::new(SemConv::trace::DB_SYSTEM_NAME, system.to_string()));
                 }
             }
         }
@@ -452,5 +446,20 @@ impl LaminasStatementExecuteHandler {
             context.span().set_status(opentelemetry::trace::Status::error(message));
         }
         take_guard(exec_data);
+    }
+}
+
+fn map_laminas_driver_to_semconv(driver: &str) -> &str {
+    match driver.to_lowercase().as_str() {
+        "mysqli" | "pdo_mysql" => "mysql",
+        "pgsql" | "pdo_pgsql" => "postgresql",
+        "sqlite" | "pdo_sqlite" => "sqlite",
+        "oci8" | "pdo_oci" => "oracle",
+        "sqlsrv" | "pdo_sqlsrv" => "mssql",
+        "ibm_db2" => "db2",
+        "pdo_firebird" => "firebird",
+        "pdo_dblib" => "mssql",
+        "pdo_odbc" => "odbc",
+        _ => "other_sql",
     }
 }

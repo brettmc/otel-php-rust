@@ -70,7 +70,7 @@ array(%d) {
   ["db.namespace"]=>
   string(%d) "%s/test.sqlite"
   ["db.system.name"]=>
-  string(%d) "Pdo_Sqlite"
+  string(%d) "sqlite"
 }
 === Prepare ===
 array(%d) {
