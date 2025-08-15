@@ -7,6 +7,9 @@ use phper::{
 pub trait Plugin: Send + Sync {
     fn get_handlers(&self) -> &[Arc<dyn Handler + Send + Sync>];
     fn get_name(&self) -> &str;
+    fn request_shutdown(&self) {
+        // Default implementation does nothing
+    }
 }
 
 pub trait Handler: Send + Sync {

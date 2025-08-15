@@ -16,10 +16,22 @@ use phper::{
     strings::{ZString},
     values::ExecuteData,
 };
+use once_cell::sync::OnceCell;
 use std::{
     ffi::CStr,
     collections::HashSet,
+    sync::RwLock,
 };
+
+static PLUGIN_MANAGER: OnceCell<RwLock<PluginManager>> = OnceCell::new();
+
+pub fn set_global(manager: PluginManager) {
+    PLUGIN_MANAGER.set(RwLock::new(manager)).ok();
+}
+
+pub fn get_global() -> Option<&'static RwLock<PluginManager>> {
+    PLUGIN_MANAGER.get()
+}
 
 pub struct PluginManager {
     plugins: Vec<Box<dyn Plugin + Send + Sync>>,
@@ -32,6 +44,14 @@ impl PluginManager {
         let mut manager = Self {plugins: vec![] };
         manager.init();
         manager
+    }
+
+    /// calls request shutdown on all plugins, allowing them to do any post-request cleanup
+    pub fn request_shutdown(&mut self) {
+        tracing::debug!("PluginManager::request_shutdown");
+        for plugin in &self.plugins {
+            plugin.request_shutdown();
+        }
     }
 
     fn init(&mut self) {
