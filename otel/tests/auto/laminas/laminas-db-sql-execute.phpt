@@ -1,5 +1,5 @@
 --TEST--
-Test laminas db prepare and execute query
+Test laminas db sql prepare+execute
 --EXTENSIONS--
 otel
 --SKIPIF--
@@ -12,7 +12,7 @@ if (PHP_VERSION_ID < 70100 || PHP_VERSION_ID >= 80400) {
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
-otel.log.level="debug"
+otel.log.level="warn"
 otel.log.file="/dev/stdout"
 otel.cli.enabled=1
 --FILE--
@@ -29,10 +29,8 @@ $adapter = new Adapter([
 ]);
 
 $sql       = new Sql($adapter);
-$select    = $sql->select('users');
-var_dump($select);
+$select    = $sql->select()->from('users')->where(['id' => 1]);
 $statement = $sql->prepareStatementForSqlObject($select);
-var_dump($statement);
 $result    = $statement->execute();
 
 var_dump(Memory::count());
@@ -53,7 +51,7 @@ array(%d) {
   ["code.line.number"]=>
   int(%d)
   ["db.query.text"]=>
-  string(%d) " SELECT "users".* FROM "users""
+  string(%d) " SELECT "users".* FROM "users" WHERE %s"
   ["db.namespace"]=>
   string(%d) "%s/test.sqlite"
   ["db.system.name"]=>
