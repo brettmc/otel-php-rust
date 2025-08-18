@@ -8,16 +8,14 @@ use crate::{
 use crate::{
     auto::execute_data::get_default_attributes,
     auto::utils::record_exception,
-    context::storage::{store_guard, take_guard},
+    context::storage::{take_guard},
     trace::local_root_span::get_local_root_span_context,
     tracer_provider,
 };
 use opentelemetry::{
-    Context,
     KeyValue,
     trace::{
         TraceContextExt,
-        Tracer,
         TracerProvider,
     },
 };
@@ -280,13 +278,7 @@ impl Zf1AdapterPrepareHandler {
         }
         let name = "Statement::prepare".to_string();
 
-        let span_builder = tracer.span_builder(name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_span(tracer, &name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -360,13 +352,7 @@ impl Zf1StatementExecuteHandler {
             }
         }
 
-        let span_builder = tracer.span_builder(span_name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,

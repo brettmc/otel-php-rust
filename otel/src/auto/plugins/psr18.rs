@@ -1,10 +1,10 @@
 use crate::auto::{
     execute_data::{get_default_attributes},
     plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
-    utils::record_exception,
+    utils::{start_span, record_exception},
 };
 use crate::tracer_provider;
-use crate::context::storage::{store_guard, take_guard};
+use crate::context::storage::{take_guard};
 use opentelemetry::{
     KeyValue,
     Context,
@@ -13,7 +13,6 @@ use opentelemetry::{
 };
 use opentelemetry::trace::TraceContextExt;
 use opentelemetry::trace::TracerProvider;
-use opentelemetry::trace::Tracer;
 use opentelemetry_semantic_conventions as SemConv;
 use std::{
     sync::Arc,
@@ -114,13 +113,7 @@ impl Psr18SendRequestHandler {
             }
         }
 
-        let span_builder = tracer.span_builder(name)
-            .with_kind(SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        start_span(tracer, &name, attributes, exec_data, SpanKind::Client);
 
         //now inject the trace context into the request headers, using the span we just started
         let mut carrier = HashMap::new();

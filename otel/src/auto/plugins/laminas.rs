@@ -8,7 +8,7 @@ use crate::{
 };
 use crate::{
     auto::utils::record_exception,
-    context::storage::{store_guard, take_guard},
+    context::storage::{take_guard},
     error::StringError,
     request::get_request_details,
     trace::local_root_span::{
@@ -17,12 +17,11 @@ use crate::{
     tracer_provider,
 };
 use opentelemetry::{
-    Context,
     KeyValue,
     trace::{
+        SpanKind,
         Status,
         TraceContextExt,
-        Tracer,
         TracerProvider,
     },
 };
@@ -124,12 +123,8 @@ impl LaminasApplicationRunHandler {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas");
         let attributes = get_default_attributes(unsafe{&*exec_data});
 
-        let span_builder = tracer.span_builder("Application::run".to_string())
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        let span_name = "Application::run".to_string();
+        utils::start_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -500,14 +495,7 @@ impl LaminasStatementExecuteHandler {
                 span_name = info.span_name.clone();
             }
         }
-
-        let span_builder = tracer.span_builder(span_name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_span(tracer, &span_name, attributes, exec_data, SpanKind::Client);
     }
 
     unsafe extern "C" fn post_callback(
@@ -556,13 +544,7 @@ impl LaminasConnectionExecuteHandler {
         let span_name = utils::extract_span_name_from_sql(sql_str)
             .unwrap_or_else(|| "OTHER".to_string());
 
-        let span_builder = tracer.span_builder(span_name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
 
     unsafe extern "C" fn post_callback(
