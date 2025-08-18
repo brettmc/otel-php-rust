@@ -48,6 +48,9 @@ impl Plugin for TestPlugin {
     fn get_name(&self) -> &str {
         "test"
     }
+    fn request_shutdown(&self) {
+        tracing::debug!("Plugin::request_shutdown: {}", self.get_name());
+    }
 }
 
 pub struct DemoHandler;

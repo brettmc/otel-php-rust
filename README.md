@@ -11,21 +11,22 @@ drop-in replacement for the core of opentelemetry-php. Since 3rd parties are
 strongly encouraged to only depend on the API, this should be all they need.
 
 As it's slowly evolved and things have changed in the official opentelemetry-php
-implementation, the focus has shifted to being an opentelemetry implementation
+implementation, the focus has shifted to being a small and fast opentelemetry implementation
 for legacy PHP versions that currently do not have an official way to use
 OpenTelemetry.
 
 I've focussed development whilst thinking about a large legacy shared PHP host
-at my day job, where we have hundreds of sites running on a single server (99%
-running as sub-directories in one Apache vhost), and we want to be able to trace
-them without modifying the code. There is a mix of frameworks, and some
-applications pre-date modern frameworks.
+at my day job, where we have hundreds of small to medium PHP applications running
+on a single server (99% running as sub-directories in one Apache vhost), and we
+want to be able to trace them without modifying the code. There is a mix of frameworks, and some
+applications that pre-date modern frameworks.
 
 ## Supported PHP versions
 
 This works on all PHP versions supported by phper (7.0+). I've mostly tested against
-`8.4`, `7.4` and some light testing against `7.0`. Auto-instrumentation is implemeneted
-via the `zend_observer` API for PHP 8.0+, and via `zend_execute_ex` for PHP 7.x.
+`8.4`, `7.4` and some light testing against `7.0`. Auto-instrumentation is implemented
+via the `zend_observer` API for PHP 8.0+, and via `zend_execute_ex` + `zend_execute_internal`
+for PHP 7.x.
 
 ### PHP 7.x
 
@@ -35,13 +36,29 @@ and OTLP exporting works as expected.
 
 ## Installation
 
+All build approaches require `llvm-dev`, `libclang-dev` (at least 9.0), rust compiler and cargo.
+
 ### PIE (PHP Installer for Extensions)
 
-Requires `llvm-dev`, `libclang-dev` (at least 9.0), rust compiler and cargo.
+_Only works for PHP versions supported by PIE (8.1+)_
 
 `php pie.phar install brettmc/otel-php-rust:<version>`
 
-### Debugging
+### PECL
+
+todo
+
+### Manual
+
+```shell
+git clone <this repository>
+cd otel-php-rust
+git checkout <version>
+make build
+make install
+```
+
+## Debugging
 
 There's a bunch of logging from the extension and the underlying opentelemetry-rust and dependencies. It's configurable via `.ini`:
 
@@ -65,8 +82,8 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc.), but has only
 
 ## Features
 
-* Auto-instrumentation of userland (PHP8.0+) and internal (PHP8.2+) code, via zend_observer API (see `tests/auto/*`)
-* Auto-instrumentation of userland code via `zend_execute_ex` (PHP 7.x)
+* Auto-instrumentation of userland and internal code
+  - using either Zend Observer API (PHP 8.0+), or zend_execute_ex/zend_execute_internal (PHP 7.x)
 * Start a span in RINIT, use `traceparent` headers, set HTTP response code in RSHUTDOWN
 * TracerProvider created in RINIT (so that child processes have a working instance)
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
@@ -80,6 +97,10 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc.), but has only
 * Disabling of auto-instrumentation via `.ini` setting `otel.auto.disabled_plugins`
   - eg `otel.auto.disabled_plugins=laminas,psr18`
 * Configure OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES and OTEL_DISABLED via .env (for multiple applications on the same host, you can override the general server environment variables)
+* Some initial auto-instrumentation plugins:
+  - Laminas
+  - Zend Framework 1
+  - PSR-18 HTTP client
 
 ## Configuration
 
@@ -118,8 +139,6 @@ set in the environment (todo: could be relaxed to allow setting all OpenTelemetr
 By installing the extension and providing the basic [SDK configuration](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.46.0/specification/configuration/sdk-environment-variables.md#general-sdk-configuration)
 that opentelemetry expects, each HTTP request will generate an HTTP server root span. There are some initial
 auto-instrumentation plugins for some legacy frameworks.
-
-I've kept things pretty basic for now: one span per request.
 
 ### Manual instrumentation
 
@@ -163,6 +182,7 @@ A couple of non-standard attributes are added if the data is available:
 
 Hooks `Laminas\Mvc\MvcEvent::setRouteMatch`. Sets framework name, and uses the `RouteMatch` to set
 module, controller and action names.
+Hooks some of the `Laminas\Db` methods to create CLIENT spans for database queries.
 
 ### Zend Framework 1
 
@@ -180,7 +200,10 @@ injects the `traceparent` header into outgoing HTTP requests.
 
 ### Vhosts
 
-Multi-site using apache vhosts should "just work". You should set the required environment variables in the vhost config.
+If providing configuration via Apache `SetEnv` directives, or FPM `env[OTEL_*]` variables, you should
+enable the `otel.env.set_from_server` setting in your php.ini, so that the extension
+will set the environment variables from the server environment on RINIT, and restore them on RSHUTDOWN.
+
 For example (untested):
 ```
 <VirtualHost *:80>

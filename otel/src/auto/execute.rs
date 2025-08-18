@@ -10,15 +10,16 @@ use crate::{
             get_global_exception,
             get_function_and_class_name,
         },
-        plugin_manager::PluginManager,
+        plugin_manager::{
+            get_global as get_plugin_manager,
+            PluginManager,
+        },
     }
 };
 use std::{
     collections::HashMap,
-    sync::OnceLock,
 };
 
-static PLUGIN_MANAGER: OnceLock<PluginManager> = OnceLock::new();
 thread_local! {
     static OBSERVER_MAP: std::cell::RefCell<HashMap<String, bool>> = std::cell::RefCell::new(HashMap::new());
 }
@@ -30,9 +31,8 @@ static mut UPSTREAM_EXECUTE_INTERNAL: Option<
     unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data, return_value: *mut sys::zval)
 > = None;
 
-pub fn init(plugin_manager: PluginManager) {
+pub fn init() {
     tracing::debug!("Execute::init");
-    PLUGIN_MANAGER.get_or_init(|| plugin_manager);
     unsafe {
         UPSTREAM_EXECUTE_EX = sys::zend_execute_ex;
         sys::zend_execute_ex = Some(execute_ex);
@@ -80,7 +80,10 @@ where
         }
     }
 
-    let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
+    let plugin_manager = get_plugin_manager()
+        .expect("PluginManager not initialized")
+        .read()
+        .unwrap();
     let observer = plugin_manager.get_function_observer(exec_data);
     OBSERVER_MAP.with(|map| {
         map.borrow_mut().insert(key.clone(), observer.is_some());
@@ -104,7 +107,7 @@ where
     upstream(Some(exec_data), Some(retval));
 
     if let Some(ref _observer) = observer {
-        run_post_hooks(plugin_manager, &key, exec_data, retval);
+        run_post_hooks(&plugin_manager, &key, exec_data, retval);
     }
 }
 

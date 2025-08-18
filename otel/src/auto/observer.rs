@@ -14,9 +14,11 @@ use crate::{
         },
         plugin::{
             FunctionObserver,
-        }
+        },
+        plugin_manager::{
+            get_global as get_plugin_manager,
+        },
     },
-    PluginManager
 };
 use std::{
     collections::HashMap,
@@ -24,11 +26,9 @@ use std::{
 };
 
 static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, FunctionObserver>>> = OnceLock::new();
-static PLUGIN_MANAGER: OnceLock<PluginManager> = OnceLock::new();
 
-pub fn init(plugin_manager: PluginManager) {
+pub fn init() {
     tracing::debug!("Observer::init");
-    PLUGIN_MANAGER.get_or_init(|| plugin_manager);
     FUNCTION_OBSERVERS.get_or_init(|| RwLock::new(HashMap::new()));
     unsafe {
         sys::zend_observer_fcall_register(Some(observer_instrument));
@@ -40,7 +40,10 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         let fqn = get_fqn(exec_data);
         //tracing::trace!("observer::observer_instrument checking: {}", fqn);
-        let plugin_manager = PLUGIN_MANAGER.get().expect("PluginManager not initialized");
+        let plugin_manager = get_plugin_manager()
+            .expect("PluginManager not initialized")
+            .read()
+            .unwrap();
         if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
             let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
             let fqn = fqn.to_string();

@@ -32,6 +32,8 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 dotenvy = "0.15.7"
 hostname = "0.4.1"
+lazy_static = "1.5.0"
+sqlparser = "0.58.0"
 
 [build-dependencies]
 cargo_metadata = "0.21.0"
