@@ -1,7 +1,7 @@
 use crate::auto::{
     execute_data::{get_default_attributes},
     plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
-    utils::{start_span, record_exception},
+    utils::{start_and_activate_span, record_exception},
 };
 use crate::tracer_provider;
 use crate::context::storage::{take_guard};
@@ -113,7 +113,7 @@ impl Psr18SendRequestHandler {
             }
         }
 
-        start_span(tracer, &name, attributes, exec_data, SpanKind::Client);
+        start_and_activate_span(tracer, &name, attributes, exec_data, SpanKind::Client);
 
         //now inject the trace context into the request headers, using the span we just started
         let mut carrier = HashMap::new();

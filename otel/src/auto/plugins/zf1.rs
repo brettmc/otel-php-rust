@@ -278,7 +278,7 @@ impl Zf1AdapterPrepareHandler {
         }
         let name = "Statement::prepare".to_string();
 
-        utils::start_span(tracer, &name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        utils::start_and_activate_span(tracer, &name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -352,7 +352,7 @@ impl Zf1StatementExecuteHandler {
             }
         }
 
-        utils::start_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,

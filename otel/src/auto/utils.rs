@@ -65,7 +65,7 @@ pub fn record_exception(context: &opentelemetry::Context, exception: &mut ZObj) 
     context.span().set_status(opentelemetry::trace::Status::error(message));
 }
 
-pub fn start_span(
+pub fn start_and_activate_span(
     tracer: SdkTracer,
     span_name: &str,
     attributes: Vec<KeyValue>,

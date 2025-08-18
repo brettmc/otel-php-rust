@@ -119,12 +119,10 @@ impl LaminasApplicationRunHandler {
             None => {}
         };
 
-
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas");
         let attributes = get_default_attributes(unsafe{&*exec_data});
-
         let span_name = "Application::run".to_string();
-        utils::start_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -260,7 +258,6 @@ impl LaminasRouteHandler {
     }
 }
 
-/// TODO store connect and prepare, and create just one span from execute with attributes from connect+prepare
 pub struct LaminasDbConnectHandler;
 
 impl Handler for LaminasDbConnectHandler {
@@ -495,7 +492,7 @@ impl LaminasStatementExecuteHandler {
                 span_name = info.span_name.clone();
             }
         }
-        utils::start_span(tracer, &span_name, attributes, exec_data, SpanKind::Client);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, SpanKind::Client);
     }
 
     unsafe extern "C" fn post_callback(
@@ -544,7 +541,7 @@ impl LaminasConnectionExecuteHandler {
         let span_name = utils::extract_span_name_from_sql(sql_str)
             .unwrap_or_else(|| "OTHER".to_string());
 
-        utils::start_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
 
     unsafe extern "C" fn post_callback(
