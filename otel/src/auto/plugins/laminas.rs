@@ -79,6 +79,10 @@ impl Plugin for LaminasPlugin {
     fn get_name(&self) -> &str {
         "laminas"
     }
+    fn request_shutdown(&self) {
+        CONNECTION_ATTRS.lock().unwrap().clear();
+        STATEMENT_ATTRS.lock().unwrap().clear();
+    }
 }
 
 pub struct LaminasApplicationRunHandler;

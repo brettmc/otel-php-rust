@@ -1,6 +1,7 @@
 use crate::{
     auto::{
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+        sql_utils,
     },
     config::trace_attributes,
 };
@@ -22,7 +23,10 @@ use opentelemetry::{
 use opentelemetry_semantic_conventions as SemConv;
 use std::{
     sync::Arc,
+    collections::HashMap,
+    sync::Mutex,
 };
+use lazy_static::lazy_static;
 use phper::{
     alloc::ToRefOwned,
     errors::{ThrowObject},
@@ -33,10 +37,19 @@ use phper::{
     },
 };
 
-/// Zend Framework 1 (ZF1) plugin for OpenTelemetry PHP auto-instrumentation.
-/// db connections are not tracked, as the _connect method is called before every db operation,
-/// which uses internal functions (can not be instrumented with php <8.2)
-/// TODO span links between prepare+execute
+// Zend Framework 1 (ZF1) plugin for OpenTelemetry PHP auto-instrumentation.
+// db connections are not tracked, as the _connect method is called before every db operation,
+// which uses internal functions (can not be instrumented with php <8.2)
+// TODO span links between prepare+execute
+
+lazy_static! {
+    static ref STATEMENT_ATTRS: Mutex<HashMap<usize, Vec<KeyValue>>> = Mutex::new(HashMap::new());
+}
+
+// Helper to get object id (pointer address)
+fn get_object_id(obj: &ZObj) -> usize {
+    obj as *const _ as usize
+}
 
 pub struct Zf1Plugin {
     handlers: HandlerList,
@@ -48,7 +61,7 @@ impl Zf1Plugin {
             handlers: vec![
                 Arc::new(Zf1RouteHandler),
                 Arc::new(Zf1SendResponseHandler),
-                Arc::new(Zf1StatementPrepareHandler),
+                Arc::new(Zf1AdapterPrepareHandler),
                 Arc::new(Zf1StatementExecuteHandler),
             ],
         }
@@ -61,6 +74,9 @@ impl Plugin for Zf1Plugin {
     }
     fn get_name(&self) -> &str {
         "zf1"
+    }
+    fn request_shutdown(&self) {
+        STATEMENT_ATTRS.lock().unwrap().clear();
     }
 }
 
@@ -223,9 +239,9 @@ impl Zf1SendResponseHandler {
     }
 }
 
-pub struct Zf1StatementPrepareHandler;
+pub struct Zf1AdapterPrepareHandler;
 
-impl Handler for Zf1StatementPrepareHandler {
+impl Handler for Zf1AdapterPrepareHandler {
     fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
             (Some("Zend_Db_Adapter_Abstract".to_string()), "prepare".to_string()),
@@ -243,7 +259,7 @@ impl Handler for Zf1StatementPrepareHandler {
     }
 }
 
-impl Zf1StatementPrepareHandler {
+impl Zf1AdapterPrepareHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1.db");
         let exec_data_ref = unsafe {&mut *exec_data};
@@ -269,7 +285,7 @@ impl Zf1StatementPrepareHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
+        retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
@@ -281,6 +297,21 @@ impl Zf1StatementPrepareHandler {
                 .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
                 .unwrap_or_default();
             context.span().set_status(opentelemetry::trace::Status::error(message));
+        } else {
+            //prepared statement is the return value
+            let statement_obj = retval.as_mut_z_obj().expect("Expected a ZObj for prepared statement");
+            let exec_data_ref = unsafe { &mut *exec_data };
+            let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
+            if let Some(sql_str) = sql_zval.as_z_str() {
+                if let Ok(sql) = sql_str.to_str() {
+                    let attr = KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string());
+                    let id = get_object_id(statement_obj);
+                    // Add SQL query as an attribute
+                    STATEMENT_ATTRS.lock().unwrap().insert(id, vec![attr]);
+                }
+            } else {
+                tracing::warn!("Zf1StatementPrepareHandler: SQL parameter is not a string");
+            }
         }
         take_guard(exec_data);
     }
@@ -309,11 +340,26 @@ impl Handler for Zf1StatementExecuteHandler {
 impl Zf1StatementExecuteHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1.db");
-        let exec_data_ref = unsafe { &*exec_data };
-        let attributes = get_default_attributes(exec_data_ref);
-        let name = "Statement::execute".to_string();
+        let exec_data_ref = unsafe { &mut *exec_data };
+        let mut attributes = get_default_attributes(exec_data_ref);
+        let mut span_name = "Statement::execute".to_string();
 
-        let span_builder = tracer.span_builder(name)
+        if let Some(this_obj) = exec_data_ref.get_this_mut() {
+            let id = get_object_id(this_obj);
+            tracing::debug!("Zf1StatementExecuteHandler: object id: {}", id);
+            if let Some(attrs) = STATEMENT_ATTRS.lock().unwrap().get(&id) {
+                attributes.extend_from_slice(attrs);
+                if let Some(query_text) = attrs.iter().find(|kv| kv.key == SemConv::trace::DB_QUERY_TEXT.into()) {
+                    if let Some(name) = sql_utils::extract_span_name_from_sql(query_text.value.as_str().as_ref()) {
+                        span_name = name;
+                    } else {
+                        span_name = "OTHER".to_string();
+                    }
+                }
+            }
+        }
+
+        let span_builder = tracer.span_builder(span_name)
             .with_kind(opentelemetry::trace::SpanKind::Client)
             .with_attributes(attributes);
         let span = tracer.build_with_context(span_builder, &Context::current());
