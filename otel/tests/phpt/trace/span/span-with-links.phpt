@@ -16,7 +16,7 @@ $span = Globals::tracerProvider()->getTracer('my_tracer', '0.1', 'schema.url')->
 $ctx_one = SpanContext::create('2b4ef3412d587ce6e7880fb27a316b8c', '7480a670201f6340');
 $span->addLink($ctx_one);
 $scope = $span->activate();
-//add link after activate goes through a SpanRef (TODO, not implemented in opentelemetry-rust)
+//add link after activate goes through a SpanRef
 $ctx_two = SpanContext::create('fffff3412d587ce6e7880fb27a316b8c', 'ffffa670201f6340');
 $span->addLink($ctx_two);
 $span->end();
@@ -41,3 +41,6 @@ Span #0
 	Link #0
 	TraceId: 2b4ef3412d587ce6e7880fb27a316b8c
 	SpanId : 7480a670201f6340
+	Link #1
+	TraceId: fffff3412d587ce6e7880fb27a316b8c
+	SpanId : ffffa670201f6340

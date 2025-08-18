@@ -83,8 +83,6 @@ impl Plugin for Zf1Plugin {
     }
 }
 
-//TODO check post sendResponse and check for exceptions (anything else?)
-
 pub struct Zf1RouteHandler;
 
 impl Handler for Zf1RouteHandler {
@@ -264,7 +262,7 @@ impl Handler for Zf1AdapterPrepareHandler {
 
 impl Zf1AdapterPrepareHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1.db");
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe {&mut *exec_data};
         let mut attributes = get_default_attributes(exec_data_ref);
         let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
@@ -338,7 +336,7 @@ impl Handler for Zf1StatementExecuteHandler {
 
 impl Zf1StatementExecuteHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.zf1.db");
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe { &mut *exec_data };
         let mut attributes = get_default_attributes(exec_data_ref);
         let mut span_name = "Statement::execute".to_string();

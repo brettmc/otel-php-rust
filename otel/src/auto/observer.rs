@@ -91,7 +91,6 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
         if let Some(observer) = lock.get(&fqn) {
-            //TODO use Option<ZVal> ??
             let retval = if retval.is_null() {
                 &mut ZVal::from(())
             } else {

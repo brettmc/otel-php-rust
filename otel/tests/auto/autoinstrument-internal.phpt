@@ -25,7 +25,7 @@ Resource
 %A
 Span #0
 	Instrumentation Scope
-		Name         : "php-auto-instrumentation"
+		Name         : "php.otel.auto.test"
 
 	Name        : phpversion
 	TraceId     : %s

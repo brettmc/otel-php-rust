@@ -21,7 +21,7 @@ demoFunction();
 assert(Memory::count() === 1);
 $span = Memory::getSpans()[0];
 assert($span['name'] === 'demo-function');
-assert($span['instrumentation_scope']['name'] === 'php-auto-instrumentation');
+assert($span['instrumentation_scope']['name'] === 'php.otel.auto.test');
 ?>
 --EXPECT--
 string(13) "demo_function"

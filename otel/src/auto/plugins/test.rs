@@ -78,7 +78,7 @@ impl Handler for DemoHandler {
 
 impl DemoHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let tracer = tracer_provider::get_tracer_provider().tracer("php-auto-instrumentation"); //TODO: store tracer in a static variable
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
         let exec_data_ref = unsafe { &*exec_data };
         let attributes = get_default_attributes(exec_data_ref);
         let name = get_fqn(exec_data_ref);
@@ -128,7 +128,7 @@ impl Handler for DemoFunctionHandler {
 
 impl DemoFunctionHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let tracer = tracer_provider::get_tracer_provider().tracer("php-auto-instrumentation"); //TODO: store tracer in a static variable
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
         let mut attributes = get_default_attributes(unsafe{&*exec_data});
         attributes.push(KeyValue::new("my-attribute", "my-value".to_string()));
 
