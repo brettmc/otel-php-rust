@@ -329,7 +329,6 @@ impl LaminasDbConnectHandler {
         }
     }
 }
-// TODO Laminas\Db\Adapter\Adapter::query calls Connection::execute for direct execute without prepare
 
 pub struct LaminasSqlPrepareHandler;
 
