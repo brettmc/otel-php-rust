@@ -1,3 +1,12 @@
+use opentelemetry::trace::TraceContextExt;
+use opentelemetry::trace::Tracer;
+use opentelemetry::trace::SpanKind;
+use opentelemetry::Context;
+use opentelemetry::KeyValue;
+use opentelemetry_sdk::trace::SdkTracer;
+use phper::values::ExecuteData;
+use crate::context::storage::store_guard;
+use phper::objects::ZObj;
 use sqlparser::{
     ast::{FromTable, Statement, TableFactor},
     dialect::GenericDialect,
@@ -44,4 +53,30 @@ pub fn extract_span_name_from_sql(sql: &str) -> Option<String> {
         }
     }
     None
+}
+
+pub fn record_exception(context: &opentelemetry::Context, exception: &mut ZObj) {
+    let attributes = crate::error::php_exception_to_attributes(exception);
+    context.span().add_event("exception", attributes);
+    let message = exception.call("getMessage", [])
+        .ok()
+        .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
+        .unwrap_or_default();
+    context.span().set_status(opentelemetry::trace::Status::error(message));
+}
+
+pub fn start_and_activate_span(
+    tracer: SdkTracer,
+    span_name: &str,
+    attributes: Vec<KeyValue>,
+    exec_data: *mut ExecuteData,
+    span_kind: SpanKind,
+) {
+    let span_builder = tracer.span_builder(span_name.to_string())
+        .with_kind(span_kind)
+        .with_attributes(attributes);
+    let span = tracer.build_with_context(span_builder, &Context::current());
+    let ctx = Context::current_with_span(span);
+    let guard = ctx.attach();
+    store_guard(exec_data, guard);
 }

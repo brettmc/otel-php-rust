@@ -4,6 +4,7 @@
 use crate::auto::{
     execute_data::{get_default_attributes, get_fqn},
     plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+    utils::record_exception,
 };
 use opentelemetry::{
     KeyValue,
@@ -15,8 +16,6 @@ use crate::{
 };
 use std::sync::Arc;
 use phper::{
-    alloc::ToRefOwned,
-    errors::ThrowObject,
     values::{ExecuteData, ZVal},
     objects::ZObj,
 };
@@ -151,9 +150,7 @@ impl DemoFunctionHandler {
         let context = opentelemetry::Context::current();
         let span_ref = context.span();
         if let Some(exception) = exception {
-            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
-                span_ref.record_error(&throwable);
-            }
+            record_exception(&opentelemetry::Context::current(), exception);
         }
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
         if let Some(_guard) = take_guard(exec_data) {

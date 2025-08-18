@@ -2,12 +2,13 @@ use crate::{
     auto::{
         execute_data::get_default_attributes,
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
-        sql_utils,
+        utils,
     },
     config::trace_attributes,
 };
 use crate::{
-    context::storage::{store_guard, take_guard},
+    auto::utils::record_exception,
+    context::storage::{take_guard},
     error::StringError,
     request::get_request_details,
     trace::local_root_span::{
@@ -16,12 +17,11 @@ use crate::{
     tracer_provider,
 };
 use opentelemetry::{
-    Context,
     KeyValue,
     trace::{
+        SpanKind,
         Status,
         TraceContextExt,
-        Tracer,
         TracerProvider,
     },
 };
@@ -119,16 +119,10 @@ impl LaminasApplicationRunHandler {
             None => {}
         };
 
-
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas");
         let attributes = get_default_attributes(unsafe{&*exec_data});
-
-        let span_builder = tracer.span_builder("Application::run".to_string())
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        let span_name = "Application::run".to_string();
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -264,7 +258,6 @@ impl LaminasRouteHandler {
     }
 }
 
-/// TODO store connect and prepare, and create just one span from execute with attributes from connect+prepare
 pub struct LaminasDbConnectHandler;
 
 impl Handler for LaminasDbConnectHandler {
@@ -323,14 +316,7 @@ impl LaminasDbConnectHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            let attributes = crate::error::php_exception_to_attributes(exception);
-            let context = opentelemetry::Context::current();
-            context.span().add_event("exception", attributes);
-            let message = exception.call("getMessage", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-                .unwrap_or_default();
-            context.span().set_status(opentelemetry::trace::Status::error(message));
+            record_exception(&opentelemetry::Context::current(), exception);
         }
     }
 }
@@ -361,17 +347,8 @@ impl LaminasSqlPrepareHandler {
     ) {
         tracing::debug!("Auto::Laminas::post (Sql::prepare) - post_callback called");
 
-        //exception recording
         if let Some(exception) = exception {
-            let context = opentelemetry::Context::current();
-            tracing::debug!("Auto::Laminas::post (Sql::prepare) - exception found");
-            let attributes = crate::error::php_exception_to_attributes(exception);
-            context.span().add_event("exception", attributes);
-            let message = exception.call("getMessage", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-                .unwrap_or_default();
-            context.span().set_status(opentelemetry::trace::Status::error(message));
+            record_exception(&opentelemetry::Context::current(), exception);
         }
         // return value may be optimized away in php 7.x, if so use the second parameter (which is mutated)
         let statement_container_zval: &mut ZVal = if retval.get_type_info() == phper::types::TypeInfo::NULL {
@@ -387,7 +364,7 @@ impl LaminasSqlPrepareHandler {
             if let Ok(zv) = obj.call("getSql", []) {
                 if let Some(sql) = zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())) {
                     attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.clone()));
-                    execute_span_name = sql_utils::extract_span_name_from_sql(&sql)
+                    execute_span_name = utils::extract_span_name_from_sql(&sql)
                         .unwrap_or_else(|| "OTHER".to_string());
                 }
             }
@@ -439,17 +416,8 @@ impl LaminasStatementPrepareHandler {
     ) {
         tracing::debug!("Auto::Laminas::post (Statement::prepare) - post_callback called");
 
-        //exception recording
         if let Some(exception) = exception {
-            let context = opentelemetry::Context::current();
-            tracing::debug!("Auto::Laminas::post (Statement::prepare) - exception found");
-            let attributes = crate::error::php_exception_to_attributes(exception);
-            context.span().add_event("exception", attributes);
-            let message = exception.call("getMessage", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-                .unwrap_or_default();
-            context.span().set_status(opentelemetry::trace::Status::error(message));
+            record_exception(&opentelemetry::Context::current(), exception);
         }
 
         // Get the first parameter as a string, if present
@@ -477,7 +445,7 @@ impl LaminasStatementPrepareHandler {
             tracing::debug!("Auto::Laminas::post (Statement::prepare) - sql: {:?}", sql);
             if let Some(sql_str) = sql {
                 attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql_str.clone()));
-                execute_span_name = sql_utils::extract_span_name_from_sql(&sql_str)
+                execute_span_name = utils::extract_span_name_from_sql(&sql_str)
                     .unwrap_or_else(|| "OTHER".to_string());
             }
             let id = get_object_id(this_obj);
@@ -524,14 +492,7 @@ impl LaminasStatementExecuteHandler {
                 span_name = info.span_name.clone();
             }
         }
-
-        let span_builder = tracer.span_builder(span_name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, SpanKind::Client);
     }
 
     unsafe extern "C" fn post_callback(
@@ -540,14 +501,7 @@ impl LaminasStatementExecuteHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            let attributes = crate::error::php_exception_to_attributes(exception);
-            let context = opentelemetry::Context::current();
-            context.span().add_event("exception", attributes);
-            let message = exception.call("getMessage", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-                .unwrap_or_default();
-            context.span().set_status(opentelemetry::trace::Status::error(message));
+            record_exception(&opentelemetry::Context::current(), exception);
         }
         take_guard(exec_data);
     }
@@ -584,16 +538,10 @@ impl LaminasConnectionExecuteHandler {
         let sql_str = sql_zval.as_z_str().and_then(|s| s.to_str().ok()).unwrap_or_default();
 
         attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql_str));
-        let span_name = sql_utils::extract_span_name_from_sql(sql_str)
+        let span_name = utils::extract_span_name_from_sql(sql_str)
             .unwrap_or_else(|| "OTHER".to_string());
 
-        let span_builder = tracer.span_builder(span_name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
 
     unsafe extern "C" fn post_callback(
@@ -603,14 +551,7 @@ impl LaminasConnectionExecuteHandler {
     ) {
         tracing::debug!("Auto::Laminas::post (Connection::execute) - post_callback called");
         if let Some(exception) = exception {
-            let attributes = crate::error::php_exception_to_attributes(exception);
-            let context = opentelemetry::Context::current();
-            context.span().add_event("exception", attributes);
-            let message = exception.call("getMessage", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-                .unwrap_or_default();
-            context.span().set_status(opentelemetry::trace::Status::error(message));
+            record_exception(&opentelemetry::Context::current(), exception);
         }
         take_guard(exec_data);
     }

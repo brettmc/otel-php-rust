@@ -93,7 +93,7 @@ pub mod auto{
     pub mod execute;
     pub mod execute_data;
     pub mod plugin_manager;
-    pub mod sql_utils;
+    pub mod utils;
     pub mod plugin;
     pub mod plugins{
         pub mod laminas;

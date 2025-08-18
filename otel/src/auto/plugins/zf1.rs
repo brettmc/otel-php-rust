@@ -1,22 +1,21 @@
 use crate::{
     auto::{
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
-        sql_utils,
+        utils,
     },
     config::trace_attributes,
 };
 use crate::{
     auto::execute_data::get_default_attributes,
-    context::storage::{store_guard, take_guard},
+    auto::utils::record_exception,
+    context::storage::{take_guard},
     trace::local_root_span::get_local_root_span_context,
     tracer_provider,
 };
 use opentelemetry::{
-    Context,
     KeyValue,
     trace::{
         TraceContextExt,
-        Tracer,
         TracerProvider,
     },
 };
@@ -29,7 +28,6 @@ use std::{
 use lazy_static::lazy_static;
 use phper::{
     alloc::ToRefOwned,
-    errors::{ThrowObject},
     objects::ZObj,
     values::{
         ExecuteData,
@@ -280,13 +278,7 @@ impl Zf1AdapterPrepareHandler {
         }
         let name = "Statement::prepare".to_string();
 
-        let span_builder = tracer.span_builder(name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_and_activate_span(tracer, &name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -294,14 +286,7 @@ impl Zf1AdapterPrepareHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            let attributes = crate::error::php_exception_to_attributes(exception);
-            let context = opentelemetry::Context::current();
-            context.span().add_event("exception", attributes);
-            let message = exception.call("getMessage", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-                .unwrap_or_default();
-            context.span().set_status(opentelemetry::trace::Status::error(message));
+            record_exception(&opentelemetry::Context::current(), exception);
         } else {
             //prepared statement is the return value
             let statement_obj = retval.as_mut_z_obj().expect("Expected a ZObj for prepared statement");
@@ -309,7 +294,7 @@ impl Zf1AdapterPrepareHandler {
             let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
             if let Some(sql_str) = sql_zval.as_z_str() {
                 if let Ok(sql) = sql_str.to_str() {
-                    let execute_span_name = sql_utils::extract_span_name_from_sql(&sql)
+                    let execute_span_name = utils::extract_span_name_from_sql(&sql)
                         .unwrap_or_else(|| "OTHER".to_string());
                     let attr = KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string());
                     let id = get_object_id(statement_obj);
@@ -367,13 +352,7 @@ impl Zf1StatementExecuteHandler {
             }
         }
 
-        let span_builder = tracer.span_builder(span_name)
-            .with_kind(opentelemetry::trace::SpanKind::Client)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -381,10 +360,7 @@ impl Zf1StatementExecuteHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
-                let context = opentelemetry::Context::current();
-                context.span().record_error(&throwable);
-            }
+            record_exception(&opentelemetry::Context::current(), exception);
         }
         take_guard(exec_data);
     }
