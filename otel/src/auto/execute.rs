@@ -18,7 +18,6 @@ use crate::{
 };
 use std::{
     collections::HashMap,
-    sync::OnceLock,
 };
 
 thread_local! {
@@ -81,9 +80,11 @@ where
         }
     }
 
-    let plugin_manager = get_plugin_manager().expect("PluginManager not initialized");
-    let pm = plugin_manager.read().unwrap();
-    let observer = pm.get_function_observer(exec_data);
+    let plugin_manager = get_plugin_manager()
+        .expect("PluginManager not initialized")
+        .read()
+        .unwrap();
+    let observer = plugin_manager.get_function_observer(exec_data);
     OBSERVER_MAP.with(|map| {
         map.borrow_mut().insert(key.clone(), observer.is_some());
     });
@@ -106,7 +107,7 @@ where
     upstream(Some(exec_data), Some(retval));
 
     if let Some(ref _observer) = observer {
-        run_post_hooks(plugin_manager, &key, exec_data, retval);
+        run_post_hooks(&plugin_manager, &key, exec_data, retval);
     }
 }
 
