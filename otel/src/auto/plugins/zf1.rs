@@ -271,7 +271,7 @@ impl Zf1AdapterPrepareHandler {
                 attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
             }
         } else {
-            tracing::warn!("Zf1StatementPrepareHandler: SQL parameter is not a string");
+            tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
         }
         let name = "Statement::prepare".to_string();
 
@@ -310,7 +310,7 @@ impl Zf1AdapterPrepareHandler {
                     STATEMENT_ATTRS.lock().unwrap().insert(id, vec![attr]);
                 }
             } else {
-                tracing::warn!("Zf1StatementPrepareHandler: SQL parameter is not a string");
+                tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
             }
         }
         take_guard(exec_data);
