@@ -1,18 +1,22 @@
-use crate::auto::{
-    execute_data::{get_default_attributes},
-    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
-    utils::{start_and_activate_span, record_exception},
+use crate::{
+    auto::{
+        execute_data::{get_default_attributes},
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+        utils::{start_and_activate_span, record_exception},
+    },
+    context::storage::{take_guard},
+    tracer_provider,
 };
-use crate::tracer_provider;
-use crate::context::storage::{take_guard};
 use opentelemetry::{
     KeyValue,
     Context,
     global,
-    trace::{SpanKind},
+    trace::{
+        SpanKind,
+        TraceContextExt,
+        TracerProvider,
+    },
 };
-use opentelemetry::trace::TraceContextExt;
-use opentelemetry::trace::TracerProvider;
 use opentelemetry_semantic_conventions as SemConv;
 use std::{
     sync::Arc,

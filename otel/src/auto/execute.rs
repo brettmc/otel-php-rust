@@ -3,7 +3,6 @@ use phper::{
     sys,
     values::{ExecuteData,ZVal},
 };
-use std::ptr::null_mut;
 use crate::{
     auto::{
         execute_data::{
@@ -18,6 +17,7 @@ use crate::{
 };
 use std::{
     collections::HashMap,
+    ptr::null_mut,
 };
 
 thread_local! {

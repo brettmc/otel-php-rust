@@ -1,27 +1,28 @@
 // A test plugin which implements three handlers:
 // - DemoHandler: observes a handful of classes and functions with a pre and post callback
 // - DemoFunctionHandler: observes a specific function with a different pre and post callback
-use crate::auto::{
-    execute_data::{get_default_attributes, get_fqn},
-    plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
-    utils::record_exception,
-};
-use opentelemetry::{
-    KeyValue,
-    trace::{Tracer, TracerProvider},
-};
 use crate::{
+    auto::{
+        execute_data::{get_default_attributes, get_fqn},
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+        utils::record_exception,
+    },
     context::storage::{store_guard, take_guard},
     tracer_provider,
+};
+use opentelemetry::{
+    Context,
+    KeyValue,
+    trace::{
+        Tracer,
+        TraceContextExt,
+        TracerProvider,
+    },
 };
 use std::sync::Arc;
 use phper::{
     values::{ExecuteData, ZVal},
     objects::ZObj,
-};
-use opentelemetry::{
-    Context,
-    trace::TraceContextExt,
 };
 
 pub struct TestPlugin {
