@@ -1,6 +1,7 @@
 use crate::auto::{
     execute_data::{get_default_attributes},
     plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+    utils::record_exception,
 };
 use crate::tracer_provider;
 use crate::context::storage::{store_guard, take_guard};
@@ -19,8 +20,6 @@ use std::{
     collections::HashMap,
 };
 use phper::{
-    alloc::ToRefOwned,
-    errors::ThrowObject,
     objects::ZObj,
     values::{
         ExecuteData,
@@ -150,9 +149,7 @@ impl Psr18SendRequestHandler {
         let context = Context::current();
         let span_ref = context.span();
         if let Some(exception) = exception {
-            if let Ok(throwable) = ThrowObject::new(exception.to_ref_owned()) {
-                span_ref.record_error(&throwable);
-            }
+            record_exception(&opentelemetry::Context::current(), exception);
         }
         if let Some(_guard) = take_guard(exec_data) {
             //do nothing, _guard will go out of scope at end of function

@@ -1,3 +1,5 @@
+use opentelemetry::trace::TraceContextExt;
+use phper::objects::ZObj;
 use sqlparser::{
     ast::{FromTable, Statement, TableFactor},
     dialect::GenericDialect,
@@ -44,4 +46,14 @@ pub fn extract_span_name_from_sql(sql: &str) -> Option<String> {
         }
     }
     None
+}
+
+pub fn record_exception(context: &opentelemetry::Context, exception: &mut ZObj) {
+    let attributes = crate::error::php_exception_to_attributes(exception);
+    context.span().add_event("exception", attributes);
+    let message = exception.call("getMessage", [])
+        .ok()
+        .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
+        .unwrap_or_default();
+    context.span().set_status(opentelemetry::trace::Status::error(message));
 }

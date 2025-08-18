@@ -61,9 +61,14 @@ array(1) {
     ["timestamp"]=>
     int(%d)
     ["attributes"]=>
-    array(1) {
+    array(3) {
       ["exception.message"]=>
       string(20) "something went wrong"
+      ["exception.type"]=>
+      string(17) "MyClientException"
+      ["exception.stacktrace"]=>
+      string(%d) "#0 %s/tests/auto/psr18/psr18-exception.php(%d): MockHttpClient->sendRequest(Object(Nyholm\Psr7\Request))
+#1 {main}"
     }
   }
 }
