@@ -2,10 +2,8 @@ use phper::{
     eg,
     objects::ZObj,
     sys,
-    strings::{ZStr},
-    values::{
-        ExecuteData,
-    }
+    strings::ZStr,
+    values::ExecuteData,
 };
 use opentelemetry::{
     KeyValue,

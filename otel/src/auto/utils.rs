@@ -1,57 +1,44 @@
-use opentelemetry::trace::TraceContextExt;
-use opentelemetry::trace::Tracer;
-use opentelemetry::trace::SpanKind;
-use opentelemetry::Context;
-use opentelemetry::KeyValue;
-use opentelemetry_sdk::trace::SdkTracer;
-use phper::values::ExecuteData;
 use crate::context::storage::store_guard;
-use phper::objects::ZObj;
-use sqlparser::{
-    ast::{FromTable, Statement, TableFactor},
-    dialect::GenericDialect,
-    parser::Parser,
+use opentelemetry::{
+    Context,
+    KeyValue,
+    trace::{
+        SpanKind,
+        Tracer,
+        TraceContextExt,
+    }
 };
+use opentelemetry_sdk::trace::SdkTracer;
+use phper::{
+    values::ExecuteData,
+    objects::ZObj,
+};
+use regex::Regex;
 
 pub fn extract_span_name_from_sql(sql: &str) -> Option<String> {
-    let dialect = GenericDialect {};
-    let ast = Parser::parse_sql(&dialect, sql).ok()?;
-    let stmt = ast.get(0)?;
-    let clean = |name: &str| name.replace(['"', '`'], "");
+    let sql = sql.trim();
+    let select_re = Regex::new(r#"(?i)^\s*SELECT.*FROM\s+([`"a-zA-Z0-9_\.]+)"#).unwrap();
+    let insert_re = Regex::new(r#"(?i)^\s*INSERT\s+INTO\s+([`"a-zA-Z0-9_\.]+)"#).unwrap();
+    let update_re = Regex::new(r#"(?i)^\s*UPDATE\s+([`"a-zA-Z0-9_\.]+)"#).unwrap();
+    let delete_re = Regex::new(r#"(?i)^\s*DELETE\s+FROM\s+([`"a-zA-Z0-9_\.]+)"#).unwrap();
 
-    match stmt {
-        Statement::Query(query) => {
-            if let sqlparser::ast::SetExpr::Select(select) = &*query.body {
-                if let Some(from) = select.from.get(0) {
-                    if let TableFactor::Table { name, .. } = &from.relation {
-                        return Some(format!("{} {}", "SELECT".to_string(), clean(&name.to_string())));
-                    }
-                }
-            }
-        }
-        Statement::Insert(insert) => {
-            return Some(format!("{} {}", "INSERT".to_string(), clean(&insert.table.to_string())));
-        }
-        Statement::Update { table, .. } => {
-            return Some(format!("{} {}", "UPDATE".to_string(), clean(&table.to_string())));
-        }
-        Statement::Delete(delete) => {
-            match &delete.from {
-                FromTable::WithFromKeyword(from_vec) | FromTable::WithoutKeyword(from_vec) => {
-                    if let Some(table_with_joins) = from_vec.get(0) {
-                        if let TableFactor::Table { name, .. } = &table_with_joins.relation {
-                            // `name` is the ObjectName of the table
-                            return Some(format!("{} {}", "DELETE".to_string(), clean(&name.to_string())));
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            tracing::debug!("Unsupported SQL statement: {:?}", stmt);
-            return Some("OTHER".to_string());
-        }
+    if let Some(caps) = select_re.captures(sql) {
+        let table = caps.get(1).map(|m| m.as_str().replace(['"', '`'], ""));
+        return table.map(|t| format!("SELECT {}", t));
     }
+    if let Some(caps) = insert_re.captures(sql) {
+        let table = caps.get(1).map(|m| m.as_str().replace(['"', '`'], ""));
+        return table.map(|t| format!("INSERT {}", t));
+    }
+    if let Some(caps) = update_re.captures(sql) {
+        let table = caps.get(1).map(|m| m.as_str().replace(['"', '`'], ""));
+        return table.map(|t| format!("UPDATE {}", t));
+    }
+    if let Some(caps) = delete_re.captures(sql) {
+        let table = caps.get(1).map(|m| m.as_str().replace(['"', '`'], ""));
+        return table.map(|t| format!("DELETE {}", t));
+    }
+
     None
 }
 

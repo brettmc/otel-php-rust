@@ -1,7 +1,9 @@
 use std::fmt;
 use opentelemetry::KeyValue;
-use phper::objects::ZObj;
-use phper::values::{ZVal};
+use phper::{
+    objects::ZObj,
+    values::ZVal,
+};
 
 /// A custom error type that wraps a String and implements the Display, Debug, and Error traits.
 /// Used for recording string-based errors on a Span.

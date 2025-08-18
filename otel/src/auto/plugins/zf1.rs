@@ -1,13 +1,10 @@
 use crate::{
     auto::{
+        execute_data::get_default_attributes,
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
         utils,
     },
     config::trace_attributes,
-};
-use crate::{
-    auto::execute_data::get_default_attributes,
-    auto::utils::record_exception,
     context::storage::{take_guard},
     trace::local_root_span::get_local_root_span_context,
     tracer_provider,
@@ -284,7 +281,7 @@ impl Zf1AdapterPrepareHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         } else {
             //prepared statement is the return value
             let statement_obj = retval.as_mut_z_obj().expect("Expected a ZObj for prepared statement");
@@ -358,7 +355,7 @@ impl Zf1StatementExecuteHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         take_guard(exec_data);
     }

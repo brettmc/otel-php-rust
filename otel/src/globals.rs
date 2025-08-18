@@ -3,8 +3,8 @@ use phper::{
         ClassEntity,
         Visibility,
     },
-    functions::{ReturnType},
-    types::{ReturnTypeHint},
+    functions::ReturnType,
+    types::ReturnTypeHint,
 };
 use crate::trace::{
     propagation::trace_context_propagator::TraceContextPropagatorClass,

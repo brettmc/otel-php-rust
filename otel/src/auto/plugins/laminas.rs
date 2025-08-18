@@ -5,9 +5,6 @@ use crate::{
         utils,
     },
     config::trace_attributes,
-};
-use crate::{
-    auto::utils::record_exception,
     context::storage::{take_guard},
     error::StringError,
     request::get_request_details,
@@ -316,7 +313,7 @@ impl LaminasDbConnectHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         }
     }
 }
@@ -348,7 +345,7 @@ impl LaminasSqlPrepareHandler {
         tracing::debug!("Auto::Laminas::post (Sql::prepare) - post_callback called");
 
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         // return value may be optimized away in php 7.x, if so use the second parameter (which is mutated)
         let statement_container_zval: &mut ZVal = if retval.get_type_info() == phper::types::TypeInfo::NULL {
@@ -417,7 +414,7 @@ impl LaminasStatementPrepareHandler {
         tracing::debug!("Auto::Laminas::post (Statement::prepare) - post_callback called");
 
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         }
 
         // Get the first parameter as a string, if present
@@ -501,7 +498,7 @@ impl LaminasStatementExecuteHandler {
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         take_guard(exec_data);
     }
@@ -551,7 +548,7 @@ impl LaminasConnectionExecuteHandler {
     ) {
         tracing::debug!("Auto::Laminas::post (Connection::execute) - post_callback called");
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         take_guard(exec_data);
     }
