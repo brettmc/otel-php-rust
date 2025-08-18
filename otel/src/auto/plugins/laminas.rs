@@ -40,10 +40,15 @@ use phper::{
     },
 };
 
+struct StatementInfo {
+    attributes: Vec<KeyValue>,
+    span_name: String,
+}
+
 // Storage for DB-related attributes
 lazy_static! {
     static ref CONNECTION_ATTRS: Mutex<HashMap<usize, Vec<KeyValue>>> = Mutex::new(HashMap::new());
-    static ref STATEMENT_ATTRS: Mutex<HashMap<usize, Vec<KeyValue>>> = Mutex::new(HashMap::new());
+    static ref STATEMENT_ATTRS: Mutex<HashMap<usize, StatementInfo>> = Mutex::new(HashMap::new());
 }
 
 // Helper to get object id (pointer address)
@@ -308,7 +313,7 @@ impl LaminasDbConnectHandler {
             }
             let id = get_object_id(this_obj);
             CONNECTION_ATTRS.lock().unwrap().insert(id, attributes.clone());
-            tracing::debug!("Auto::Laminas::pre (connect) - storing connection attributes: {:?}, obj={:?} id={}", attributes, this_obj, id);
+            tracing::debug!("Auto::Laminas::pre (connect) - storing connection attributes: {:?}, id={}", attributes, id);
         }
     }
 
@@ -376,11 +381,14 @@ impl LaminasSqlPrepareHandler {
             retval
         };
         let mut attributes = vec![];
+        let mut execute_span_name = "Sql::prepare".to_string();
 
         if let Some(obj) = statement_container_zval.as_mut_z_obj() {
             if let Ok(zv) = obj.call("getSql", []) {
                 if let Some(sql) = zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())) {
-                    attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql));
+                    attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.clone()));
+                    execute_span_name = sql_utils::extract_span_name_from_sql(&sql)
+                        .unwrap_or_else(|| "OTHER".to_string());
                 }
             }
             let driver_zval: &mut ZVal = obj.get_mut_property("driver");
@@ -399,8 +407,8 @@ impl LaminasSqlPrepareHandler {
             }
 
             let id = get_object_id(obj);
-            tracing::debug!("Auto::Laminas::post (Sql::prepare) - storing statement attributes for statement container object: {:?} id: {}", obj, id);
-            STATEMENT_ATTRS.lock().unwrap().insert(id, attributes);
+            tracing::debug!("Auto::Laminas::post (Sql::prepare) - storing statement attributes for statement container id: {}", id);
+            STATEMENT_ATTRS.lock().unwrap().insert(id, StatementInfo {attributes, span_name: execute_span_name});
         }
     }
 }
@@ -458,6 +466,7 @@ impl LaminasStatementPrepareHandler {
         // Now get this_obj and use it for everything else
         let exec_data_ref = unsafe { &mut *exec_data };
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
+            let mut execute_span_name = "Statement::prepare".to_string();
             let sql = sql_from_param.or_else(|| {
                 this_obj.call("getSql", [])
                     .ok()
@@ -467,14 +476,13 @@ impl LaminasStatementPrepareHandler {
             let mut attributes = vec![];
             tracing::debug!("Auto::Laminas::post (Statement::prepare) - sql: {:?}", sql);
             if let Some(sql_str) = sql {
-                attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql_str));
+                attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql_str.clone()));
+                execute_span_name = sql_utils::extract_span_name_from_sql(&sql_str)
+                    .unwrap_or_else(|| "OTHER".to_string());
             }
             let id = get_object_id(this_obj);
-            tracing::debug!(
-                "Auto::Laminas::post (Statement::prepare) - storing statement attributes for statement object: {:?} id: {}",
-                this_obj, id
-            );
-            STATEMENT_ATTRS.lock().unwrap().insert(id, attributes);
+            tracing::debug!("Auto::Laminas::post (Statement::prepare) - storing statement attributes for statement id: {}", id);
+            STATEMENT_ATTRS.lock().unwrap().insert(id, StatementInfo{attributes, span_name: execute_span_name});
         }
     }
 }
@@ -509,17 +517,11 @@ impl LaminasStatementExecuteHandler {
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
             let statement_id = get_object_id(this_obj);
             tracing::debug!("Auto::Laminas::pre (Statement::execute) - found this object: {:?}, id={}", this_obj, statement_id);
-            if let Some(attrs) = STATEMENT_ATTRS.lock().unwrap().get(&statement_id) {
-                tracing::debug!("Auto::Laminas::pre (Statement::execute) - found statement attributes: {:?}", attrs);
-                attributes.extend_from_slice(attrs);
+            if let Some(info) = STATEMENT_ATTRS.lock().unwrap().get(&statement_id) {
+                tracing::debug!("Auto::Laminas::pre (Statement::execute) - found statement attributes: {:?}", info.attributes);
+                attributes.extend_from_slice(&info.attributes);
                 //check for SemConv::trace::DB_QUERY_TEXT attribute, and if found use it to name the span
-                if let Some(query_text) = attrs.iter().find(|kv| kv.key == SemConv::trace::DB_QUERY_TEXT.into()) {
-                    if let Some(name) = sql_utils::extract_span_name_from_sql(query_text.value.as_str().as_ref()) {
-                        span_name = name;
-                    } else {
-                        span_name = "OTHER".to_string();
-                    }
-                }
+                span_name = info.span_name.clone();
             }
         }
 

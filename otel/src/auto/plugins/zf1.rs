@@ -42,8 +42,13 @@ use phper::{
 // which uses internal functions (can not be instrumented with php <8.2)
 // TODO span links between prepare+execute
 
+struct StatementInfo {
+    attributes: Vec<KeyValue>,
+    span_name: String,
+}
+
 lazy_static! {
-    static ref STATEMENT_ATTRS: Mutex<HashMap<usize, Vec<KeyValue>>> = Mutex::new(HashMap::new());
+    static ref STATEMENT_ATTRS: Mutex<HashMap<usize, StatementInfo>> = Mutex::new(HashMap::new());
 }
 
 // Helper to get object id (pointer address)
@@ -304,10 +309,19 @@ impl Zf1AdapterPrepareHandler {
             let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
             if let Some(sql_str) = sql_zval.as_z_str() {
                 if let Ok(sql) = sql_str.to_str() {
+                    let execute_span_name = sql_utils::extract_span_name_from_sql(&sql)
+                        .unwrap_or_else(|| "OTHER".to_string());
                     let attr = KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string());
                     let id = get_object_id(statement_obj);
                     // Add SQL query as an attribute
-                    STATEMENT_ATTRS.lock().unwrap().insert(id, vec![attr]);
+                    STATEMENT_ATTRS.lock()
+                        .unwrap()
+                        .insert(
+                            id,
+                            StatementInfo{
+                                attributes: vec![attr],
+                                span_name: execute_span_name
+                            });
                 }
             } else {
                 tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
@@ -347,15 +361,9 @@ impl Zf1StatementExecuteHandler {
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
             let id = get_object_id(this_obj);
             tracing::debug!("Zf1StatementExecuteHandler: object id: {}", id);
-            if let Some(attrs) = STATEMENT_ATTRS.lock().unwrap().get(&id) {
-                attributes.extend_from_slice(attrs);
-                if let Some(query_text) = attrs.iter().find(|kv| kv.key == SemConv::trace::DB_QUERY_TEXT.into()) {
-                    if let Some(name) = sql_utils::extract_span_name_from_sql(query_text.value.as_str().as_ref()) {
-                        span_name = name;
-                    } else {
-                        span_name = "OTHER".to_string();
-                    }
-                }
+            if let Some(info) = STATEMENT_ATTRS.lock().unwrap().get(&id) {
+                attributes.extend_from_slice(&info.attributes);
+                span_name = info.span_name.clone();
             }
         }
 
