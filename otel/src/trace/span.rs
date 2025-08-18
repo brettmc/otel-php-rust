@@ -190,9 +190,9 @@ pub fn make_span_class(
             let attributes = vec![];
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.add_link(span_context.clone(), attributes);
-            } else if let Some(_ctx) = storage::get_context_instance(instance_id as u64) {
+            } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
                 //SpanRef.add_link does not exist, so do nothing (see unreleased https://github.com/open-telemetry/opentelemetry-rust/pull/1515 )
-                //ctx.span().add_link(&span_context.clone(), attributes);
+                ctx.span().add_link(span_context.clone(), attributes);
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())

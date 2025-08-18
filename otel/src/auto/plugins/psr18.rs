@@ -71,7 +71,7 @@ impl Handler for Psr18SendRequestHandler {
 
 impl Psr18SendRequestHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let tracer = tracer_provider::get_tracer_provider().tracer("psr18"); //TODO: store tracer in a static variable
+        let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.psr18");
         let mut name = "psr18.request".to_string();
 
         let exec_data_ref = unsafe {&mut *exec_data};
