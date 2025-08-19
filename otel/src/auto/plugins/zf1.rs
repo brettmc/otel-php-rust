@@ -12,6 +12,7 @@ use crate::{
 use opentelemetry::{
     KeyValue,
     trace::{
+        SpanContext,
         TraceContextExt,
         TracerProvider,
     },
@@ -35,11 +36,11 @@ use phper::{
 // Zend Framework 1 (ZF1) plugin for OpenTelemetry PHP auto-instrumentation.
 // db connections are not tracked, as the _connect method is called before every db operation,
 // which uses internal functions (can not be instrumented with php <8.2)
-// TODO span links between prepare+execute
 
 struct StatementInfo {
     attributes: Vec<KeyValue>,
     span_name: String,
+    span_context: SpanContext,
 }
 
 lazy_static! {
@@ -261,19 +262,23 @@ impl Zf1AdapterPrepareHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe {&mut *exec_data};
+        let mut span_name = "prepare".to_string();
         let mut attributes = get_default_attributes(exec_data_ref);
         let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         if let Some(sql_str) = sql_zval.as_z_str() {
             if let Ok(sql) = sql_str.to_str() {
                 // Add SQL query as an attribute
                 attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
+                let sql_name = utils::extract_span_name_from_sql(&sql)
+                    .unwrap_or_else(|| "OTHER".to_string());
+                span_name = format!("prepare {}", sql_name);
             }
         } else {
             tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
         }
-        let name = "Statement::prepare".to_string();
 
-        utils::start_and_activate_span(tracer, &name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -289,8 +294,13 @@ impl Zf1AdapterPrepareHandler {
             let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
             if let Some(sql_str) = sql_zval.as_z_str() {
                 if let Ok(sql) = sql_str.to_str() {
-                    let execute_span_name = utils::extract_span_name_from_sql(&sql)
+                    let sql_name = utils::extract_span_name_from_sql(&sql)
                         .unwrap_or_else(|| "OTHER".to_string());
+                    let execute_span_name = sql_name.clone();
+                    let prepare_span_name = format!("prepare {}", sql_name.clone());
+                    opentelemetry::Context::current()
+                        .span()
+                        .update_name(prepare_span_name);
                     let attr = KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string());
                     let id = get_object_id(statement_obj);
                     // Add SQL query as an attribute
@@ -300,7 +310,8 @@ impl Zf1AdapterPrepareHandler {
                             id,
                             StatementInfo{
                                 attributes: vec![attr],
-                                span_name: execute_span_name
+                                span_name: execute_span_name,
+                                span_context: opentelemetry::Context::current().span().span_context().clone(),
                             });
                 }
             } else {
@@ -337,6 +348,7 @@ impl Zf1StatementExecuteHandler {
         let exec_data_ref = unsafe { &mut *exec_data };
         let mut attributes = get_default_attributes(exec_data_ref);
         let mut span_name = "Statement::execute".to_string();
+        let mut link = None;
 
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
             let id = get_object_id(this_obj);
@@ -344,10 +356,16 @@ impl Zf1StatementExecuteHandler {
             if let Some(info) = STATEMENT_ATTRS.lock().unwrap().get(&id) {
                 attributes.extend_from_slice(&info.attributes);
                 span_name = info.span_name.clone();
+                link = Some(info.span_context.clone());
             }
         }
 
         utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        if link.is_some() {
+            opentelemetry::Context::current()
+                .span()
+                .add_link(link.unwrap(), vec![]);
+        }
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
