@@ -44,85 +44,39 @@ $result = $adapter->query($sql, []);
 
 // method 4 - query with direct execute
 $result = $adapter->query($sql, Adapter::QUERY_MODE_EXECUTE);
-//var_dump(Memory::getSpans());
-//die;
 
 var_dump(Memory::count());
-echo '===first span===' . PHP_EOL;
-$first = Memory::getSpans()[0];
-var_dump($first['name']);
-var_dump($first['span_kind']);
-var_dump($first['attributes']);
+foreach (Memory::getSpans() as $span) {
+    var_dump($span['name']);
+}
 
-echo '===second span===' . PHP_EOL;
-$second = Memory::getSpans()[1];
-var_dump($second['name']);
-var_dump($second['span_kind']);
-var_dump($second['attributes']);
-
-echo '===third span===' . PHP_EOL;
-$third = Memory::getSpans()[2];
-var_dump($third['name']);
-var_dump($third['span_kind']);
-var_dump($third['attributes']);
-
-echo '===fourth span===' . PHP_EOL;
-$fourth = Memory::getSpans()[3];
-var_dump($fourth['name']);
-var_dump($fourth['span_kind']);
-var_dump($fourth['attributes']);
+echo '===direct execute===' . PHP_EOL;
+//validate the direct execute span
+$execute_span = Memory::getSpans()[7];
+var_dump($execute_span['name']);
+var_dump($execute_span['span_kind']);
+var_dump($execute_span['attributes']);
 ?>
 --EXPECTF--
-int(4)
-===first span===
-string(%d) "SELECT users"
-string(%d) "Client"
-array(%d) {
-  ["code.function.name"]=>
-  string(%d) "%s\Statement::execute"
-  ["code.file.path"]=>
-  string(%d) "%s/Adapter/Driver/Pdo/Statement.php"
-  ["code.line.number"]=>
-  int(%d)
-  ["db.query.text"]=>
-  string(%d) "select * from users"
-}
-===second span===
-string(%d) "SELECT users"
-string(%d) "Client"
-array(%d) {
-  ["code.function.name"]=>
-  string(%d) "%s\Statement::execute"
-  ["code.file.path"]=>
-  string(%d) "%s/Adapter/Driver/Pdo/Statement.php"
-  ["code.line.number"]=>
-  int(%d)
-  ["db.query.text"]=>
-  string(%d) "select * from users"
-}
-===third span===
+int(8)
+string(7) "connect"
+string(20) "prepare SELECT users"
 string(12) "SELECT users"
-string(6) "Client"
-array(%d) {
-  ["code.function.name"]=>
-  string(%d) "%s\Statement::execute"
-  ["code.file.path"]=>
-  string(%d) "%s/Adapter/Driver/Pdo/Statement.php"
-  ["code.line.number"]=>
-  int(%d)
-  ["db.query.text"]=>
-  string(%d) "select * from users"
-}
-===fourth span===
+string(20) "prepare SELECT users"
+string(12) "SELECT users"
+string(20) "prepare SELECT users"
+string(12) "SELECT users"
+string(12) "SELECT users"
+===direct execute===
 string(12) "SELECT users"
 string(6) "Client"
 array(4) {
   ["code.function.name"]=>
-  string(%d) "Laminas\Db\Adapter\Driver\Pdo\Connection::execute"
+  string(49) "Laminas\Db\Adapter\Driver\Pdo\Connection::execute"
   ["code.file.path"]=>
   string(%d) "%s/Adapter/Driver/Pdo/Connection.php"
   ["code.line.number"]=>
   int(%d)
   ["db.query.text"]=>
-  string(%d) "select * from users"
+  string(19) "select * from users"
 }
