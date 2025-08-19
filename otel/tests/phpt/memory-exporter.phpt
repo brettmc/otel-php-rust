@@ -27,7 +27,7 @@ int(0)
 int(1)
 array(1) {
   [0]=>
-  array(10) {
+  array(%d) {
     ["name"]=>
     string(4) "root"
     ["span_context"]=>
@@ -67,6 +67,9 @@ array(1) {
     array(0) {
     }
     ["events"]=>
+    array(0) {
+    }
+    ["links"]=>
     array(0) {
     }
   }
