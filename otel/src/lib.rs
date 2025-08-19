@@ -45,7 +45,6 @@ use opentelemetry_sdk::{
     propagation::TraceContextPropagator,
 };
 use std::env;
-use tokio::runtime::Runtime;
 use once_cell::sync::OnceCell;
 
 pub mod context{
@@ -107,7 +106,6 @@ use crate::auto::plugin_manager::PluginManager;
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
-static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
 static DISABLED: OnceCell<bool> = OnceCell::new();
 
 #[php_get_module]
@@ -228,18 +226,6 @@ pub fn get_module() -> Module {
             return;
         }
 
-        let protocol = env::var("OTEL_EXPORTER_OTLP_PROTOCOL").unwrap_or("grpc".to_string());
-        if protocol == "grpc" {
-            if TOKIO_RUNTIME.get().is_none() {
-                tracing::debug!("OpenTelemetry::RINIT::Creating tokio runtime");
-                let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-                TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
-                tracing::debug!("OpenTelemetry::RINIT::tokio runtime initialized");
-            }
-        } else {
-            tracing::debug!("OpenTelemetry::RINIT not creating tokio runtime for non-gRPC exporter");
-        }
-
         tracer_provider::init_once();
         global::set_text_map_propagator(TraceContextPropagator::new());
 
@@ -260,8 +246,4 @@ pub fn get_module() -> Module {
     });
 
     module
-}
-
-pub fn get_runtime() -> &'static Runtime {
-    TOKIO_RUNTIME.get().expect("Tokio runtime not initialized")
 }

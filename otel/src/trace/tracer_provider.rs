@@ -28,19 +28,23 @@ use opentelemetry_sdk::{
     },
     Resource,
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::{
+    Lazy,
+    OnceCell,
+};
+use tokio::runtime::Runtime;
 use crate::{
     request,
     trace::tracer::TracerClass,
     util,
 };
 use crate::trace::memory_exporter::MEMORY_EXPORTER;
-use crate::get_runtime;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";
 
 pub type TracerProviderClass = StateClass<()>;
 
+static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
 static TRACER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     Arc::new(SdkTracerProvider::builder()
@@ -120,6 +124,12 @@ pub fn init_once() {
             }
         } else {
             tracing::debug!("Using gRPC trace exporter with tokio runtime");
+            if TOKIO_RUNTIME.get().is_none() {
+                tracing::debug!("Creating tokio runtime");
+                let runtime = Runtime::new().expect("Failed to create Tokio runtime required for gRPC export");
+                TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
+                tracing::debug!("tokio runtime initialized");
+            }
             let runtime = get_runtime();
             let exporter = runtime.block_on(async {
                 OtlpSpanExporter::builder()
@@ -139,6 +149,10 @@ pub fn init_once() {
         .build()
     );
     providers.insert(key, provider.clone());
+}
+
+fn get_runtime() -> &'static Runtime {
+    TOKIO_RUNTIME.get().expect("Tokio runtime not initialized")
 }
 
 pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
