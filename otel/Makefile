@@ -29,15 +29,17 @@ clean:
 	rm -rf configure* config.h.* libtool Makefile.* run-tests.php build/ autom4te.cache/
 	rm -rf tests/auto/laminas/vendor/* tests/auto/laminas/composer.lock
 	rm -rf tests/auto/zf1/vendor/* tests/auto/zf1/composer.lock
+	rm -rf tests/auto/psr18/vendor/* tests/auto/psr18/composer.lock
 update:
 	@echo "Updating composer dependencies..."
 	(cd tests/auto/laminas && composer update --no-dev)
 	(cd tests/auto/zf1 && composer update --no-dev)
+	(cd tests/auto/psr18 && composer update --no-dev)
 	@echo "✅ Composer dependencies updated"
 clean-build-test: clean test-all
 test: build-test
 	@echo "Running all tests..."
-	php run-tests.php -q --show-diff tests/phpt/
+	php run-tests.php -q -j4 --show-diff tests/phpt/
 test-all: build-test
 	@echo "Running functional tests..."
 	php run-tests.php -q tests/
@@ -46,7 +48,7 @@ test-export: build-test
 	php run-tests.php -q --show-diff tests/otlp/
 test-auto: build-test
 	@echo "Running auto-instrumentation tests..."
-	php run-tests.php -q --show-diff tests/auto/
+	php run-tests.php -q -j4 --show-diff tests/auto/
 test-http: build-test
 	@echo "Running HTTP tests with built-in webserver..."
 	php run-tests.php -q --show-diff tests/http/
