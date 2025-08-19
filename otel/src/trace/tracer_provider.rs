@@ -35,10 +35,12 @@ use once_cell::sync::{
 use tokio::runtime::Runtime;
 use crate::{
     request,
-    trace::tracer::TracerClass,
+    trace::{
+        memory_exporter::MEMORY_EXPORTER,
+        tracer::TracerClass
+    },
     util,
 };
-use crate::trace::memory_exporter::MEMORY_EXPORTER;
 
 const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";
 
@@ -130,7 +132,7 @@ pub fn init_once() {
                 TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
                 tracing::debug!("tokio runtime initialized");
             }
-            let runtime = get_runtime();
+            let runtime = TOKIO_RUNTIME.get().expect("Tokio runtime not initialized");
             let exporter = runtime.block_on(async {
                 OtlpSpanExporter::builder()
                     .with_tonic()
@@ -149,10 +151,6 @@ pub fn init_once() {
         .build()
     );
     providers.insert(key, provider.clone());
-}
-
-fn get_runtime() -> &'static Runtime {
-    TOKIO_RUNTIME.get().expect("Tokio runtime not initialized")
 }
 
 pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {

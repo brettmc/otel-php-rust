@@ -102,7 +102,6 @@ pub mod auto{
         pub mod zf1;
     }
 }
-use crate::auto::plugin_manager::PluginManager;
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 
@@ -190,16 +189,16 @@ pub fn get_module() -> Module {
 
         let auto_enabled = ini_get::<bool>(config::ini::OTEL_AUTO_ENABLED);
         if auto_enabled {
-            let plugin_manager = PluginManager::new();
-            crate::auto::plugin_manager::set_global(plugin_manager);
+            let plugin_manager = auto::plugin_manager::PluginManager::new();
+            auto::plugin_manager::set_global(plugin_manager);
 
             #[cfg(otel_observer_supported)]
             {
-                crate::auto::observer::init();
+                auto::observer::init();
             }
             #[cfg(otel_observer_not_supported)]
             {
-                crate::auto::execute::init();
+                auto::execute::init();
             }
         } else {
             tracing::debug!("OpenTelemetry::MINIT auto-instrumentation disabled");
@@ -239,7 +238,7 @@ pub fn get_module() -> Module {
         tracing::debug!("OpenTelemetry::RSHUTDOWN");
         request::shutdown();
         //call plugin manager request_shutdown
-        if let Some(plugin_manager) = crate::auto::plugin_manager::get_global() {
+        if let Some(plugin_manager) = auto::plugin_manager::get_global() {
             let mut pm = plugin_manager.write().expect("Failed to acquire write lock");
             pm.request_shutdown();
         }
