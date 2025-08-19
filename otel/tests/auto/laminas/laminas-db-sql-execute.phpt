@@ -55,7 +55,13 @@ int(3)
 ===connect===
 string(7) "connect"
 string(6) "Client"
-array(2) {
+array(5) {
+  ["code.function.name"]=>
+  string(49) "Laminas\Db\Adapter\Driver\Pdo\Connection::connect"
+  ["code.file.path"]=>
+  string(%d) "%s/Adapter/Driver/Pdo/Connection.php"
+  ["code.line.number"]=>
+  int(%d)
   ["db.namespace"]=>
   string(%d) "%s/test.sqlite"
   ["db.system.name"]=>

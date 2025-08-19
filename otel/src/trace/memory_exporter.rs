@@ -147,7 +147,46 @@ pub fn make_memory_exporter_class() -> ClassEntity<()> {
                 events.insert((), event_arr);
             }
             arr.insert("events", events);
+            // Add span links
+            let mut links = ZArray::new();
+            for link in span.links.clone() {
+                let mut link_arr = ZArray::new();
+                let mut link_context = ZArray::new();
+                link_context.insert("trace_id", link.span_context.trace_id().to_string());
+                link_context.insert("span_id", link.span_context.span_id().to_string());
+                link_context.insert("trace_flags", format!("{:02x}", link.span_context.trace_flags()));
+                link_context.insert("is_remote", link.span_context.is_remote());
+                link_arr.insert("span_context", link_context);
+
+                // Link attributes
+                let mut link_attributes = ZArray::new();
+                for kv in link.attributes.iter() {
+                    match &kv.value {
+                        opentelemetry::Value::String(s) => link_attributes.insert(kv.key.as_str(), s.as_str()),
+                        opentelemetry::Value::I64(i) => link_attributes.insert(kv.key.as_str(), *i),
+                        opentelemetry::Value::F64(f) => link_attributes.insert(kv.key.as_str(), *f),
+                        opentelemetry::Value::Bool(b) => link_attributes.insert(kv.key.as_str(), *b),
+                        opentelemetry::Value::Array(arr) => {
+                            let mut arr_values = ZArray::new();
+                            match arr {
+                                opentelemetry::Array::Bool(vec) => for v in vec { arr_values.insert((), *v); },
+                                opentelemetry::Array::I64(vec) => for v in vec { arr_values.insert((), *v); },
+                                opentelemetry::Array::F64(vec) => for v in vec { arr_values.insert((), *v); },
+                                opentelemetry::Array::String(vec) => for v in vec { arr_values.insert((), v.as_str()); },
+                                _ => continue,
+                            }
+                            link_attributes.insert(kv.key.as_str(), arr_values);
+                        }
+                        _ => continue,
+                    }
+                }
+                link_arr.insert("attributes", link_attributes);
+                links.insert((), link_arr);
+            }
+            arr.insert("links", links);
+            //add to final result set
             result.insert((), arr);
+
         }
         Ok::<_, Infallible>(result)
     })

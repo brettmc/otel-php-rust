@@ -59,6 +59,7 @@ pub fn start_and_activate_span(
     exec_data: *mut ExecuteData,
     span_kind: SpanKind,
 ) {
+    //TODO merge attributes with default attributes from exec_data ?
     let span_builder = tracer.span_builder(span_name.to_string())
         .with_kind(span_kind)
         .with_attributes(attributes);
