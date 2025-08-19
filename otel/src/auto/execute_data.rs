@@ -8,6 +8,37 @@ use phper::{
 use opentelemetry::{
     KeyValue,
 };
+use std::collections::HashMap;
+use std::cell::RefCell;
+
+/// Storage for communication between pre and post hooks, using exec_data as key
+thread_local! {
+    static EXEC_DATA_FLAGS: RefCell<HashMap<usize, bool>> = RefCell::new(HashMap::new());
+}
+
+/// Set a flag. If you set a flag (eg in a pre hook), ensure you remove it in the post hook.
+pub fn set_exec_data_flag(exec_data: *mut ExecuteData, value: bool) {
+    let key = exec_data as usize;
+    EXEC_DATA_FLAGS.with(|map| {
+        map.borrow_mut().insert(key, value);
+    });
+}
+
+// Get a flag
+pub fn get_exec_data_flag(exec_data: *mut ExecuteData) -> Option<bool> {
+    let key = exec_data as usize;
+    EXEC_DATA_FLAGS.with(|map| {
+        map.borrow().get(&key).copied()
+    })
+}
+
+// Remove a flag (cleanup)
+pub fn remove_exec_data_flag(exec_data: *mut ExecuteData) {
+    let key = exec_data as usize;
+    EXEC_DATA_FLAGS.with(|map| {
+        map.borrow_mut().remove(&key);
+    });
+}
 
 //copied from https://github.com/apache/skywalking-php/blob/v0.8.0/src/execute.rs#L283
 pub fn get_function_and_class_name(

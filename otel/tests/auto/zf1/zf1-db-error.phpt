@@ -26,14 +26,14 @@ try {
 
 var_dump(Memory::count());
 $spans = Memory::getSpans();
-$prepareSpan = $spans[0];
+$prepareSpan = $spans[1];
 var_dump($prepareSpan['name']);
 var_dump($prepareSpan['status']);
 var_dump($prepareSpan['attributes']);
 var_dump($prepareSpan['events']);
 ?>
 --EXPECTF--
-%Aint(1)
+%Aint(2)
 string(%d) "prepare SELECT does_not_exist"
 string(%d) "Error { description: "%s no such table: does_not_exist" }"
 array(%d) {
