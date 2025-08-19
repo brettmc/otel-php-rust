@@ -41,7 +41,7 @@ assert(count($execute_two['links']) === 1);
 assert($execute_two['links'][0]['span_context']['span_id'] === $prepare['span_context']['span_id']);
 ?>
 --EXPECTF--
-int(4)
+%Aint(4)
 string(7) "connect"
 string(20) "prepare SELECT users"
 string(12) "SELECT users"

@@ -11,7 +11,7 @@ use opentelemetry::{
 use std::collections::HashMap;
 use std::cell::RefCell;
 
-/// Storage for communication between pre and post hooks, using exec_data as key
+// Storage for communication between pre and post hooks, using exec_data as key
 thread_local! {
     static EXEC_DATA_FLAGS: RefCell<HashMap<usize, bool>> = RefCell::new(HashMap::new());
 }
