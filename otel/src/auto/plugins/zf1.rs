@@ -282,7 +282,7 @@ impl Zf1AdapterConnectHandler {
         if should_start_span {
             let span_name = "connect".to_string();
             let mut execute_attributes = vec![];
-            let mut attributes = execute_data::get_default_attributes(unsafe {&mut *exec_data});
+            let mut attributes = vec![];
             if class_name.is_some() {
                 execute_attributes.push(KeyValue::new(SemConv::trace::DB_SYSTEM_NAME, map_adapter_class_to_db_system(&class_name.unwrap())));
             }
@@ -354,7 +354,7 @@ impl Zf1AdapterPrepareHandler {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe {&mut *exec_data};
         let mut span_name = "prepare".to_string();
-        let mut attributes = execute_data::get_default_attributes(exec_data_ref);
+        let mut attributes = vec![];
         let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         if let Some(sql_str) = sql_zval.as_z_str() {
             if let Ok(sql) = sql_str.to_str() {
@@ -452,7 +452,7 @@ impl Zf1StatementExecuteHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe { &mut *exec_data };
-        let mut attributes = execute_data::get_default_attributes(exec_data_ref);
+        let mut attributes = vec![];
         let mut span_name = "Statement::execute".to_string();
         let mut link = None;
 

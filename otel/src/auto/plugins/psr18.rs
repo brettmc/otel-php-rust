@@ -1,6 +1,5 @@
 use crate::{
     auto::{
-        execute_data::{get_default_attributes},
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
         utils::{start_and_activate_span, record_exception},
     },
@@ -79,7 +78,7 @@ impl Psr18SendRequestHandler {
         let mut name = "psr18.request".to_string();
 
         let exec_data_ref = unsafe {&mut *exec_data};
-        let mut attributes = get_default_attributes(exec_data_ref);
+        let mut attributes = vec![];
         let request_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
 
         //TODO add more SemConv attributes...

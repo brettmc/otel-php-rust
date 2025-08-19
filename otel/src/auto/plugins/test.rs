@@ -3,18 +3,16 @@
 // - DemoFunctionHandler: observes a specific function with a different pre and post callback
 use crate::{
     auto::{
-        execute_data::{get_default_attributes, get_fqn},
+        execute_data::get_fqn,
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
-        utils::record_exception,
+        utils,
     },
-    context::storage::{store_guard, take_guard},
+    context::storage::take_guard,
     tracer_provider,
 };
 use opentelemetry::{
-    Context,
     KeyValue,
     trace::{
-        Tracer,
         TraceContextExt,
         TracerProvider,
     },
@@ -81,15 +79,9 @@ impl DemoHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
         let exec_data_ref = unsafe { &*exec_data };
-        let attributes = get_default_attributes(exec_data_ref);
-        let name = get_fqn(exec_data_ref);
+        let span_name = get_fqn(exec_data_ref);
 
-        let span_builder = tracer.span_builder(name)
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal);
     }
 
     unsafe extern "C" fn post_callback(
@@ -130,15 +122,11 @@ impl Handler for DemoFunctionHandler {
 impl DemoFunctionHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
-        let mut attributes = get_default_attributes(unsafe{&*exec_data});
+        let mut attributes = vec![];
         attributes.push(KeyValue::new("my-attribute", "my-value".to_string()));
+        let span_name = "demo-function";
 
-        let span_builder = tracer.span_builder("demo-function".to_string())
-            .with_attributes(attributes);
-        let span = tracer.build_with_context(span_builder, &Context::current());
-        let ctx = Context::current_with_span(span);
-        let guard = ctx.attach();
-        store_guard(exec_data, guard);
+        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal);
     }
 
     unsafe extern "C" fn post_callback(
@@ -151,7 +139,7 @@ impl DemoFunctionHandler {
         let context = opentelemetry::Context::current();
         let span_ref = context.span();
         if let Some(exception) = exception {
-            record_exception(&opentelemetry::Context::current(), exception);
+            utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
         if let Some(_guard) = take_guard(exec_data) {

@@ -1,4 +1,7 @@
-use crate::context::storage::store_guard;
+use crate::{
+    auto::execute_data::get_default_attributes,
+    context::storage::store_guard,
+};
 use opentelemetry::{
     Context,
     KeyValue,
@@ -59,10 +62,11 @@ pub fn start_and_activate_span(
     exec_data: *mut ExecuteData,
     span_kind: SpanKind,
 ) {
-    //TODO merge attributes with default attributes from exec_data ?
+    let mut merged_attributes = get_default_attributes(unsafe { &*exec_data });
+    merged_attributes.extend(attributes);
     let span_builder = tracer.span_builder(span_name.to_string())
         .with_kind(span_kind)
-        .with_attributes(attributes);
+        .with_attributes(merged_attributes);
     let span = tracer.build_with_context(span_builder, &Context::current());
     let ctx = Context::current_with_span(span);
     let guard = ctx.attach();
