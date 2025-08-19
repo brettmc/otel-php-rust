@@ -33,25 +33,69 @@ $select    = $sql->select()->from('users')->where(['id' => 1]);
 $statement = $sql->prepareStatementForSqlObject($select);
 $result    = $statement->execute();
 
-var_dump(Memory::count());
-$span = Memory::getSpans()[0];
-var_dump($span['name']);
-var_dump($span['span_kind']);
-var_dump($span['attributes']);
+var_dump(Memory::count()); //expect 3: connect, prepare, execute
+echo '===connect===' . PHP_EOL;
+$connect = Memory::getSpans()[0];
+var_dump($connect['name']);
+var_dump($connect['span_kind']);
+var_dump($connect['attributes']);
+echo '===prepare===' . PHP_EOL;
+$prepare = Memory::getSpans()[1];
+var_dump($prepare['name']);
+var_dump($prepare['span_kind']);
+var_dump($prepare['attributes']);
+echo '===execute===' . PHP_EOL;
+$execute = Memory::getSpans()[2];
+var_dump($execute['name']);
+var_dump($execute['span_kind']);
+var_dump($execute['attributes']);
 ?>
 --EXPECTF--
-int(1)
-string(%d) "SELECT users"
-string(%d) "Client"
-array(%d) {
+int(3)
+===connect===
+string(7) "connect"
+string(6) "Client"
+array(5) {
   ["code.function.name"]=>
-  string(%d) "%s\Statement::execute"
+  string(49) "Laminas\Db\Adapter\Driver\Pdo\Connection::connect"
+  ["code.file.path"]=>
+  string(%d) "%s/Adapter/Driver/Pdo/Connection.php"
+  ["code.line.number"]=>
+  int(%d)
+  ["db.namespace"]=>
+  string(%d) "%s/test.sqlite"
+  ["db.system.name"]=>
+  string(6) "sqlite"
+}
+===prepare===
+string(20) "prepare SELECT users"
+string(6) "Client"
+array(6) {
+  ["code.function.name"]=>
+  string(48) "Laminas\Db\Adapter\Driver\Pdo\Statement::prepare"
   ["code.file.path"]=>
   string(%d) "%s/Adapter/Driver/Pdo/Statement.php"
   ["code.line.number"]=>
   int(%d)
   ["db.query.text"]=>
-  string(%d) " SELECT "users".* FROM "users" WHERE %s"
+  string(%d) " SELECT %s FROM %s WHERE %s"
+  ["db.namespace"]=>
+  string(%d) "%s/test.sqlite"
+  ["db.system.name"]=>
+  string(6) "sqlite"
+}
+===execute===
+string(%d) "SELECT users"
+string(6) "Client"
+array(6) {
+  ["code.function.name"]=>
+  string(48) "Laminas\Db\Adapter\Driver\Pdo\Statement::execute"
+  ["code.file.path"]=>
+  string(%d) "%s/Adapter/Driver/Pdo/Statement.php"
+  ["code.line.number"]=>
+  int(%d)
+  ["db.query.text"]=>
+  string(%d) " SELECT %s FROM %s WHERE %s"
   ["db.namespace"]=>
   string(%d) "%s/test.sqlite"
   ["db.system.name"]=>

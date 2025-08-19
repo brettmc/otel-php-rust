@@ -28,6 +28,8 @@ $adapter = new Adapter([
     'database' => __DIR__ . '/data/test.sqlite',
 ]);
 
+$adapter->getDriver()->getConnection()->beginTransaction();
+
 //insert
 $statement = $adapter->createStatement();
 $statement->prepare('insert into "scratch" (i) values (1)');
@@ -43,6 +45,8 @@ $statement = $adapter->createStatement();
 $statement->prepare('delete from scratch where i=0');
 $result = $statement->execute();
 
+$adapter->getDriver()->getConnection()->rollback();
+
 //"other"
 $statement = $adapter->createStatement();
 $statement->prepare('vacuum');
@@ -50,19 +54,18 @@ $result = $statement->execute();
 
 var_dump(Memory::count());
 $spans = Memory::getSpans();
-$insert = $spans[0];
-$update = $spans[1];
-$delete = $spans[2];
-$vacuum = $spans[3];
-
-var_dump($insert['name']);
-var_dump($update['name']);
-var_dump($delete['name']);
-var_dump($vacuum['name']);
+foreach ($spans as $span) {
+    var_dump($span['name']);
+}
 ?>
 --EXPECTF--
-int(4)
+int(9)
+string(7) "connect"
+string(22) "prepare INSERT scratch"
 string(14) "INSERT scratch"
+string(22) "prepare UPDATE scratch"
 string(14) "UPDATE scratch"
+string(22) "prepare DELETE scratch"
 string(14) "DELETE scratch"
+string(13) "prepare OTHER"
 string(5) "OTHER"
