@@ -79,7 +79,7 @@ impl DemoHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
         let exec_data_ref = unsafe { &*exec_data };
-        let span_name = get_fqn(exec_data_ref).unwrap();
+        let span_name = get_fqn(exec_data_ref).unwrap_or_default();
 
         utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal);
     }

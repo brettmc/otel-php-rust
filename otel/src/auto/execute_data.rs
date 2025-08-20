@@ -115,7 +115,10 @@ pub fn get_global_exception() -> Option<&'static mut ZObj> {
 
 // Default auto-instrumentation attributes from ExecuteData
 pub fn get_default_attributes(execute_data: &ExecuteData) -> Vec<KeyValue> {
-    let mut attributes = vec![KeyValue::new("code.function.name".to_string(), get_fqn(execute_data).unwrap())];
+    let mut attributes = vec![];
+    if let Some(fqn) = get_fqn(execute_data) {
+        attributes.push(KeyValue::new("code.function.name".to_string(), fqn));
+    }
     unsafe {
         if let Some((file, line)) = get_file_and_line(execute_data) {
             attributes.push(KeyValue::new("code.file.path".to_string(), file));

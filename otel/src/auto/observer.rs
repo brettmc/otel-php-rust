@@ -40,7 +40,7 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         let fqn = get_fqn(exec_data);
         if fqn.is_some() {
-            tracing::trace!("observer::observer_instrument checking: {}", fqn.clone().unwrap());
+            tracing::trace!("observer::observer_instrument checking: {}", fqn.as_ref().unwrap());
             let plugin_manager = get_plugin_manager()
                 .expect("PluginManager not initialized")
                 .read()
@@ -70,15 +70,15 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_execute_data) {
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
-        let fqn = get_fqn(exec_data).unwrap();
-
-        let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-        let lock = observers.read().unwrap();
-        if let Some(observer) = lock.get(&fqn) {
-            if observer.has_hooks() {
-                for hook in observer.pre_hooks() {
-                    tracing::trace!("running pre hook: {}", fqn);
-                    hook(&mut *exec_data);
+        if let Some(fqn) = get_fqn(exec_data) {
+            let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
+            let lock = observers.read().unwrap();
+            if let Some(observer) = lock.get(&fqn) {
+                if observer.has_hooks() {
+                    for hook in observer.pre_hooks() {
+                        tracing::trace!("running pre hook: {}", fqn);
+                        hook(&mut *exec_data);
+                    }
                 }
             }
         }
@@ -88,20 +88,20 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, retval: *mut sys::zval) {
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
-        let fqn = get_fqn(exec_data).unwrap();
+        if let Some(fqn) = get_fqn(exec_data) {
+            let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
+            let lock = observers.read().unwrap();
+            if let Some(observer) = lock.get(&fqn) {
+                let retval = if retval.is_null() {
+                    &mut ZVal::from(())
+                } else {
+                    unsafe { (retval as *mut ZVal).as_mut().unwrap() }
+                };
 
-        let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-        let lock = observers.read().unwrap();
-        if let Some(observer) = lock.get(&fqn) {
-            let retval = if retval.is_null() {
-                &mut ZVal::from(())
-            } else {
-                unsafe{(retval as *mut ZVal).as_mut().unwrap()}
-            };
-
-            for hook in observer.post_hooks() {
-                tracing::trace!("running post hook: {}", fqn);
-                hook(&mut *exec_data, retval, get_global_exception());
+                for hook in observer.post_hooks() {
+                    tracing::trace!("running post hook: {}", fqn);
+                    hook(&mut *exec_data, retval, get_global_exception());
+                }
             }
         }
     }
