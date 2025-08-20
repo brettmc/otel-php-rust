@@ -51,9 +51,7 @@ pub fn build_context_class(
         .add_method("__destruct", Visibility::Public, |this, _| {
             let context_id = get_instance_id(this);
             debug!("Context::__destruct for context_id = {:?}", context_id);
-            if context_id.is_some() {
-                storage::maybe_remove_context_instance(context_id);
-            }
+            storage::maybe_remove_context_instance(context_id);
             Ok::<_, Infallible>(())
         });
 
