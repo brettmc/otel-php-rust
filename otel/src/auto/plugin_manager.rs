@@ -53,7 +53,7 @@ impl PluginManager {
     }
 
     /// calls request shutdown on all plugins, allowing them to do any post-request cleanup
-    pub fn request_shutdown(&mut self) {
+    pub fn request_shutdown(&self) {
         tracing::debug!("PluginManager::request_shutdown");
         for plugin in &self.plugins {
             plugin.request_shutdown();

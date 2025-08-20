@@ -239,7 +239,7 @@ pub fn get_module() -> Module {
         request::shutdown();
         //call plugin manager request_shutdown
         if let Some(plugin_manager) = auto::plugin_manager::get_global() {
-            let mut pm = plugin_manager.write().expect("Failed to acquire write lock");
+            let pm = plugin_manager.read().expect("Failed to acquire read lock");
             pm.request_shutdown();
         }
     });
