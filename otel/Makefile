@@ -15,7 +15,6 @@ build-test:
 	cargo build --features test
 	cp target/debug/libotel.so modules/otel.so
 re: build-test
-	phpize
 	php -d extension=target/debug/libotel.so --re otel
 check:
 	cargo check
@@ -38,10 +37,10 @@ update:
 	@echo "✅ Composer dependencies updated"
 clean-build-test: clean test-all
 test: build-test
-	@echo "Running all tests..."
+	@echo "Running functional tests..."
 	php run-tests.php -q --show-diff tests/phpt/
 test-all: build-test
-	@echo "Running functional tests..."
+	@echo "Running all tests..."
 	php run-tests.php -q tests/
 test-export: build-test
 	@echo "Running live export tests..."
