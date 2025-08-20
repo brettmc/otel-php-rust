@@ -13,7 +13,6 @@ use phper::{
     classes::ClassEntry,
     functions::ZFunc,
     ini::ini_get,
-    strings::ZString,
     values::ExecuteData,
 };
 use once_cell::sync::OnceCell;
@@ -119,29 +118,27 @@ fn get_disabled_plugins() -> HashSet<String> {
 }
 
 fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name: &str) -> bool {
-    let function_name: ZString = func.get_function_or_method_name();
-    let function_name_str = match function_name.to_str() {
+    let name_zstr = func.get_function_or_method_name();
+    let function_name = match name_zstr.to_str() {
         Ok(name) => name,
-        Err(_) => return false, // If the function name is not valid UTF-8, return false
-    };
-    let parts: Vec<&str> = function_name_str.split("::").collect();
-    let is_method = parts.len() == 2;
-    let observed_name_pair = if is_method {
-        (Some(parts[0].to_string()), parts[1].to_string())
-    } else {
-        (None, function_name_str.to_string())
+        Err(_) => return false,
     };
 
-    //tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
-    if targets.iter().any(|target| target == &observed_name_pair) {
-        //tracing::trace!("should_trace:: {:?} matches on name_pair", name_pair);
-        return true;
+    let mut parts = function_name.splitn(2, "::");
+    let class_part = parts.next();
+    let method_part = parts.next();
+
+    let observed_name_pair = if let Some(method) = method_part {
+        (class_part.map(|s| s.to_owned()), method.to_owned())
     } else {
-        //tracing::trace!("should_trace:: {:?} does not match on name_pair", name_pair);
+        (None, function_name.to_owned())
+    };
+
+    if targets.iter().any(|target| target == &observed_name_pair) {
+        return true;
     }
 
-    //check for interfaces
-    if !is_method {
+    if observed_name_pair.0.is_none() {
         //tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
         return false;
     }
@@ -152,14 +149,12 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name
     };
     for (target_class_name, target_method_name) in targets.iter() {
         if let Some(interface_name) = target_class_name {
-            // Only check if the observed class is an instance of the interface
-            match ClassEntry::from_globals(interface_name.to_string()) {
-                Ok(iface_ce) => {
-                    if ce.is_instance_of(&iface_ce) && &observed_name_pair.1 == target_method_name {
+            if &observed_name_pair.1 == target_method_name {
+                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.clone()) {
+                    if ce.is_instance_of(&iface_ce) {
                         return true;
                     }
                 }
-                Err(_) => {}
             }
         }
     }

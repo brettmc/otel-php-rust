@@ -21,11 +21,15 @@ use crate::{
     },
 };
 use std::{
+    cell::RefCell,
     collections::HashMap,
     sync::{OnceLock, RwLock},
 };
 
 static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, FunctionObserver>>> = OnceLock::new();
+thread_local! {
+    static OBSERVER_CACHE: RefCell<HashMap<String, bool>> = RefCell::new(HashMap::new());
+}
 
 pub fn init() {
     tracing::debug!("Observer::init");
@@ -39,6 +43,14 @@ pub fn init() {
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         let fqn = get_fqn(exec_data);
+
+        // Check the cache, short-circuit out if we already know this function is not observed
+        if let Some(is_observed) = OBSERVER_CACHE.with(|cache| cache.borrow().get(&fqn).copied()) {
+            if !is_observed {
+                return sys::zend_observer_fcall_handlers { begin: None, end: None };
+            }
+        }
+
         //tracing::trace!("observer::observer_instrument checking: {}", fqn);
         let plugin_manager = get_plugin_manager()
             .expect("PluginManager not initialized")
@@ -48,7 +60,12 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
             let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
             let fqn = fqn.to_string();
             let mut lock = observers.write().unwrap();
-            lock.insert(fqn, observer);
+            lock.insert(fqn.clone(), observer);
+
+            // Update the cache
+            OBSERVER_CACHE.with(|cache| {
+                cache.borrow_mut().insert(fqn, true);
+            });
 
             static mut HANDLERS: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
                 begin: Some(pre_observe_c_function),
@@ -56,6 +73,11 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
             };
 
             return unsafe { HANDLERS };
+        } else {
+            // Update the cache for unobserved functions
+            OBSERVER_CACHE.with(|cache| {
+                cache.borrow_mut().insert(fqn, false);
+            });
         }
     }
 
