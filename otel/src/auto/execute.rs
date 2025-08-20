@@ -6,7 +6,6 @@ use phper::{
 use crate::{
     auto::{
         execute_data::{
-            get_fqn,
             get_global_exception,
         },
         plugin_manager::{
@@ -16,13 +15,8 @@ use crate::{
     }
 };
 use std::{
-    collections::HashMap,
     ptr::null_mut,
 };
-
-thread_local! {
-    static OBSERVER_MAP: std::cell::RefCell<HashMap<String, bool>> = std::cell::RefCell::new(HashMap::new());
-}
 
 static mut UPSTREAM_EXECUTE_EX: Option<
     unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data),
@@ -54,7 +48,7 @@ fn handle_execution<F, G>(
 )
 where
     F: Fn(Option<&mut ExecuteData>, Option<&mut ZVal>),
-    G: Fn(&PluginManager, &str, &mut ExecuteData, &mut ZVal),
+    G: Fn(&PluginManager, &mut ExecuteData, &mut ZVal),
 {
     let exec_data = match exec_data {
         Some(data) => data,
@@ -64,30 +58,11 @@ where
         }
     };
 
-    let key = match get_fqn(exec_data) {
-        Some(fqn) => fqn,
-        None => {
-            upstream(Some(exec_data), return_value);
-            return;
-        },
-    };
-
-    // Check if we've already decided to observe this function or not
-    if let Some(observed) = OBSERVER_MAP.with(|map| map.borrow_mut().get(&key).copied()) {
-        if !observed {
-            upstream(Some(exec_data), return_value);
-            return;
-        }
-    }
-
     let plugin_manager = get_plugin_manager()
         .expect("PluginManager not initialized")
         .read()
         .unwrap();
     let observer = plugin_manager.get_function_observer(exec_data);
-    OBSERVER_MAP.with(|map| {
-        map.borrow_mut().insert(key.clone(), observer.is_some());
-    });
 
     if let Some(ref obs) = observer {
         for hook in obs.pre_hooks() {
@@ -107,7 +82,7 @@ where
     upstream(Some(exec_data), Some(retval));
 
     if let Some(ref _observer) = observer {
-        run_post_hooks(&plugin_manager, &key, exec_data, retval);
+        run_post_hooks(&plugin_manager, exec_data, retval);
     }
 }
 
@@ -117,7 +92,7 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         exec_data,
         None,
         |ed, _| upstream_execute_ex(ed),
-        |plugin_manager, _key, exec_data, _retval| {
+        |plugin_manager, exec_data, _retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
                 let retval_ptr: *mut sys::zval = unsafe { (*execute_data).return_value };
                 let mut fallback = ZVal::from(());
@@ -145,7 +120,7 @@ unsafe extern "C" fn execute_internal(
         exec_data,
         ret_val,
         |ed, rv| upstream_execute_internal(ed, rv),
-        |plugin_manager, _key, exec_data, retval| {
+        |plugin_manager, exec_data, retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
                 for hook in observer.post_hooks() {
                     hook(exec_data, retval, get_global_exception());
