@@ -23,7 +23,10 @@ use opentelemetry::{
 use opentelemetry_sdk::trace::Span as SdkSpan;
 use crate::{
     context::{
-        context::ContextClass,
+        context::{
+            get_instance_id,
+            ContextClass,
+        },
         scope::ScopeClass,
         storage,
     },
@@ -282,9 +285,7 @@ pub fn make_span_class(
             let span = this.as_mut_state().take().expect("No span stored!");
 
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let context_id = context_obj.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let context_id = get_instance_id(context_obj);
             // Always go through storage — handles context_id = None as Context::current()
             let context = storage::resolve_context(context_id);
             let arc_ctx = Arc::new(context.with_span(span));
@@ -310,10 +311,4 @@ pub fn make_span_class(
         });
 
     class
-}
-
-fn get_instance_id(this: &phper::objects::ZObj) -> Option<u64> {
-    this.get_property("context_id")
-        .as_long()
-        .and_then(|id| if id > 0 { Some(id as u64) } else { None })
 }

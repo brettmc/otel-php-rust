@@ -7,9 +7,11 @@ use phper::{
 use std::sync::Arc;
 use std::convert::Infallible;
 use crate::context::{
-    context::ContextClassEntity,
+    context::{
+        get_instance_id,
+        ContextClassEntity,
+    },
     storage,
-
 };
 
 pub type TraceContextPropagatorClass = StateClass<()>;
@@ -32,10 +34,7 @@ pub fn make_trace_context_propagator_class(
         .add_method("inject", Visibility::Public, |_, arguments| -> phper::Result<()> {
             // Context (optional, default to Context::current)
             let context_obj = arguments[2].expect_mut_z_obj()?;
-            let context_id = context_obj
-                .get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let context_id = get_instance_id(context_obj);
             tracing::debug!("inject() using context_id = {:?}", context_id);
 
             let context = storage::get_context_instance(context_id);

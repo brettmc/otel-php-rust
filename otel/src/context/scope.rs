@@ -1,6 +1,9 @@
 use crate::{
     context::{
-        context::ContextClassEntity,
+        context::{
+            get_instance_id,
+            ContextClassEntity,
+        },
         storage,
     },
     trace::local_root_span,
@@ -43,9 +46,7 @@ pub fn build_scope_class(
 
     class
         .add_method("detach", Visibility::Public, |this, _| -> phper::Result<()> {
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             if instance_id.is_some() {
                 storage::detach_context(instance_id);
                 local_root_span::maybe_remove_local_root_span(instance_id);
@@ -56,9 +57,7 @@ pub fn build_scope_class(
 
     class
         .add_method("context", Visibility::Public, move |this,_| {
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             let ctx = storage::get_context_instance(instance_id);
             let mut object = context_ce.init_object()?;
             *object.as_mut_state() = ctx;

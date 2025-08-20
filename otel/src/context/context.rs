@@ -49,9 +49,7 @@ pub fn build_context_class(
 
     class
         .add_method("__destruct", Visibility::Public, |this, _| {
-            let context_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let context_id = get_instance_id(this);
             debug!("Context::__destruct for context_id = {:?}", context_id);
             if context_id.is_some() {
                 storage::maybe_remove_context_instance(context_id);
@@ -126,4 +124,11 @@ pub fn build_context_class(
             Ok::<_, phper::Error>(object)
         });
 
+}
+
+/// Get context instance id from a PHP object
+pub fn get_instance_id(obj: &phper::objects::ZObj) -> Option<u64> {
+    obj.get_property("context_id")
+        .as_long()
+        .and_then(|id| if id > 0 { Some(id as u64) } else { None })
 }
