@@ -39,7 +39,7 @@ pub fn init() {
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         if let Some(fqn) = get_fqn(exec_data) {
-            tracing::trace!("observer::observer_instrument checking: {}", fqn.clone());
+            tracing::trace!("observer::observer_instrument checking: {}", &fqn);
             let plugin_manager = get_plugin_manager()
                 .expect("PluginManager not initialized")
                 .read()
