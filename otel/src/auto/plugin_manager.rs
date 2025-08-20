@@ -86,7 +86,7 @@ impl PluginManager {
 
         // Check cache
         if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
-            if let Some(observer) = cache.read().unwrap().get(&fqn).cloned() {
+            if let Some(observer) = cache.read().expect("FUNCTION_OBSERVER_CACHE lock poisoned while reading").get(&fqn).cloned() {
                 tracing::trace!("Using cached observer for function: {}", fqn);
                 return Some(observer);
             }
@@ -116,7 +116,7 @@ impl PluginManager {
             let arc_observer = Arc::new(observer);
             if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
                 tracing::trace!("Caching observer for function: {}", fqn);
-                cache.write().unwrap().insert(fqn, arc_observer.clone());
+                cache.write().expect("FUNCTION_OBSERVER_CACHE poisoned during write").insert(fqn, arc_observer.clone());
             }
             Some(arc_observer)
         } else {
