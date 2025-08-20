@@ -1,5 +1,6 @@
 use crate::{
     auto::{
+        execute_data::get_fqn,
         plugin::{FunctionObserver, Plugin},
         plugins::{
             laminas::LaminasPlugin,
@@ -13,17 +14,21 @@ use phper::{
     classes::ClassEntry,
     functions::ZFunc,
     ini::ini_get,
-    strings::ZString,
     values::ExecuteData,
 };
 use once_cell::sync::OnceCell;
 use std::{
     ffi::CStr,
-    collections::HashSet,
-    sync::RwLock,
+    collections::{HashMap, HashSet},
+    sync::{Arc, RwLock},
 };
 
 static PLUGIN_MANAGER: OnceCell<RwLock<PluginManager>> = OnceCell::new();
+static FUNCTION_OBSERVER_CACHE: OnceCell<RwLock<HashMap<String, Arc<FunctionObserver>>>> = OnceCell::new();
+
+pub fn init_observer_cache() {
+    FUNCTION_OBSERVER_CACHE.set(RwLock::new(HashMap::new())).ok();
+}
 
 pub fn set_global(manager: PluginManager) {
     PLUGIN_MANAGER.set(RwLock::new(manager)).ok();
@@ -40,6 +45,7 @@ pub struct PluginManager {
 impl PluginManager {
     pub fn new() -> Self {
         tracing::debug!("PluginManager::init");
+        init_observer_cache();
         // tracing::debug!("PluginManager::new");
         let mut manager = Self {plugins: vec![] };
         manager.init();
@@ -47,7 +53,7 @@ impl PluginManager {
     }
 
     /// calls request shutdown on all plugins, allowing them to do any post-request cleanup
-    pub fn request_shutdown(&mut self) {
+    pub fn request_shutdown(&self) {
         tracing::debug!("PluginManager::request_shutdown");
         for plugin in &self.plugins {
             plugin.request_shutdown();
@@ -75,21 +81,28 @@ impl PluginManager {
         &self.plugins
     }
 
-    pub fn get_function_observer(&self, execute_data: &mut ExecuteData) -> Option<FunctionObserver> {
-        let mut observer = FunctionObserver::new();
+    pub fn get_function_observer(&self, execute_data: &mut ExecuteData) -> Option<Arc<FunctionObserver>> {
+        let fqn = get_fqn(execute_data)?;
 
+        // Check cache
+        if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
+            if let Some(observer) = cache.read().expect("Failed to acquire read lock on function observer cache").get(&fqn).cloned() {
+                tracing::trace!("Using cached observer for function: {}", fqn);
+                return Some(observer);
+            }
+        }
+
+        // Build observer as before
+        let mut observer = FunctionObserver::new();
         for plugin in &self.plugins {
-            //tracing::trace!("plugin: {}", plugin.get_name());
             for handler in plugin.get_handlers() {
                 if should_trace(execute_data.func(), &handler.get_targets(), plugin.get_name()) {
                     let callbacks = handler.get_callbacks();
-
                     if let Some(pre) = callbacks.pre_observe {
                         observer.add_pre_hook(Box::new(move |execute_data| {
                             pre(execute_data);
                         }));
                     }
-
                     if let Some(post) = callbacks.post_observe {
                         observer.add_post_hook(Box::new(move |execute_data, retval, exception| {
                             post(execute_data, retval, exception);
@@ -100,7 +113,12 @@ impl PluginManager {
         }
 
         if observer.has_hooks() {
-            Some(observer)
+            let arc_observer = Arc::new(observer);
+            if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
+                tracing::trace!("Caching observer for function: {}", fqn);
+                cache.write().expect("Failed to acquire write lock on function observer cache").insert(fqn, arc_observer.clone());
+            }
+            Some(arc_observer)
         } else {
             None
         }
@@ -119,29 +137,27 @@ fn get_disabled_plugins() -> HashSet<String> {
 }
 
 fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name: &str) -> bool {
-    let function_name: ZString = func.get_function_or_method_name();
-    let function_name_str = match function_name.to_str() {
+    let name_zstr = func.get_function_or_method_name();
+    let function_name = match name_zstr.to_str() {
         Ok(name) => name,
-        Err(_) => return false, // If the function name is not valid UTF-8, return false
-    };
-    let parts: Vec<&str> = function_name_str.split("::").collect();
-    let is_method = parts.len() == 2;
-    let observed_name_pair = if is_method {
-        (Some(parts[0].to_string()), parts[1].to_string())
-    } else {
-        (None, function_name_str.to_string())
+        Err(_) => return false,
     };
 
-    //tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
-    if targets.iter().any(|target| target == &observed_name_pair) {
-        //tracing::trace!("should_trace:: {:?} matches on name_pair", name_pair);
-        return true;
+    let mut parts = function_name.splitn(2, "::");
+    let class_part = parts.next();
+    let method_part = parts.next();
+
+    let observed_name_pair = if let Some(method) = method_part {
+        (class_part.map(|s| s.to_owned()), method.to_owned())
     } else {
-        //tracing::trace!("should_trace:: {:?} does not match on name_pair", name_pair);
+        (None, function_name.to_owned())
+    };
+
+    if targets.iter().any(|target| target == &observed_name_pair) {
+        return true;
     }
 
-    //check for interfaces
-    if !is_method {
+    if observed_name_pair.0.is_none() {
         //tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
         return false;
     }
@@ -152,14 +168,12 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name
     };
     for (target_class_name, target_method_name) in targets.iter() {
         if let Some(interface_name) = target_class_name {
-            // Only check if the observed class is an instance of the interface
-            match ClassEntry::from_globals(interface_name.to_string()) {
-                Ok(iface_ce) => {
-                    if ce.is_instance_of(&iface_ce) && &observed_name_pair.1 == target_method_name {
+            if &observed_name_pair.1 == target_method_name {
+                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.clone()) {
+                    if ce.is_instance_of(&iface_ce) {
                         return true;
                     }
                 }
-                Err(_) => {}
             }
         }
     }
