@@ -59,19 +59,21 @@ pub fn make_span_class(
 
     class
         .add_method("end", Visibility::Public, |this, _| -> phper::Result<()> {
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
             if let Some(span) = this.as_mut_state().as_mut() {
                 tracing::debug!("Span::Ending Span (SdkSpan)");
                 span.end();
             } else {
                 {
                     //in own block to ensure reference dropped before remove
-                    if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+                    if let Some(ctx) = storage::get_context_instance(instance_id) {
                         tracing::debug!("Span::Ending Span (SpanRef)");
                         ctx.span().end();
                     }
                 }
-                storage::maybe_remove_context_instance(instance_id as u64);
+                storage::maybe_remove_context_instance(instance_id);
             }
 
             Ok(())
@@ -101,10 +103,12 @@ pub fn make_span_class(
                 _ => Status::Unset,
             };
 
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.set_status(status_code.clone());
-            } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+            } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                 ctx.span().set_status(status_code);
             }
 
@@ -118,10 +122,12 @@ pub fn make_span_class(
             let key = arguments[0].expect_z_str()?.to_str()?.to_string();
             let value = &arguments[1];
             if let Some(kv) = util::zval_to_key_value(&key, &value) {
-                let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+                let instance_id = this.get_property("context_id")
+                    .as_long()
+                    .and_then(|id| if id > 0 { Some(id as u64) } else { None });
                 if let Some(span) = this.as_mut_state().as_mut() {
                     span.set_attribute(kv.clone());
-                } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+                } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                     ctx.span().set_attribute(kv.clone());
                 }
              }
@@ -137,10 +143,12 @@ pub fn make_span_class(
 
             let attributes = util::zval_arr_to_key_value_vec(attrs);
 
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.set_attributes(attributes);
-            } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+            } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                 ctx.span().set_attributes(attributes);
             }
 
@@ -152,11 +160,13 @@ pub fn make_span_class(
             tracing::debug!("Span::updateName");
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
 
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
             if let Some(span) = this.as_mut_state().as_mut() {
                 tracing::debug!("Span::updateName (SdkSpan)");
                 span.update_name(name.clone());
-            } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+            } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                 tracing::debug!("Span::updateName (SpanRef)");
                 ctx.span().update_name(name);
             }
@@ -167,10 +177,12 @@ pub fn make_span_class(
         .add_method("recordException", Visibility::Public, |this, arguments| {
             let t: ZObject = arguments[0].expect_mut_z_obj()?.to_ref_owned();
             if let Ok(throwable) = ThrowObject::new(t) {
-                let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+                let instance_id = this.get_property("context_id")
+                    .as_long()
+                    .and_then(|id| if id > 0 { Some(id as u64) } else { None });
                 if let Some(span) = this.as_mut_state().as_mut() {
                     span.record_error(&throwable);
-                } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+                } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                     ctx.span().record_error(&throwable);
                 }
             }
@@ -186,11 +198,13 @@ pub fn make_span_class(
                 None => return Err(phper::Error::boxed("Invalid SpanContext object")),
             };
 
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
             let attributes = vec![];
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.add_link(span_context.clone(), attributes);
-            } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+            } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                 //SpanRef.add_link does not exist, so do nothing (see unreleased https://github.com/open-telemetry/opentelemetry-rust/pull/1515 )
                 ctx.span().add_link(span_context.clone(), attributes);
             }
@@ -217,10 +231,12 @@ pub fn make_span_class(
                 }
             }
 
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.add_event(event_name.clone(), attributes.clone());
-            } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+            } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                 ctx.span().add_event(event_name.clone(), attributes.clone());
             }
 
@@ -230,10 +246,12 @@ pub fn make_span_class(
     class
         .add_method("getContext", Visibility::Public, move |this, _| {
             let mut object = span_context_class.init_object()?;
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
             if let Some(sdk_span) = this.as_state().as_ref() {
                 *object.as_mut_state() = Some(sdk_span.span_context().clone());
-            } else if let Some(ctx) = storage::get_context_instance(instance_id as u64) {
+            } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                 *object.as_mut_state() = Some(ctx.span().span_context().clone());
             }
             Ok::<_, phper::Error>(object)
@@ -248,7 +266,7 @@ pub fn make_span_class(
 
                 let mut object = span_class.init_object()?;
                 *object.as_mut_state() = None;
-                object.set_property("context_id", instance_id as i64);
+                object.set_property("context_id", instance_id.unwrap_or(0) as i64);
 
                 Ok::<_, phper::Error>(object)
             }
@@ -264,7 +282,7 @@ pub fn make_span_class(
 
                 let ctx = Context::current_with_span(span);
                 let instance_id = storage::store_context_instance(Arc::new(ctx.clone()));
-                this.set_property("context_id", instance_id as i64);
+                this.set_property("context_id", instance_id.unwrap_or(0) as i64);
                 if is_local_root {
                     this.set_property("is_local_root", true);
                     store_local_root_span(instance_id);
@@ -273,7 +291,7 @@ pub fn make_span_class(
                 storage::attach_context(instance_id).map_err(phper::Error::boxed)?;
 
                 let mut object = scope_ce.init_object()?;
-                object.set_property("context_id", instance_id as i64);
+                object.set_property("context_id", instance_id.unwrap_or(0) as i64);
                 Ok::<_, phper::Error>(object)
             }
         });
@@ -283,15 +301,17 @@ pub fn make_span_class(
             let span = this.as_mut_state().take().expect("No span stored!");
 
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let context_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
-            // Always go through storage — handles context_id = 0 as Context::current()
-            let context = storage::resolve_context(context_id as u64);
+            let context_id = context_obj.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            // Always go through storage — handles context_id = None as Context::current()
+            let context = storage::resolve_context(context_id);
             let arc_ctx = Arc::new(context.with_span(span));
             let instance_id = storage::store_context_instance(arc_ctx.clone());
 
             let mut object = context_class.init_object()?;
             *object.as_mut_state() = Some(arc_ctx);
-            object.set_property("context_id", instance_id as i64);
+            object.set_property("context_id", instance_id.unwrap_or(0) as i64);
 
             Ok::<_, phper::Error>(object)
         }); //argument ContextInterface, return ContextInterface

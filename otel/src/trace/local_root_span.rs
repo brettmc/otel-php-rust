@@ -56,8 +56,8 @@ pub fn make_local_root_span_class(
     class
 }
 
-pub fn store_local_root_span(context_id: u64) {
-    LOCAL_ROOT_SPAN_ID.with(|cell| *cell.borrow_mut() = Some(context_id));
+pub fn store_local_root_span(context_id: Option<u64>) {
+    LOCAL_ROOT_SPAN_ID.with(|cell| *cell.borrow_mut() = context_id);
 }
 
 /// Retrieves the stored context instance ID containing the local root span, if it exists.
@@ -69,22 +69,28 @@ fn get_local_root_span_instance_id() -> Option<u64> {
 pub fn get_local_root_span_context() -> Option<Arc<Context>> {
     LOCAL_ROOT_SPAN_ID.with(|cell| {
         if let Some(context_id) = *cell.borrow() {
-            storage::get_context_instance(context_id)
+            storage::get_context_instance(Some(context_id))
         } else {
             None
         }
     })
 }
 
-pub fn maybe_remove_local_root_span(context_id: u64) {
+pub fn maybe_remove_local_root_span(context_id: Option<u64>) {
     LOCAL_ROOT_SPAN_ID.with(|cell| {
         let mut borrowed = cell.borrow_mut();
-        if let Some(current_id) = *borrowed {
-            if current_id == context_id {
-                tracing::debug!("Removing local root span: {}", context_id);
+        match (context_id, *borrowed) {
+            (Some(id), Some(current_id)) if id == current_id => {
+                tracing::debug!("Removing local root span: {}", id);
                 *borrowed = None;
-                storage::maybe_remove_context_instance(context_id);
+                storage::maybe_remove_context_instance(Some(id));
             }
+            (None, Some(current_id)) => {
+                tracing::debug!("Removing local root span: {}", current_id);
+                *borrowed = None;
+                storage::maybe_remove_context_instance(Some(current_id));
+            }
+            _ => {}
         }
     });
 }

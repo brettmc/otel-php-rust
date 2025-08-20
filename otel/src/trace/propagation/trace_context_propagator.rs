@@ -32,10 +32,13 @@ pub fn make_trace_context_propagator_class(
         .add_method("inject", Visibility::Public, |_, arguments| -> phper::Result<()> {
             // Context (optional, default to Context::current)
             let context_obj = arguments[2].expect_mut_z_obj()?;
-            let context_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
-            tracing::debug!("inject() using context_id = {}", context_id);
+            let context_id = context_obj
+                .get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            tracing::debug!("inject() using context_id = {:?}", context_id);
 
-            let context = storage::get_context_instance(context_id as u64);
+            let context = storage::get_context_instance(context_id);
             let context_ref = context.as_ref().map(|arc| arc.as_ref()).expect("invalid context");
 
             // Carrier gymnastics (PHP array passed by ref)
@@ -98,7 +101,7 @@ pub fn make_trace_context_propagator_class(
             };
 
             let parent_cx = context_id
-                .and_then(|id| storage::get_context_instance(id))
+                .and_then(|id| storage::get_context_instance(Some(id)))
                 .unwrap_or_else(|| Arc::new(opentelemetry::Context::current()));
 
             // Extract new context from headers
@@ -109,7 +112,7 @@ pub fn make_trace_context_propagator_class(
 
             // Wrap in PHP context object
             let mut obj = context_ce.init_object()?;
-            obj.set_property("context_id", instance_id as i64);
+            obj.set_property("context_id", instance_id.unwrap_or(0) as i64);
             Ok::<_, phper::Error>(obj)
         })
         .argument(Argument::new("carrier"))

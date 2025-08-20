@@ -116,7 +116,7 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilder
             let span_builder = state.span_builder.as_ref().expect("SpanBuilder not set");
             let tracer = state.tracer.as_ref().expect("Tracer not set");
             let parent_context = if state.parent_context_id > 0 {
-                storage::get_context_instance(state.parent_context_id)
+                storage::get_context_instance(Some(state.parent_context_id))
                     .map(|ctx| {
                         tracing::debug!(
                             "SpanBuilder::Using parent context {} (ref count = {})",

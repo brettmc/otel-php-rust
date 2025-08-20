@@ -49,10 +49,12 @@ pub fn build_context_class(
 
     class
         .add_method("__destruct", Visibility::Public, |this, _| {
-            let context_id = this.get_property("context_id").as_long().expect("invalid context_id stored");
-            debug!("Context::__destruct for context_id = {}", context_id);
-            if context_id > 0 {
-                storage::maybe_remove_context_instance(context_id as u64);
+            let context_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            debug!("Context::__destruct for context_id = {:?}", context_id);
+            if context_id.is_some() {
+                storage::maybe_remove_context_instance(context_id);
             }
             Ok::<_, Infallible>(())
         });
@@ -105,13 +107,13 @@ pub fn build_context_class(
             move |this, _arguments| {
                 let arc = this.as_state().as_ref().unwrap().clone(); // Arc<Context>
                 let instance_id = storage::store_context_instance(arc.clone());
-                debug!("Storing context: {}", instance_id);
+                debug!("Storing context: {:?}", instance_id);
 
-                this.set_property("context_id", instance_id as i64);
+                this.set_property("context_id", instance_id.unwrap_or(0) as i64);
                 storage::attach_context(instance_id).map_err(phper::Error::boxed)?;
 
                 let mut object = scope_ce.init_object()?;
-                object.set_property("context_id", instance_id as i64);
+                object.set_property("context_id", instance_id.unwrap_or(0) as i64);
 
                 Ok::<_, phper::Error>(object)
             }

@@ -60,7 +60,7 @@ string(19) "pre: storage attach"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Getting context instance 1
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Cloned context instance 1 (ref count after clone = 3)
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Before attach: context instance 1 has ref count = 4
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = 1
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = Some(1)
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Maybe remove context for instance 1
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Cannot remove context instance 1 (ref count = 2, still in use)
 string(20) "post: storage attach"
@@ -72,7 +72,7 @@ string(18) "post: detach scope"
 string(32) "pre: get span from scope context"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Getting context instance 1
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Cloned context instance 1 (ref count after clone = 2)
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = 1
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = Some(1)
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Maybe remove context for instance 1
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Cannot remove context instance 1 (ref count = 2, still in use)
 string(33) "post: get span from scope context"
@@ -85,6 +85,6 @@ string(13) "pre: span end"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Maybe remove context for instance 1
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Removing context instance 1 (ref count = 1, no external holders)
 string(14) "post: span end"
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = 0
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Context::__destruct for context_id = None
 %A
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::CONTEXT_STORAGE is empty :)%A

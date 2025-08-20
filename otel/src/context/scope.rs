@@ -43,10 +43,12 @@ pub fn build_scope_class(
 
     class
         .add_method("detach", Visibility::Public, |this, _| -> phper::Result<()> {
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
-            if instance_id > 0 {
-                storage::detach_context(instance_id as u64);
-                local_root_span::maybe_remove_local_root_span(instance_id as u64);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            if instance_id.is_some() {
+                storage::detach_context(instance_id);
+                local_root_span::maybe_remove_local_root_span(instance_id);
             }
             Ok(())
         })
@@ -54,11 +56,13 @@ pub fn build_scope_class(
 
     class
         .add_method("context", Visibility::Public, move |this,_| {
-            let instance_id = this.get_property("context_id").as_long().unwrap_or(0);
-            let ctx = storage::get_context_instance(instance_id as u64);
+            let instance_id = this.get_property("context_id")
+                .as_long()
+                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let ctx = storage::get_context_instance(instance_id);
             let mut object = context_ce.init_object()?;
             *object.as_mut_state() = ctx;
-            object.set_property("context_id", instance_id as i64);
+            object.set_property("context_id", instance_id.unwrap_or(0) as i64);
             Ok::<_, phper::Error>(object)
         })
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))));
