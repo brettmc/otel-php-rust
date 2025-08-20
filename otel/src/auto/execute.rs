@@ -6,6 +6,7 @@ use phper::{
 use crate::{
     auto::{
         execute_data::{
+            get_fqn,
             get_global_exception,
             get_function_and_class_name,
         },
@@ -64,15 +65,15 @@ where
         }
     };
 
-    let key = match get_function_and_class_name(exec_data) {
-        Ok((Some(func), Some(cls))) => format!("{}::{}", cls, func),
-        Ok((Some(func), None)) => func,
-        _ => {
+    let key = match get_fqn(exec_data) {
+        Some(fqn) => fqn,
+        None => {
             upstream(Some(exec_data), return_value);
             return;
         },
     };
 
+    // Check if we've already decided to observe this function or not
     if let Some(observed) = OBSERVER_MAP.with(|map| map.borrow_mut().get(&key).copied()) {
         if !observed {
             upstream(Some(exec_data), return_value);

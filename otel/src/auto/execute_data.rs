@@ -59,13 +59,13 @@ pub fn get_function_and_class_name(
     Ok((function_name, class_name))
 }
 
-pub fn get_fqn(execute_data: &ExecuteData) -> String {
+pub fn get_fqn(execute_data: &ExecuteData) -> Option<String> {
     let (function_name, class_name) = get_function_and_class_name(execute_data).unwrap_or((None, None));
 
     match (class_name, function_name) {
-        (Some(cls), Some(func)) => format!("{}::{}", cls, func),
-        (None, Some(func)) => func,
-        _ => "<unknown>".to_string(),
+        (Some(cls), Some(func)) => Some(format!("{}::{}", cls, func)),
+        (None, Some(func)) => Some(func),
+        _ => None,
     }
 }
 
@@ -115,7 +115,7 @@ pub fn get_global_exception() -> Option<&'static mut ZObj> {
 
 // Default auto-instrumentation attributes from ExecuteData
 pub fn get_default_attributes(execute_data: &ExecuteData) -> Vec<KeyValue> {
-    let mut attributes = vec![KeyValue::new("code.function.name".to_string(), get_fqn(execute_data))];
+    let mut attributes = vec![KeyValue::new("code.function.name".to_string(), get_fqn(execute_data).unwrap())];
     unsafe {
         if let Some((file, line)) = get_file_and_line(execute_data) {
             attributes.push(KeyValue::new("code.file.path".to_string(), file));

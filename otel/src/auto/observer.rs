@@ -21,15 +21,11 @@ use crate::{
     },
 };
 use std::{
-    cell::RefCell,
     collections::HashMap,
     sync::{OnceLock, RwLock},
 };
 
 static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, FunctionObserver>>> = OnceLock::new();
-thread_local! {
-    static OBSERVER_CACHE: RefCell<HashMap<String, bool>> = RefCell::new(HashMap::new());
-}
 
 pub fn init() {
     tracing::debug!("Observer::init");
@@ -43,41 +39,25 @@ pub fn init() {
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
         let fqn = get_fqn(exec_data);
+        if fqn.is_some() {
+            tracing::trace!("observer::observer_instrument checking: {}", fqn.clone().unwrap());
+            let plugin_manager = get_plugin_manager()
+                .expect("PluginManager not initialized")
+                .read()
+                .unwrap();
+            if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
+                let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
+                let fqn = fqn.unwrap();
+                let mut lock = observers.write().unwrap();
+                lock.insert(fqn.clone(), observer);
 
-        // Check the cache, short-circuit out if we already know this function is not observed
-        if let Some(is_observed) = OBSERVER_CACHE.with(|cache| cache.borrow().get(&fqn).copied()) {
-            if !is_observed {
-                return sys::zend_observer_fcall_handlers { begin: None, end: None };
+                static mut HANDLERS: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
+                    begin: Some(pre_observe_c_function),
+                    end: Some(post_observe_c_function),
+                };
+
+                return unsafe { HANDLERS };
             }
-        }
-
-        //tracing::trace!("observer::observer_instrument checking: {}", fqn);
-        let plugin_manager = get_plugin_manager()
-            .expect("PluginManager not initialized")
-            .read()
-            .unwrap();
-        if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
-            let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-            let fqn = fqn.to_string();
-            let mut lock = observers.write().unwrap();
-            lock.insert(fqn.clone(), observer);
-
-            // Update the cache
-            OBSERVER_CACHE.with(|cache| {
-                cache.borrow_mut().insert(fqn, true);
-            });
-
-            static mut HANDLERS: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
-                begin: Some(pre_observe_c_function),
-                end: Some(post_observe_c_function),
-            };
-
-            return unsafe { HANDLERS };
-        } else {
-            // Update the cache for unobserved functions
-            OBSERVER_CACHE.with(|cache| {
-                cache.borrow_mut().insert(fqn, false);
-            });
         }
     }
 
@@ -90,7 +70,7 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_execute_data) {
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
-        let fqn = get_fqn(exec_data);
+        let fqn = get_fqn(exec_data).unwrap();
 
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
@@ -108,7 +88,7 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, retval: *mut sys::zval) {
     if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)} {
-        let fqn = get_fqn(exec_data);
+        let fqn = get_fqn(exec_data).unwrap();
 
         let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
         let lock = observers.read().unwrap();
