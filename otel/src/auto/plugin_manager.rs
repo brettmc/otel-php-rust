@@ -1,5 +1,6 @@
 use crate::{
     auto::{
+        execute_data::get_fqn,
         plugin::{FunctionObserver, Plugin},
         plugins::{
             laminas::LaminasPlugin,
@@ -18,11 +19,16 @@ use phper::{
 use once_cell::sync::OnceCell;
 use std::{
     ffi::CStr,
-    collections::HashSet,
-    sync::RwLock,
+    collections::{HashMap, HashSet},
+    sync::{Arc, RwLock},
 };
 
 static PLUGIN_MANAGER: OnceCell<RwLock<PluginManager>> = OnceCell::new();
+static FUNCTION_OBSERVER_CACHE: OnceCell<RwLock<HashMap<String, Arc<FunctionObserver>>>> = OnceCell::new();
+
+pub fn init_observer_cache() {
+    FUNCTION_OBSERVER_CACHE.set(RwLock::new(HashMap::new())).ok();
+}
 
 pub fn set_global(manager: PluginManager) {
     PLUGIN_MANAGER.set(RwLock::new(manager)).ok();
@@ -39,6 +45,7 @@ pub struct PluginManager {
 impl PluginManager {
     pub fn new() -> Self {
         tracing::debug!("PluginManager::init");
+        init_observer_cache();
         // tracing::debug!("PluginManager::new");
         let mut manager = Self {plugins: vec![] };
         manager.init();
@@ -74,21 +81,28 @@ impl PluginManager {
         &self.plugins
     }
 
-    pub fn get_function_observer(&self, execute_data: &mut ExecuteData) -> Option<FunctionObserver> {
-        let mut observer = FunctionObserver::new();
+    pub fn get_function_observer(&self, execute_data: &mut ExecuteData) -> Option<Arc<FunctionObserver>> {
+        let fqn = get_fqn(execute_data)?;
 
+        // Check cache
+        if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
+            if let Some(observer) = cache.read().unwrap().get(&fqn).cloned() {
+                tracing::trace!("Using cached observer for function: {}", fqn);
+                return Some(observer);
+            }
+        }
+
+        // Build observer as before
+        let mut observer = FunctionObserver::new();
         for plugin in &self.plugins {
-            //tracing::trace!("plugin: {}", plugin.get_name());
             for handler in plugin.get_handlers() {
                 if should_trace(execute_data.func(), &handler.get_targets(), plugin.get_name()) {
                     let callbacks = handler.get_callbacks();
-
                     if let Some(pre) = callbacks.pre_observe {
                         observer.add_pre_hook(Box::new(move |execute_data| {
                             pre(execute_data);
                         }));
                     }
-
                     if let Some(post) = callbacks.post_observe {
                         observer.add_post_hook(Box::new(move |execute_data, retval, exception| {
                             post(execute_data, retval, exception);
@@ -99,7 +113,12 @@ impl PluginManager {
         }
 
         if observer.has_hooks() {
-            Some(observer)
+            let arc_observer = Arc::new(observer);
+            if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
+                tracing::trace!("Caching observer for function: {}", fqn);
+                cache.write().unwrap().insert(fqn, arc_observer.clone());
+            }
+            Some(arc_observer)
         } else {
             None
         }

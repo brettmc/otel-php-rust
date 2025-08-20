@@ -22,10 +22,10 @@ use crate::{
 };
 use std::{
     collections::HashMap,
-    sync::{OnceLock, RwLock},
+    sync::{Arc, OnceLock, RwLock},
 };
 
-static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, FunctionObserver>>> = OnceLock::new();
+static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, Arc<FunctionObserver>>>> = OnceLock::new();
 
 pub fn init() {
     tracing::debug!("Observer::init");

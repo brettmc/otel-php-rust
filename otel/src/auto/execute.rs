@@ -8,7 +8,6 @@ use crate::{
         execute_data::{
             get_fqn,
             get_global_exception,
-            get_function_and_class_name,
         },
         plugin_manager::{
             get_global as get_plugin_manager,
