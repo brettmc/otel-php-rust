@@ -54,14 +54,15 @@ impl Plugin for TestPlugin {
 pub struct DemoHandler;
 
 impl Handler for DemoHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (Some("DemoClass".to_string()), "test".to_string()),
-            (Some("DemoClass".to_string()), "inner".to_string()),
-            (None, "phpversion".to_string()),
-            (Some("IDemo".to_string()), "foo".to_string()),
-            (Some("IDemo".to_string()), "bar".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 5] = [
+            (Some("DemoClass"), "test"),
+            (Some("DemoClass"), "inner"),
+            (None, "phpversion"),
+            (Some("IDemo"), "foo"),
+            (Some("IDemo"), "bar"),
+        ];
+        &TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -101,10 +102,11 @@ impl DemoHandler {
 pub struct DemoFunctionHandler;
 
 impl Handler for DemoFunctionHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (None, "demoFunction".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 1] = [
+            (None, "demoFunction"),
+        ];
+        &TARGETS
     }
 
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -153,11 +155,12 @@ impl DemoFunctionHandler {
 
 pub struct TestClassHandler;
 impl Handler for TestClassHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (Some(r"OpenTelemetry\Test\ITestClass".to_string()), "getString".to_string()),
-            (Some(r"OpenTelemetry\Test\ITestClass".to_string()), "throwException".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 2] = [
+            (Some(r"OpenTelemetry\Test\ITestClass"), "getString"),
+            (Some(r"OpenTelemetry\Test\ITestClass"), "throwException"),
+        ];
+        &TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {

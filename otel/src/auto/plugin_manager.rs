@@ -118,7 +118,7 @@ fn get_disabled_plugins() -> HashSet<String> {
         .collect()
 }
 
-fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name: &str) -> bool {
+fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], _plugin_name: &str) -> bool {
     let function_name: ZString = func.get_function_or_method_name();
     let function_name_str = match function_name.to_str() {
         Ok(name) => name,
@@ -127,22 +127,17 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name
     let parts: Vec<&str> = function_name_str.split("::").collect();
     let is_method = parts.len() == 2;
     let observed_name_pair = if is_method {
-        (Some(parts[0].to_string()), parts[1].to_string())
+        (Some(parts[0]), parts[1])
     } else {
-        (None, function_name_str.to_string())
+        (None, function_name_str)
     };
 
-    //tracing::trace!("[plugin={}] should_trace: function_name: {:?}", plugin_name, function_name_str);
     if targets.iter().any(|target| target == &observed_name_pair) {
-        //tracing::trace!("should_trace:: {:?} matches on name_pair", name_pair);
         return true;
-    } else {
-        //tracing::trace!("should_trace:: {:?} does not match on name_pair", name_pair);
     }
 
     //check for interfaces
     if !is_method {
-        //tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
         return false;
     }
 
@@ -152,10 +147,9 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name
     };
     for (target_class_name, target_method_name) in targets.iter() {
         if let Some(interface_name) = target_class_name {
-            // Only check if the observed class is an instance of the interface
             match ClassEntry::from_globals(interface_name.to_string()) {
                 Ok(iface_ce) => {
-                    if ce.is_instance_of(&iface_ce) && &observed_name_pair.1 == target_method_name {
+                    if ce.is_instance_of(&iface_ce) && observed_name_pair.1 == *target_method_name {
                         return true;
                     }
                 }

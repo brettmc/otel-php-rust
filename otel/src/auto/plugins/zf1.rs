@@ -91,10 +91,11 @@ impl Plugin for Zf1Plugin {
 pub struct Zf1RouteHandler;
 
 impl Handler for Zf1RouteHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (Some("Zend_Controller_Router_Interface".to_string()), "route".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 1] = [
+            (Some(r"Zend_Controller_Router_Interface"), "route"),
+        ];
+        &TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -179,10 +180,11 @@ impl Zf1RouteHandler {
 
 pub struct Zf1SendResponseHandler;
 impl Handler for Zf1SendResponseHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (Some("Zend_Controller_Response_Abstract".to_string()), "sendResponse".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 1] = [
+            (Some(r"Zend_Controller_Response_Abstract"), "sendResponse"),
+        ];
+        &TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -248,10 +250,11 @@ impl Zf1SendResponseHandler {
 pub struct Zf1AdapterConnectHandler;
 
 impl Handler for Zf1AdapterConnectHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (Some("Zend_Db_Adapter_Abstract".to_string()), "_connect".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 1] = [
+            (Some(r"Zend_Db_Adapter_Abstract"), "_connect"),
+        ];
+        &TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -332,10 +335,11 @@ impl Zf1AdapterConnectHandler {
 pub struct Zf1AdapterPrepareHandler;
 
 impl Handler for Zf1AdapterPrepareHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (Some("Zend_Db_Adapter_Abstract".to_string()), "prepare".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 1] = [
+            (Some(r"Zend_Db_Adapter_Abstract"), "prepare"),
+        ];
+        &TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -431,10 +435,11 @@ impl Zf1AdapterPrepareHandler {
 pub struct Zf1StatementExecuteHandler;
 
 impl Handler for Zf1StatementExecuteHandler {
-    fn get_targets(&self) -> Vec<(Option<String>, String)> {
-        vec![
-            (Some("Zend_Db_Statement_Interface".to_string()), "execute".to_string()),
-        ]
+    fn get_targets(&self) -> &[ (Option<&'static str>, &'static str) ] {
+        static TARGETS: [(Option<&'static str>, &'static str); 1] = [
+            (Some(r"Zend_Db_Statement_Interface"), "execute"),
+        ];
+        &TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
