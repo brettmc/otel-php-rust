@@ -59,9 +59,7 @@ pub fn make_span_class(
 
     class
         .add_method("end", Visibility::Public, |this, _| -> phper::Result<()> {
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             if let Some(span) = this.as_mut_state().as_mut() {
                 tracing::debug!("Span::Ending Span (SdkSpan)");
                 span.end();
@@ -103,9 +101,7 @@ pub fn make_span_class(
                 _ => Status::Unset,
             };
 
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.set_status(status_code.clone());
             } else if let Some(ctx) = storage::get_context_instance(instance_id) {
@@ -122,9 +118,7 @@ pub fn make_span_class(
             let key = arguments[0].expect_z_str()?.to_str()?.to_string();
             let value = &arguments[1];
             if let Some(kv) = util::zval_to_key_value(&key, &value) {
-                let instance_id = this.get_property("context_id")
-                    .as_long()
-                    .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+                let instance_id = get_instance_id(this);
                 if let Some(span) = this.as_mut_state().as_mut() {
                     span.set_attribute(kv.clone());
                 } else if let Some(ctx) = storage::get_context_instance(instance_id) {
@@ -142,10 +136,7 @@ pub fn make_span_class(
                 .to_owned();
 
             let attributes = util::zval_arr_to_key_value_vec(attrs);
-
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.set_attributes(attributes);
             } else if let Some(ctx) = storage::get_context_instance(instance_id) {
@@ -160,9 +151,7 @@ pub fn make_span_class(
             tracing::debug!("Span::updateName");
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
 
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             if let Some(span) = this.as_mut_state().as_mut() {
                 tracing::debug!("Span::updateName (SdkSpan)");
                 span.update_name(name.clone());
@@ -177,9 +166,7 @@ pub fn make_span_class(
         .add_method("recordException", Visibility::Public, |this, arguments| {
             let t: ZObject = arguments[0].expect_mut_z_obj()?.to_ref_owned();
             if let Ok(throwable) = ThrowObject::new(t) {
-                let instance_id = this.get_property("context_id")
-                    .as_long()
-                    .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+                let instance_id = get_instance_id(this);
                 if let Some(span) = this.as_mut_state().as_mut() {
                     span.record_error(&throwable);
                 } else if let Some(ctx) = storage::get_context_instance(instance_id) {
@@ -198,9 +185,7 @@ pub fn make_span_class(
                 None => return Err(phper::Error::boxed("Invalid SpanContext object")),
             };
 
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             let attributes = vec![];
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.add_link(span_context.clone(), attributes);
@@ -231,9 +216,7 @@ pub fn make_span_class(
                 }
             }
 
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             if let Some(span) = this.as_mut_state().as_mut() {
                 span.add_event(event_name.clone(), attributes.clone());
             } else if let Some(ctx) = storage::get_context_instance(instance_id) {
@@ -246,9 +229,7 @@ pub fn make_span_class(
     class
         .add_method("getContext", Visibility::Public, move |this, _| {
             let mut object = span_context_class.init_object()?;
-            let instance_id = this.get_property("context_id")
-                .as_long()
-                .and_then(|id| if id > 0 { Some(id as u64) } else { None });
+            let instance_id = get_instance_id(this);
             if let Some(sdk_span) = this.as_state().as_ref() {
                 *object.as_mut_state() = Some(sdk_span.span_context().clone());
             } else if let Some(ctx) = storage::get_context_instance(instance_id) {
@@ -329,4 +310,10 @@ pub fn make_span_class(
         });
 
     class
+}
+
+fn get_instance_id(this: &phper::objects::ZObj) -> Option<u64> {
+    this.get_property("context_id")
+        .as_long()
+        .and_then(|id| if id > 0 { Some(id as u64) } else { None })
 }
