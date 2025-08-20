@@ -216,13 +216,12 @@ pub fn init() {
     let ctx = Context::current_with_span(span);
     let context_id = storage::store_context_instance(Arc::new(ctx.clone()));
     OTEL_CONTEXT_ID.with(|cell| {
-        *cell.borrow_mut() = Some(context_id);
+        *cell.borrow_mut() = context_id;
     });
     if is_local_root {
         tracing::debug!("RINIT::is_local_root: {}", is_local_root);
         local_root_span::store_local_root_span(context_id);
     }
-    //TODO use span::storeInContext logic
     let guard = ctx.attach();
 
     OTEL_REQUEST_GUARD.with(|slot| {
@@ -241,7 +240,7 @@ pub fn shutdown() {
         let context_id = context_id.unwrap();
         let is_http_request = get_sapi_module_name() != "cli";
         tracing::debug!("RSHUTDOWN::auto-closing root span...");
-        let ctx = storage::get_context_instance(context_id);
+        let ctx = storage::get_context_instance(Some(context_id));
         if ctx.is_none() {
             tracing::warn!("RSHUTDOWN::no context found for id {}", context_id);
             return;
@@ -270,7 +269,7 @@ pub fn shutdown() {
             span.end();
             tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
             drop(ctx);
-            storage::maybe_remove_context_instance(context_id);
+            storage::maybe_remove_context_instance(Some(context_id));
         }
 
         OTEL_REQUEST_GUARD.with(|slot| {

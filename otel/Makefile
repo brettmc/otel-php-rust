@@ -29,10 +29,12 @@ clean:
 	rm -rf configure* config.h.* libtool Makefile.* run-tests.php build/ autom4te.cache/
 	rm -rf tests/auto/laminas/vendor/* tests/auto/laminas/composer.lock
 	rm -rf tests/auto/zf1/vendor/* tests/auto/zf1/composer.lock
+	rm -rf tests/auto/psr18/vendor/* tests/auto/psr18/composer.lock
 update:
 	@echo "Updating composer dependencies..."
 	(cd tests/auto/laminas && composer update --no-dev)
 	(cd tests/auto/zf1 && composer update --no-dev)
+	(cd tests/auto/psr18 && composer update --no-dev)
 	@echo "✅ Composer dependencies updated"
 clean-build-test: clean test-all
 test: build-test
