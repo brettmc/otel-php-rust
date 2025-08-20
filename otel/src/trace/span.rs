@@ -256,7 +256,6 @@ pub fn make_span_class(
             }
         });
 
-    //TODO should activate() use storeInContext()
     class
         .add_method("activate", Visibility::Public, {
             let scope_ce = scope_class.clone();
@@ -301,7 +300,6 @@ pub fn make_span_class(
     let span_class_clone = class.bound_class();
     class
         .add_static_method("fromContext", Visibility::Public, move |arguments| {
-            //todo could this become a macro?? better, a generic macro?
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
             let instance_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
             let mut object = span_class_clone.init_object()?;

@@ -222,7 +222,6 @@ pub fn init() {
         tracing::debug!("RINIT::is_local_root: {}", is_local_root);
         local_root_span::store_local_root_span(context_id);
     }
-    //TODO use span::storeInContext logic
     let guard = ctx.attach();
 
     OTEL_REQUEST_GUARD.with(|slot| {

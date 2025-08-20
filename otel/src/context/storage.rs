@@ -163,7 +163,6 @@ pub fn current_context_instance_id() -> Option<u64> {
     })
 }
 
-//TODO use Option<u64> instead of 0 having special meaning
 fn new_instance_id() -> u64 {
     INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
@@ -190,7 +189,6 @@ pub fn build_storage_class(
 
     class
         .add_static_method("current", Visibility::Public, move |_| {
-            //TODO current from storage's perspective or opentelemetry-rust's?
             let context = Arc::new(Context::current());
             let mut object = context_ce.clone().init_object()?;
             *object.as_mut_state() = Some(context);
