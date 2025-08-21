@@ -68,8 +68,8 @@ impl Handler for DemoHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -86,6 +86,7 @@ impl DemoHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        _retval: Option<&mut ZVal>,
         _exception: Option<&mut ZObj>
     ) {
         if let Some(_guard) = take_guard(exec_data) {
@@ -111,8 +112,8 @@ impl Handler for DemoFunctionHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -130,6 +131,7 @@ impl DemoFunctionHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("DemoFunctionHandler: post_callback called");
@@ -162,8 +164,8 @@ impl Handler for TestClassHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -175,13 +177,16 @@ impl TestClassHandler {
     }
 
     unsafe extern "C" fn post_callback(
-        exec_data: *mut ExecuteData,
+        _exec_data: *mut ExecuteData,
+        retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
-        let exec_data_ref = unsafe { &mut *exec_data };
-        let retval = exec_data_ref.get_return_value();
         tracing::debug!("TestClassHandler: post_callback called");
-        tracing::debug!("retval type: {:?}", retval.unwrap().get_type_info());
+        if let Some(rv) = retval {
+            tracing::debug!("retval type: {:?}", rv.get_type_info());
+        } else {
+            tracing::debug!("retval: None");
+        }
         tracing::debug!("exception: {:?}", exception);
     }
 }

@@ -99,8 +99,8 @@ impl Handler for Zf1RouteHandler {
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
             pre_observe: None,
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -109,6 +109,7 @@ impl Handler for Zf1RouteHandler {
 impl Zf1RouteHandler {
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        retval: Option<&mut ZVal>,
         _exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Zf1::post (Router_Interface::route)");
@@ -122,11 +123,9 @@ impl Zf1RouteHandler {
         tracing::debug!("Auto::Zf1::post - got local root span context");
         ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "zf1"));
 
-        // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
-        // instead use the first parameter of the execute_data (which is also the request object)
         let exec_data_ref = unsafe { &mut *exec_data };
-        let zf1_request_zval = match exec_data_ref.get_return_value_mut() {
-            Some(rv) if rv.get_type_info() == phper::types::TypeInfo::NULL => rv,
+        let zf1_request_zval = match retval {
+            Some(rv) if rv.get_type_info() != phper::types::TypeInfo::NULL => rv,
             _ => {
                 tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no return value found, getting first parameter");
                 exec_data_ref.get_mut_parameter(0)
@@ -163,7 +162,6 @@ impl Zf1RouteHandler {
                 action.as_deref().unwrap_or("unknown_action")
             );
 
-            //let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
             tracing::debug!("Auto::Zf1::updateName (Router_Interface::route)");
             ctx.span().update_name(span_name);
             if let Some(module) = &module {
@@ -191,8 +189,8 @@ impl Handler for Zf1SendResponseHandler {
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
             pre_observe: None,
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -201,6 +199,7 @@ impl Handler for Zf1SendResponseHandler {
 impl Zf1SendResponseHandler {
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        _retval: Option<&mut ZVal>,
         _exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Zf1::post (Zend_Controller_Response_Abstract::sendResponse)");
@@ -261,8 +260,8 @@ impl Handler for Zf1AdapterConnectHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -318,6 +317,7 @@ impl Zf1AdapterConnectHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
@@ -344,8 +344,8 @@ impl Handler for Zf1AdapterPrepareHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -374,6 +374,7 @@ impl Zf1AdapterPrepareHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
@@ -445,8 +446,8 @@ impl Handler for Zf1StatementExecuteHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -479,6 +480,7 @@ impl Zf1StatementExecuteHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {

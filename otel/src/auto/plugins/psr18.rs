@@ -65,8 +65,8 @@ impl Handler for Psr18SendRequestHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, exception| unsafe {
-                Self::post_callback(exec_data, exception)
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
             })),
         }
     }
@@ -138,6 +138,7 @@ impl Psr18SendRequestHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
+        _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
         //get the current span

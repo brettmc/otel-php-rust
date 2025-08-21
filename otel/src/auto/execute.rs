@@ -48,7 +48,7 @@ fn handle_execution<F, G>(
 )
 where
     F: Fn(Option<&mut ExecuteData>, Option<&mut ZVal>),
-    G: Fn(&PluginManager, &mut ExecuteData),
+    G: Fn(&PluginManager, &mut ExecuteData, &mut ZVal),
 {
     let exec_data = match exec_data {
         Some(data) => data,
@@ -92,10 +92,10 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         exec_data,
         None,
         |ed, _| upstream_execute_ex(ed),
-        |plugin_manager, exec_data,| {
+        |plugin_manager, exec_data, retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
                 for hook in observer.post_hooks() {
-                    hook(exec_data, get_global_exception());
+                    hook(exec_data, retval, get_global_exception());
                 }
             }
         },
@@ -113,7 +113,7 @@ unsafe extern "C" fn execute_internal(
         exec_data,
         ret_val,
         |ed, rv| upstream_execute_internal(ed, rv),
-        |plugin_manager, exec_data| {
+        |plugin_manager, exec_data, retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
                 for hook in observer.post_hooks() {
                     hook(exec_data, get_global_exception());
