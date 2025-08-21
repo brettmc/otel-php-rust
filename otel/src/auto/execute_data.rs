@@ -1,7 +1,6 @@
 use phper::{
     eg,
     objects::ZObj,
-    sys,
     strings::ZStr,
     values::ExecuteData,
 };
@@ -69,43 +68,15 @@ pub fn get_fqn(execute_data: &ExecuteData) -> Option<String> {
     }
 }
 
-//TODO get these through ExecuteData?
-unsafe fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
-    let zend_execute_data = execute_data.as_ptr();
-
-    if zend_execute_data.is_null() {
-        return None;
-    }
-
-    let func = unsafe{(*zend_execute_data).func};
-    if func.is_null() {
-        return None;
-    }
-
-    let func = unsafe{&*func};
-
-    // Ensure it's a user-defined function before accessing op_array
-    if unsafe{func.type_} as u32 != sys::ZEND_USER_FUNCTION {
-        return None; // Not a user-defined function, no file/line info available
-    }
-
-    let op_array = unsafe{&func.op_array};
-
-    let file_name = if !op_array.filename.is_null() {
-        let zend_filename = unsafe{&*op_array.filename};
-        let c_str = unsafe{std::ffi::CStr::from_ptr(zend_filename.val.as_ptr())};
-        c_str.to_string_lossy().into_owned()
+fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
+    let filename = execute_data.func().get_filename();
+    let lineno = execute_data.get_lineno();
+    if filename.is_some() && lineno.is_some() {
+        let file = filename.unwrap().to_str().unwrap_or("").to_string();
+        let line = lineno.unwrap();
+        Some((file, line))
     } else {
-        "<unknown>".to_string()
-    };
-
-    unsafe {
-        let line_number = if !(*zend_execute_data).opline.is_null() {
-            (*(*zend_execute_data).opline).lineno
-        } else {
-            0
-        };
-        Some((file_name, line_number))
+        None
     }
 }
 
@@ -119,11 +90,9 @@ pub fn get_default_attributes(execute_data: &ExecuteData) -> Vec<KeyValue> {
     if let Some(fqn) = get_fqn(execute_data) {
         attributes.push(KeyValue::new("code.function.name".to_string(), fqn));
     }
-    unsafe {
-        if let Some((file, line)) = get_file_and_line(execute_data) {
-            attributes.push(KeyValue::new("code.file.path".to_string(), file));
-            attributes.push(KeyValue::new("code.line.number".to_string(), line as i64));
-        }
+    if let Some((file, line)) = get_file_and_line(execute_data) {
+        attributes.push(KeyValue::new("code.file.path".to_string(), file));
+        attributes.push(KeyValue::new("code.line.number".to_string(), line as i64));
     }
 
     attributes

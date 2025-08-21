@@ -105,8 +105,8 @@ impl Handler for LaminasApplicationRunHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
-                Self::post_callback(exec_data, retval, exception)
+            post_observe: Some(Box::new(|exec_data, exception| unsafe {
+                Self::post_callback(exec_data, exception)
             })),
         }
     }
@@ -127,7 +127,6 @@ impl LaminasApplicationRunHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
         take_guard(exec_data);
@@ -272,8 +271,8 @@ impl Handler for LaminasDbConnectHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
-                Self::post_callback(exec_data, retval, exception)
+            post_observe: Some(Box::new(|exec_data, exception| unsafe {
+                Self::post_callback(exec_data, exception)
             })),
         }
     }
@@ -325,7 +324,6 @@ impl LaminasDbConnectHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
@@ -348,8 +346,8 @@ impl Handler for LaminasStatementPrepareHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
-                Self::post_callback(exec_data, retval, exception)
+            post_observe: Some(Box::new(|exec_data, exception| unsafe {
+                Self::post_callback(exec_data, exception)
             })),
         }
     }
@@ -367,7 +365,6 @@ impl LaminasStatementPrepareHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Laminas::post (Statement::prepare) - post_callback called");
@@ -462,8 +459,8 @@ impl Handler for LaminasStatementExecuteHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
-                Self::post_callback(exec_data, retval, exception)
+            post_observe: Some(Box::new(|exec_data, exception| unsafe {
+                Self::post_callback(exec_data, exception)
             })),
         }
     }
@@ -479,7 +476,6 @@ impl LaminasStatementExecuteHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
@@ -522,8 +518,8 @@ impl Handler for LaminasConnectionExecuteHandler {
             pre_observe: Some(Box::new(|exec_data| unsafe {
                 Self::pre_callback(exec_data)
             })),
-            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
-                Self::post_callback(exec_data, retval, exception)
+            post_observe: Some(Box::new(|exec_data, exception| unsafe {
+                Self::post_callback(exec_data, exception)
             })),
         }
     }
@@ -548,7 +544,6 @@ impl LaminasConnectionExecuteHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Laminas::post (Connection::execute) - post_callback called");

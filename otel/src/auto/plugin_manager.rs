@@ -104,8 +104,8 @@ impl PluginManager {
                         }));
                     }
                     if let Some(post) = callbacks.post_observe {
-                        observer.add_post_hook(Box::new(move |execute_data, retval, exception| {
-                            post(execute_data, retval, exception);
+                        observer.add_post_hook(Box::new(move |execute_data, exception| {
+                            post(execute_data, exception);
                         }));
                     }
                 }
