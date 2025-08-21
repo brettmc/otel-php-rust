@@ -82,7 +82,7 @@ where
     upstream(Some(exec_data), Some(retval));
 
     if let Some(ref _observer) = observer {
-        run_post_hooks(&plugin_manager, exec_data);
+        run_post_hooks(&plugin_manager, exec_data, retval);
     }
 }
 
@@ -95,7 +95,7 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         |plugin_manager, exec_data, retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
                 for hook in observer.post_hooks() {
-                    hook(exec_data, retval, get_global_exception());
+                    hook(exec_data, Some(retval), get_global_exception());
                 }
             }
         },
@@ -116,7 +116,7 @@ unsafe extern "C" fn execute_internal(
         |plugin_manager, exec_data, retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
                 for hook in observer.post_hooks() {
-                    hook(exec_data, get_global_exception());
+                    hook(exec_data, Some(retval), get_global_exception());
                 }
             }
         },
