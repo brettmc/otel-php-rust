@@ -32,7 +32,6 @@ $spans = Memory::getSpans();
 $span = $spans[0];
 assert($span['name'] === 'DemoClass::test');
 var_dump($span['attributes']);
-//var_dump(Memory::getSpans());
 ?>
 --EXPECTF--
 string(4) "test"
@@ -40,7 +39,7 @@ array(3) {
   ["code.function.name"]=>
   string(15) "DemoClass::test"
   ["code.file.path"]=>
-  string(%d) "%s/autoinstrument-eval.php(4) : eval()'d code"
+  string(%d) "%s/autoinstrument-eval.php(%d) : eval()'d code"
   ["code.line.number"]=>
   int(%d)
 }
