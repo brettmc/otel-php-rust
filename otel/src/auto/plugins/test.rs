@@ -33,6 +33,7 @@ impl TestPlugin {
             handlers: vec![
                 Arc::new(DemoHandler),
                 Arc::new(DemoFunctionHandler),
+                Arc::new(DemoHelloHandler),
                 Arc::new(TestClassHandler),
             ],
         }
@@ -94,6 +95,47 @@ impl DemoHandler {
         } else {
             tracing::warn!("DemoHandler: No context guard found for post callback");
             return;
+        }
+    }
+}
+
+pub struct DemoHelloHandler;
+
+impl Handler for DemoHelloHandler {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
+        vec![
+            (Some("DemoClass".to_string()), "hello".to_string()),
+        ]
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: None,
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
+        }
+    }
+}
+
+impl DemoHelloHandler {
+    unsafe extern "C" fn post_callback(
+        _exec_data: *mut ExecuteData,
+        retval: Option<&mut ZVal>,
+        _exception: Option<&mut ZObj>
+    ) {
+        tracing::debug!("DemoFunctionHandler: post_callback called");
+        // Print info about the return value
+        match retval {
+            Some(rv) => {
+                tracing::debug!("Return value type: {:?}", rv.get_type_info());
+                tracing::debug!("Return value (debug): {:?}", rv);
+
+                *rv = ZVal::from("goodbye");
+                tracing::debug!("Return value mutated to: {:?}", rv);
+            }
+            None => {
+                tracing::debug!("No return value provided to post_callback");
+            }
         }
     }
 }
