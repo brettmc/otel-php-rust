@@ -63,12 +63,10 @@ pub fn add_module_info(module: &mut Module) {
     #[cfg(otel_observer_supported)]
     {
         module.add_info("auto-instrumentation", "observer".to_string());
-        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "observer".to_string());
     }
     #[cfg(otel_observer_not_supported)]
     {
         module.add_info("auto-instrumentation", "zend_execute_ex".to_string());
-        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "zend_execute_ex".to_string());
     }
 }
 
