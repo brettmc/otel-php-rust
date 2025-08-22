@@ -25,7 +25,7 @@ var_dump("scope detached");
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RINIT::not auto-creating root span...
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=RINIT::not auto-creating root span...
 string(16) "activate context"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Storing context instance 1 (ref count after clone = 3)
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::context: event src/context/context.rs:%d message=Storing context: Some(1)
@@ -42,5 +42,5 @@ string(15) "detaching scope"
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Maybe remove context for instance 1
 [%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::context::storage: event src/context/storage.rs:%d message=Removing context instance 1 (ref count = 1, no external holders)
 string(14) "scope detached"
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RSHUTDOWN
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=OpenTelemetry::RSHUTDOWN
 %A

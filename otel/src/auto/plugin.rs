@@ -4,6 +4,14 @@ use phper::{
     objects::ZObj,
 };
 
+// Submodules
+pub mod laminas;
+pub mod psr18;
+#[cfg(feature = "test")]
+pub mod test;
+pub mod zf1;
+
+// Plugin trait and related types
 pub trait Plugin: Send + Sync {
     fn get_handlers(&self) -> &[Arc<dyn Handler + Send + Sync>];
     fn get_name(&self) -> &str;

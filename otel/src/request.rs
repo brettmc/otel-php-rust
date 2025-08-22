@@ -18,16 +18,20 @@ use std::{
     sync::Mutex,
 };
 use opentelemetry::{
+    global,
     Context,
     InstrumentationScope,
     KeyValue,
-    global,
     trace::{SpanKind, Tracer, TraceContextExt, TracerProvider},
 };
+use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_semantic_conventions as SemConv;
 use crate::{
+    auto,
     config,
     context::storage,
+    logging,
+    module,
     error::php_error_to_attributes,
     trace::{local_root_span, tracer_provider},
     util::{get_sapi_module_name},
@@ -40,7 +44,85 @@ thread_local! {
 //backup mutating environment variables for request duration
 static ENV_BACKUP: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn init_environment() {
+/// RINIT handler.
+pub fn on_request_init() {
+    if module::is_disabled() {
+        return;
+    }
+    logging::init_once();
+    tracing::debug!("OpenTelemetry::RINIT");
+    init_environment();
+
+    if is_disabled() {
+        tracing::debug!("OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization");
+        return;
+    }
+
+    tracer_provider::init_once();
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    init();
+}
+
+/// RSHUTDOWN handler. Invoke request shutdown logic, call shutdown() on plugin manager.
+pub fn on_request_shutdown() {
+    if module::is_disabled() {
+        return;
+    }
+    tracing::debug!("OpenTelemetry::RSHUTDOWN");
+    shutdown();
+    if let Some(plugin_manager) = auto::plugin_manager::get_global() {
+        let pm = plugin_manager.read().expect("Failed to acquire read lock");
+        pm.request_shutdown();
+    }
+}
+
+/// Check if OpenTelemetry is disabled for the current request (by env or .env)
+pub fn is_disabled() -> bool {
+    match std::env::var("OTEL_SDK_DISABLED") {
+        Ok(val) => val == "true",
+        Err(_) => false,
+    }
+}
+
+pub fn get_request_details() -> RequestDetails {
+    unsafe {
+        //depending in SAPI, request_info.request_uri may not be what we want (eg "index.php" instead of url)
+        let request_info = sg!(request_info);
+        let server = get_request_server();
+        let uri = server
+            .ok()
+            .and_then(|server| server.get("REQUEST_URI"))
+            .and_then(|zv| z_val_to_string(zv))
+            // Fallback to request_info.request_uri if not found
+            .or_else(|| {
+                Some(request_info.request_uri)
+                    .filter(|ptr| !ptr.is_null())
+                    .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned())
+            });
+
+        RequestDetails {
+            method: Some(request_info.request_method)
+                .filter(|ptr| !ptr.is_null())
+                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
+            uri,
+            body_length: request_info.content_length as u64,
+            content_type: Some(request_info.content_type)
+                .filter(|ptr| !ptr.is_null())
+                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub struct RequestDetails {
+    pub method: Option<String>,
+    uri: Option<String>,
+    body_length: u64,
+    content_type: Option<String>,
+}
+
+fn init_environment() {
     let dotenv_enabled = ini_get::<bool>(config::ini::OTEL_ENV_DOTENV_ENABLED);
     let env_from_server = ini_get::<bool>(config::ini::OTEL_ENV_SET_FROM_SERVER);
 
@@ -169,7 +251,7 @@ fn find_dotenv() -> Option<PathBuf> {
 }
 
 /// Initialize the request handler, creating a root span if necessary.
-pub fn init() {
+fn init() {
     tracing::debug!("RINIT::initializing request handler");
     unsafe {
         //ensure $_SERVER is populated
@@ -232,7 +314,7 @@ pub fn init() {
 
 /// Shutdown the request handler, closing the root span if it exists.
 /// Restore the environment variables to their original state.
-pub fn shutdown() {
+fn shutdown() {
     restore_env();
     let context_id = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take());
     let is_tracing = context_id.is_some();
@@ -289,43 +371,6 @@ pub fn shutdown() {
         tracing::debug!("RSHUTDOWN::CONTEXT_STORAGE is empty :)");
     }
     storage::clear_context_storage();
-}
-
-pub fn get_request_details() -> RequestDetails {
-    unsafe {
-        //depending in SAPI, request_info.request_uri may not be what we want (eg "index.php" instead of url)
-        let request_info = sg!(request_info);
-        let server = get_request_server();
-        let uri = server
-            .ok()
-            .and_then(|server| server.get("REQUEST_URI"))
-            .and_then(|zv| z_val_to_string(zv))
-            // Fallback to request_info.request_uri if not found
-            .or_else(|| {
-                Some(request_info.request_uri)
-                    .filter(|ptr| !ptr.is_null())
-                    .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned())
-            });
-
-        RequestDetails {
-            method: Some(request_info.request_method)
-                .filter(|ptr| !ptr.is_null())
-                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
-            uri,
-            body_length: request_info.content_length as u64,
-            content_type: Some(request_info.content_type)
-                .filter(|ptr| !ptr.is_null())
-                .map(|ptr| std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()),
-        }
-    }
-}
-
-#[allow(dead_code)]
-pub struct RequestDetails {
-    pub method: Option<String>,
-    uri: Option<String>,
-    body_length: u64,
-    content_type: Option<String>,
 }
 
 // @see https://github.com/apache/skywalking-php/blob/v0.8.0/src/request.rs#L152
@@ -434,18 +479,10 @@ fn get_propagated_context() -> Context {
 }
 
 //per-request .env support
-pub fn set_request_dotenv(env: HashMap<String, String>) {
+fn set_request_dotenv(env: HashMap<String, String>) {
     for (k, v) in env {
         unsafe { std::env::set_var(&k, &v) };
         tracing::debug!("Set environment variable from .env {}={}", k, v);
-    }
-}
-
-/// Check if OpenTelemetry is disabled for the current request (by env or .env)
-pub fn is_disabled() -> bool {
-    match std::env::var("OTEL_SDK_DISABLED") {
-        Ok(val) => val == "true",
-        Err(_) => false,
     }
 }
 

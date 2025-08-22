@@ -8,7 +8,7 @@ use crate::{
         utils,
     },
     context::storage::take_guard,
-    tracer_provider,
+    trace::tracer_provider,
 };
 use opentelemetry::{
     KeyValue,

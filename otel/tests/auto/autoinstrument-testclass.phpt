@@ -44,12 +44,12 @@ try {
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=TestClassHandler: pre_callback called
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=TestClassHandler: post_callback called
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=retval type: TypeInfo { base_name: "string", base: 6, raw: 6 }
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=exception: None
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=TestClassHandler: pre_callback called
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=TestClassHandler: post_callback called
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=retval type: TypeInfo { base_name: "null", base: 1, raw: 1 }
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugins::test: event src/auto/plugins/test.rs:%d message=exception: Some(ZObj { class: "Exception", handle: 2 })
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=TestClassHandler: pre_callback called
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=TestClassHandler: post_callback called
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=retval type: TypeInfo { base_name: "string", base: 6, raw: 6 }
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=exception: None
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=TestClassHandler: pre_callback called
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=TestClassHandler: post_callback called
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=retval type: TypeInfo { base_name: "null", base: 1, raw: 1 }
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::auto::plugin::test: event src/auto/plugin/test.rs:%d message=exception: Some(ZObj { class: "Exception", handle: 2 })
 %A

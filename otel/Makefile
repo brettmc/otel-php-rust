@@ -16,6 +16,8 @@ build-test:
 	cp target/debug/libotel.so modules/otel.so
 re: build-test
 	php -d extension=target/debug/libotel.so --re otel
+ri: build-test
+	php -d extension=target/debug/libotel.so --ri otel
 check:
 	cargo check
 install: build

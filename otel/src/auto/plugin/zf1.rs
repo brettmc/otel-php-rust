@@ -6,8 +6,10 @@ use crate::{
     },
     config::trace_attributes,
     context::storage::{take_guard},
-    trace::local_root_span::get_local_root_span_context,
-    tracer_provider,
+    trace::{
+        local_root_span::get_local_root_span_context,
+        tracer_provider,
+    },
 };
 use opentelemetry::{
     KeyValue,

@@ -7,10 +7,12 @@ use crate::{
     context::storage::{take_guard},
     error::StringError,
     request::get_request_details,
-    trace::local_root_span::{
-        get_local_root_span_context,
+    trace::{
+        local_root_span::{
+            get_local_root_span_context,
+        },
+        tracer_provider,
     },
-    tracer_provider,
 };
 use opentelemetry::{
     KeyValue,

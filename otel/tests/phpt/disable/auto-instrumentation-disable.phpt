@@ -11,5 +11,5 @@ otel.auto.enabled=Off
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::MINIT auto-instrumentation disabled
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=OpenTelemetry::MINIT auto-instrumentation disabled
 %A
