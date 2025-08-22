@@ -320,13 +320,15 @@ impl Zf1AdapterConnectHandler {
         _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
+        let mut _guard = None;
+        let did_start_span = execute_data::get_exec_data_flag(exec_data).unwrap_or(false);
+        if did_start_span {
+            _guard = take_guard(exec_data);
+        }
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
-        let did_start_span = execute_data::get_exec_data_flag(exec_data).unwrap_or(false);
-        if did_start_span {
-            take_guard(exec_data);
-        }
+
         execute_data::remove_exec_data_flag(exec_data);
     }
 }
@@ -377,6 +379,7 @@ impl Zf1AdapterPrepareHandler {
         retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
+        let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
@@ -428,7 +431,6 @@ impl Zf1AdapterPrepareHandler {
                 }
             }
         }
-        take_guard(exec_data);
     }
 }
 
@@ -482,10 +484,10 @@ impl Zf1StatementExecuteHandler {
         _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
+        let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
-        take_guard(exec_data);
     }
 }
 

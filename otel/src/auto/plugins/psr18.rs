@@ -141,17 +141,12 @@ impl Psr18SendRequestHandler {
         _retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
+        let _guard = take_guard(exec_data);
         //get the current span
         let context = Context::current();
         let span_ref = context.span();
         if let Some(exception) = exception {
             record_exception(&opentelemetry::Context::current(), exception);
-        }
-        if let Some(_guard) = take_guard(exec_data) {
-            //do nothing, _guard will go out of scope at end of function
-        } else {
-            tracing::warn!("Psr18Handler: No context guard found for post callback");
-            return;
         }
 
         let exec_data_ref = unsafe { &mut *exec_data };

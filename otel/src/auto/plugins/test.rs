@@ -90,12 +90,7 @@ impl DemoHandler {
         _retval: Option<&mut ZVal>,
         _exception: Option<&mut ZObj>
     ) {
-        if let Some(_guard) = take_guard(exec_data) {
-            //do nothing, _guard will go out of scope at end of function
-        } else {
-            tracing::warn!("DemoHandler: No context guard found for post callback");
-            return;
-        }
+        take_guard(exec_data);
     }
 }
 
@@ -177,6 +172,7 @@ impl DemoFunctionHandler {
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("DemoFunctionHandler: post_callback called");
+        let _guard = take_guard(exec_data);
         //get current span
         let context = opentelemetry::Context::current();
         let span_ref = context.span();
@@ -184,12 +180,6 @@ impl DemoFunctionHandler {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
-        if let Some(_guard) = take_guard(exec_data) {
-            //do nothing, _guard will go out of scope at end of function
-        } else {
-            tracing::warn!("DemoFunctionHandler: No context guard found for post callback");
-            return;
-        }
     }
 }
 
