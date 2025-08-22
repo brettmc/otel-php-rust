@@ -30,11 +30,10 @@ use crate::{
             trace_context_propagator::{make_trace_context_propagator_class},
         },
     },
-    util::get_sapi_module_name,
     globals::{make_globals_class},
 };
 use phper::{
-    ini::{ini_get, Policy},
+    ini::Policy,
     modules::Module,
     php_get_module,
 };
@@ -45,7 +44,6 @@ use opentelemetry_sdk::{
     propagation::TraceContextPropagator,
 };
 use std::env;
-use once_cell::sync::OnceCell;
 
 pub mod context{
     pub mod context;
@@ -84,6 +82,7 @@ pub mod globals;
 pub mod request;
 pub mod logging;
 pub mod util;
+pub mod module;
 
 pub mod auto{
     #[cfg(otel_observer_supported)]
@@ -104,8 +103,6 @@ pub mod auto{
 }
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
-
-static DISABLED: OnceCell<bool> = OnceCell::new();
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -175,48 +172,18 @@ pub fn get_module() -> Module {
     let _globals_class = module.add_class(make_globals_class(tracer_provider_class.clone(), trace_context_propagator_class.clone()));
     let _status_code_interface = module.add_interface(make_status_code_interface());
 
+    // Replace DISABLED usages with module::is_disabled()
     module.on_module_init(|| {
-        logging::init_once(); //from here on we can use tracing macros
-        let cli_enabled = ini_get::<bool>(config::ini::OTEL_CLI_ENABLED);
-        let sapi = get_sapi_module_name();
-        let disabled = sapi == "cli" && !cli_enabled;
-        DISABLED.set(disabled).ok();
-        if disabled {
-            tracing::debug!("OpenTelemetry::MINIT disabled");
-            return;
-        }
-        tracing::debug!("OpenTelemetry::MINIT");
-
-        let auto_enabled = ini_get::<bool>(config::ini::OTEL_AUTO_ENABLED);
-        if auto_enabled {
-            let plugin_manager = auto::plugin_manager::PluginManager::new();
-            auto::plugin_manager::set_global(plugin_manager);
-
-            #[cfg(otel_observer_supported)]
-            {
-                auto::observer::init();
-            }
-            #[cfg(otel_observer_not_supported)]
-            {
-                auto::execute::init();
-            }
-        } else {
-            tracing::debug!("OpenTelemetry::MINIT auto-instrumentation disabled");
-        }
+        module::on_module_init();
     });
     module.on_module_shutdown(|| {
-        let is_disabled = *DISABLED.get().unwrap_or(&false);
-        if is_disabled {
-            return;
-        }
-        tracing::debug!("OpenTelemetry::MSHUTDOWN");
-        tracer_provider::shutdown();
+        module::on_module_shutdown();
     });
     module.on_request_init(|| {
-        if *DISABLED.get().unwrap_or(&false) {
+        if module::is_disabled() {
             return;
         }
-        logging::init_once(); //we maybe need to initialize logging for each worker (apache, fpm)
+        logging::init_once();
         tracing::debug!("OpenTelemetry::RINIT");
         request::init_environment();
 
@@ -231,13 +198,11 @@ pub fn get_module() -> Module {
         request::init();
     });
     module.on_request_shutdown(|| {
-        let is_disabled = *DISABLED.get().unwrap_or(&false);
-        if is_disabled {
+        if module::is_disabled() {
             return;
         }
         tracing::debug!("OpenTelemetry::RSHUTDOWN");
         request::shutdown();
-        //call plugin manager request_shutdown
         if let Some(plugin_manager) = auto::plugin_manager::get_global() {
             let pm = plugin_manager.read().expect("Failed to acquire read lock");
             pm.request_shutdown();
