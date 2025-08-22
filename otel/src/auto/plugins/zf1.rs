@@ -374,15 +374,14 @@ impl Zf1AdapterPrepareHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        retval: Option<&mut ZVal>,
         exception: Option<&mut ZObj>
     ) {
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         //prepared statement is the return value
-        let exec_data_ref = unsafe { &mut *exec_data };
-        if let Some(retval) = exec_data_ref.get_return_value_mut() {
+        if let Some(retval) = retval {
             if let Some(statement_obj) = retval.as_mut_z_obj() {
                 let mut execute_attributes = vec![];
                 let exec_data_ref = unsafe {&mut *exec_data};
