@@ -18,16 +18,20 @@ use std::{
     sync::Mutex,
 };
 use opentelemetry::{
+    global,
     Context,
     InstrumentationScope,
     KeyValue,
-    global,
     trace::{SpanKind, Tracer, TraceContextExt, TracerProvider},
 };
+use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_semantic_conventions as SemConv;
 use crate::{
+    auto,
     config,
     context::storage,
+    logging,
+    module,
     error::php_error_to_attributes,
     trace::{local_root_span, tracer_provider},
     util::{get_sapi_module_name},
@@ -473,5 +477,36 @@ fn restore_env() {
         for (k, v) in backup {
             unsafe { env::set_var(k, v) };
         }
+    }
+}
+
+pub fn on_request_init() {
+    if module::is_disabled() {
+        return;
+    }
+    logging::init_once();
+    tracing::debug!("OpenTelemetry::RINIT");
+    crate::request::init_environment();
+
+    if crate::request::is_disabled() {
+        tracing::debug!("OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization");
+        return;
+    }
+
+    tracer_provider::init_once();
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    crate::request::init();
+}
+
+pub fn on_request_shutdown() {
+    if module::is_disabled() {
+        return;
+    }
+    tracing::debug!("OpenTelemetry::RSHUTDOWN");
+    crate::request::shutdown();
+    if let Some(plugin_manager) = auto::plugin_manager::get_global() {
+        let pm = plugin_manager.read().expect("Failed to acquire read lock");
+        pm.request_shutdown();
     }
 }

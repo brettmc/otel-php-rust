@@ -11,4 +11,4 @@ OTEL_SDK_DISABLED=true
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::MINIT disabled%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=OpenTelemetry::MINIT disabled%A

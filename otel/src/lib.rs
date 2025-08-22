@@ -37,12 +37,6 @@ use phper::{
     modules::Module,
     php_get_module,
 };
-use opentelemetry::{
-    global,
-};
-use opentelemetry_sdk::{
-    propagation::TraceContextPropagator,
-};
 use std::env;
 
 pub mod context{
@@ -173,41 +167,10 @@ pub fn get_module() -> Module {
     let _status_code_interface = module.add_interface(make_status_code_interface());
 
     // Replace DISABLED usages with module::is_disabled()
-    module.on_module_init(|| {
-        module::on_module_init();
-    });
-    module.on_module_shutdown(|| {
-        module::on_module_shutdown();
-    });
-    module.on_request_init(|| {
-        if module::is_disabled() {
-            return;
-        }
-        logging::init_once();
-        tracing::debug!("OpenTelemetry::RINIT");
-        request::init_environment();
-
-        if request::is_disabled() {
-            tracing::debug!("OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization");
-            return;
-        }
-
-        tracer_provider::init_once();
-        global::set_text_map_propagator(TraceContextPropagator::new());
-
-        request::init();
-    });
-    module.on_request_shutdown(|| {
-        if module::is_disabled() {
-            return;
-        }
-        tracing::debug!("OpenTelemetry::RSHUTDOWN");
-        request::shutdown();
-        if let Some(plugin_manager) = auto::plugin_manager::get_global() {
-            let pm = plugin_manager.read().expect("Failed to acquire read lock");
-            pm.request_shutdown();
-        }
-    });
+    module.on_module_init(module::on_module_init);
+    module.on_module_shutdown(module::on_module_shutdown);
+    module.on_request_init(request::on_request_init);
+    module.on_request_shutdown(request::on_request_shutdown);
 
     module
 }
