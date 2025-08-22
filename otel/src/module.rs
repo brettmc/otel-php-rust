@@ -8,6 +8,7 @@ use crate::{
 use phper::ini::ini_get;
 use once_cell::sync::OnceCell;
 use tracing;
+use phper::modules::Module;
 
 static DISABLED: OnceCell<bool> = OnceCell::new();
 
@@ -51,4 +52,33 @@ pub fn on_module_shutdown() {
 
 pub fn is_disabled() -> bool {
     *DISABLED.get().unwrap_or(&false)
+}
+
+pub fn add_module_info(module: &mut Module) {
+    module.add_info("opentelemetry-rust", crate::OPENTELEMETRY_VERSION);
+    module.add_info("phper", crate::PHPER_VERSION);
+    module.add_info("tokio", crate::TOKIO_VERSION);
+
+    //which auto-instrumentation mechanism is enabled
+    #[cfg(otel_observer_supported)]
+    {
+        module.add_info("auto-instrumentation", "observer".to_string());
+        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "observer".to_string());
+    }
+    #[cfg(otel_observer_not_supported)]
+    {
+        module.add_info("auto-instrumentation", "zend_execute_ex".to_string());
+        module.add_constant("OTEL_AUTO_INSTRUMENTATION", "zend_execute_ex".to_string());
+    }
+}
+
+pub fn add_module_ini(module: &mut Module) {
+    module.add_ini(config::ini::OTEL_LOG_LEVEL, "error".to_string(), phper::ini::Policy::All);
+    module.add_ini(config::ini::OTEL_LOG_FILE, "/dev/stderr".to_string(), phper::ini::Policy::All);
+    module.add_ini(config::ini::OTEL_CLI_CREATE_ROOT_SPAN, false, phper::ini::Policy::All);
+    module.add_ini(config::ini::OTEL_CLI_ENABLED, false, phper::ini::Policy::All);
+    module.add_ini(config::ini::OTEL_ENV_DOTENV_ENABLED, false, phper::ini::Policy::All);
+    module.add_ini(config::ini::OTEL_ENV_SET_FROM_SERVER, false, phper::ini::Policy::All);
+    module.add_ini(config::ini::OTEL_AUTO_ENABLED, true, phper::ini::Policy::All);
+    module.add_ini(config::ini::OTEL_AUTO_DISABLED_PLUGINS, "".to_string(), phper::ini::Policy::All);
 }
