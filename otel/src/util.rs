@@ -11,6 +11,7 @@ use opentelemetry::{
 };
 use std::ffi::CStr;
 
+/// Convert a ZVal to a single KeyValue pair based on its type.
 pub fn zval_to_key_value(key: &str, value: &ZVal) -> Option<KeyValue> {
     let type_info = value.get_type_info();
     if type_info.is_string() {
@@ -31,6 +32,7 @@ pub fn zval_to_key_value(key: &str, value: &ZVal) -> Option<KeyValue> {
     None
 }
 
+/// Convert a ZArray to a vector of KeyValue pairs.
 pub fn zval_arr_to_key_value_vec(arr: ZArray) -> Vec<KeyValue> {
     let mut result = Vec::new();
 
@@ -49,6 +51,22 @@ pub fn zval_arr_to_key_value_vec(arr: ZArray) -> Vec<KeyValue> {
     }
 
     result
+}
+
+/// Get the name of the SAPI module.
+pub fn get_sapi_module_name() -> String {
+    unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
+}
+
+/// Get the PHP version as a string.
+pub fn get_php_version() -> String {
+    let php_version = format!(
+        "{}.{}.{}",
+        phper::sys::PHP_MAJOR_VERSION,
+        phper::sys::PHP_MINOR_VERSION,
+        phper::sys::PHP_RELEASE_VERSION
+    );
+    php_version
 }
 
 fn zval_to_vec(key: &str, value: &ZVal) -> Option<KeyValue> {
@@ -96,18 +114,4 @@ fn zval_to_vec(key: &str, value: &ZVal) -> Option<KeyValue> {
     }
 
     None
-}
-
-pub fn get_sapi_module_name() -> String {
-    unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
-}
-
-pub fn get_php_version() -> String {
-    let php_version = format!(
-        "{}.{}.{}",
-        phper::sys::PHP_MAJOR_VERSION,
-        phper::sys::PHP_MINOR_VERSION,
-        phper::sys::PHP_RELEASE_VERSION
-    );
-    php_version
 }

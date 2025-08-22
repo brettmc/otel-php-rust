@@ -44,6 +44,7 @@ thread_local! {
 //backup mutating environment variables for request duration
 static ENV_BACKUP: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// RINIT handler.
 pub fn on_request_init() {
     if module::is_disabled() {
         return;
@@ -63,6 +64,7 @@ pub fn on_request_init() {
     init();
 }
 
+/// RSHUTDOWN handler. Invoke request shutdown logic, call shutdown() on plugin manager.
 pub fn on_request_shutdown() {
     if module::is_disabled() {
         return;
