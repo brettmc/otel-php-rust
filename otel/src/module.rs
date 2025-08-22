@@ -3,7 +3,7 @@ use crate::{
     logging,
     util::get_sapi_module_name,
     auto,
-    tracer_provider,
+    trace::tracer_provider,
 };
 use phper::ini::ini_get;
 use once_cell::sync::OnceCell;

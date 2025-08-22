@@ -4,7 +4,7 @@ use crate::{
         utils::{start_and_activate_span, record_exception},
     },
     context::storage::{take_guard},
-    tracer_provider,
+    trace::tracer_provider,
 };
 use opentelemetry::{
     KeyValue,
