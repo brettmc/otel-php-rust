@@ -2,7 +2,7 @@ use crate::{
     auto::{
         execute_data::get_fqn,
         plugin::{FunctionObserver, Plugin},
-        plugins::{
+        plugin::{
             laminas::LaminasPlugin,
             psr18::Psr18Plugin,
             zf1::Zf1Plugin,
@@ -73,7 +73,7 @@ impl PluginManager {
         }
         if !disabled.contains("test") {
             #[cfg(feature="test")]
-            self.plugins.push(Box::new(crate::auto::plugins::test::TestPlugin::new()));
+            self.plugins.push(Box::new(crate::auto::plugin::test::TestPlugin::new()));
         }
     }
 
