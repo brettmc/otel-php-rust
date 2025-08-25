@@ -87,7 +87,7 @@ impl DemoHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
         take_guard(exec_data);
@@ -115,23 +115,16 @@ impl Handler for DemoHelloHandler {
 impl DemoHelloHandler {
     unsafe extern "C" fn post_callback(
         _exec_data: *mut ExecuteData,
-        retval: Option<&mut ZVal>,
+        retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
         tracing::debug!("DemoFunctionHandler: post_callback called");
         // Print info about the return value
-        match retval {
-            Some(rv) => {
-                tracing::debug!("Return value type: {:?}", rv.get_type_info());
-                tracing::debug!("Return value (debug): {:?}", rv);
+        tracing::debug!("Return value type: {:?}", retval.get_type_info());
+        tracing::debug!("Return value (debug): {:?}", retval);
 
-                *rv = ZVal::from("goodbye");
-                tracing::debug!("Return value mutated to: {:?}", rv);
-            }
-            None => {
-                tracing::debug!("No return value provided to post_callback");
-            }
-        }
+        *retval = ZVal::from("goodbye");
+        tracing::debug!("Return value mutated to: {:?}", retval);
     }
 }
 
@@ -168,7 +161,7 @@ impl DemoFunctionHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("DemoFunctionHandler: post_callback called");
@@ -210,15 +203,11 @@ impl TestClassHandler {
 
     unsafe extern "C" fn post_callback(
         _exec_data: *mut ExecuteData,
-        retval: Option<&mut ZVal>,
+        retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("TestClassHandler: post_callback called");
-        if let Some(rv) = retval {
-            tracing::debug!("retval type: {:?}", rv.get_type_info());
-        } else {
-            tracing::debug!("retval: None");
-        }
+        tracing::debug!("retval type: {:?}", retval.get_type_info());
         tracing::debug!("exception: {:?}", exception);
     }
 }

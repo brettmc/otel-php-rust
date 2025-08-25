@@ -138,7 +138,7 @@ impl Psr18SendRequestHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         let _guard = take_guard(exec_data);

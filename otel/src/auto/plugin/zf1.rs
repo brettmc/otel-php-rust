@@ -111,7 +111,7 @@ impl Handler for Zf1RouteHandler {
 impl Zf1RouteHandler {
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        retval: Option<&mut ZVal>,
+        retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Zf1::post (Router_Interface::route)");
@@ -126,12 +126,11 @@ impl Zf1RouteHandler {
         ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "zf1"));
 
         let exec_data_ref = unsafe { &mut *exec_data };
-        let zf1_request_zval = match retval {
-            Some(rv) if rv.get_type_info() != phper::types::TypeInfo::NULL => rv,
-            _ => {
-                tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no return value found, getting first parameter");
-                exec_data_ref.get_mut_parameter(0)
-            }
+        let zf1_request_zval = if retval.get_type_info() != phper::types::TypeInfo::NULL {
+            retval
+        } else {
+            tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no return value found, getting first parameter");
+            exec_data_ref.get_mut_parameter(0)
         };
 
         if let Some(zf1_request_obj) = zf1_request_zval.as_mut_z_obj() {
@@ -201,7 +200,7 @@ impl Handler for Zf1SendResponseHandler {
 impl Zf1SendResponseHandler {
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Zf1::post (Zend_Controller_Response_Abstract::sendResponse)");
@@ -319,7 +318,7 @@ impl Zf1AdapterConnectHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         let mut _guard = None;
@@ -378,7 +377,7 @@ impl Zf1AdapterPrepareHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        retval: Option<&mut ZVal>,
+        retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         let _guard = take_guard(exec_data);
@@ -386,51 +385,49 @@ impl Zf1AdapterPrepareHandler {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         //prepared statement is the return value
-        if let Some(retval) = retval {
-            if let Some(statement_obj) = retval.as_mut_z_obj() {
-                let mut execute_attributes = vec![];
-                let exec_data_ref = unsafe {&mut *exec_data};
-                if let Some(this_obj) = exec_data_ref.get_this_mut() {
-                    let id = get_object_id(this_obj);
-                    tracing::debug!("Zf1AdapterPrepareHandler: object id: {}", id);
-                    if let Some(info) = CONNECTION_ATTRS.lock().unwrap().get(&id) {
-                        execute_attributes.extend_from_slice(&info.attributes);
-                        let link = info.span_context.clone();
-                        let ctx = opentelemetry::Context::current();
-                        let span = ctx.span();
-                        span.add_link(link, vec![]);
-                    }
+        if let Some(statement_obj) = retval.as_mut_z_obj() {
+            let mut execute_attributes = vec![];
+            let exec_data_ref = unsafe {&mut *exec_data};
+            if let Some(this_obj) = exec_data_ref.get_this_mut() {
+                let id = get_object_id(this_obj);
+                tracing::debug!("Zf1AdapterPrepareHandler: object id: {}", id);
+                if let Some(info) = CONNECTION_ATTRS.lock().unwrap().get(&id) {
+                    execute_attributes.extend_from_slice(&info.attributes);
+                    let link = info.span_context.clone();
+                    let ctx = opentelemetry::Context::current();
+                    let span = ctx.span();
+                    span.add_link(link, vec![]);
                 }
+            }
 
 
-                let exec_data_ref = unsafe { &mut *exec_data };
-                let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
-                if let Some(sql_str) = sql_zval.as_z_str() {
-                    if let Ok(sql) = sql_str.to_str() {
-                        let sql_name = utils::extract_span_name_from_sql(&sql)
-                            .unwrap_or_else(|| "OTHER".to_string());
-                        let execute_span_name = sql_name.clone();
-                        let prepare_span_name = format!("prepare {}", sql_name.clone());
-                        let ctx = opentelemetry::Context::current();
-                        let span = ctx.span();
-                        span.update_name(prepare_span_name);
-                        execute_attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
-                        span.set_attributes(execute_attributes.clone());
-                        let id = get_object_id(statement_obj);
-                        // Add SQL query as an attribute
-                        STATEMENT_ATTRS.lock()
-                            .unwrap()
-                            .insert(
-                                id,
-                                StatementInfo{
-                                    attributes: execute_attributes.clone(),
-                                    span_name: execute_span_name,
-                                    span_context: opentelemetry::Context::current().span().span_context().clone(),
-                                });
-                    }
-                } else {
-                    tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
+            let exec_data_ref = unsafe { &mut *exec_data };
+            let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
+            if let Some(sql_str) = sql_zval.as_z_str() {
+                if let Ok(sql) = sql_str.to_str() {
+                    let sql_name = utils::extract_span_name_from_sql(&sql)
+                        .unwrap_or_else(|| "OTHER".to_string());
+                    let execute_span_name = sql_name.clone();
+                    let prepare_span_name = format!("prepare {}", sql_name.clone());
+                    let ctx = opentelemetry::Context::current();
+                    let span = ctx.span();
+                    span.update_name(prepare_span_name);
+                    execute_attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
+                    span.set_attributes(execute_attributes.clone());
+                    let id = get_object_id(statement_obj);
+                    // Add SQL query as an attribute
+                    STATEMENT_ATTRS.lock()
+                        .unwrap()
+                        .insert(
+                            id,
+                            StatementInfo{
+                                attributes: execute_attributes.clone(),
+                                span_name: execute_span_name,
+                                span_context: opentelemetry::Context::current().span().span_context().clone(),
+                            });
                 }
+            } else {
+                tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
             }
         }
     }
@@ -483,7 +480,7 @@ impl Zf1StatementExecuteHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         let _guard = take_guard(exec_data);

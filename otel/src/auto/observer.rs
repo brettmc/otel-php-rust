@@ -97,7 +97,7 @@ pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_ex
                 };
                 for hook in observer.post_hooks() {
                     tracing::trace!("running post hook: {}", fqn);
-                    hook(&mut *exec_data, Some(retval), get_global_exception());
+                    hook(&mut *exec_data, retval, get_global_exception());
                 }
             }
         }

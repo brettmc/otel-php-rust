@@ -129,7 +129,7 @@ impl LaminasApplicationRunHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
         take_guard(exec_data);
@@ -327,7 +327,7 @@ impl LaminasDbConnectHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         let _guard = take_guard(exec_data);
@@ -369,7 +369,7 @@ impl LaminasStatementPrepareHandler {
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Laminas::post (Statement::prepare) - post_callback called");
@@ -481,7 +481,7 @@ impl LaminasStatementExecuteHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         let _guard = take_guard(exec_data);
@@ -549,7 +549,7 @@ impl LaminasConnectionExecuteHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: Option<&mut ZVal>,
+        _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Laminas::post (Connection::execute) - post_callback called");
