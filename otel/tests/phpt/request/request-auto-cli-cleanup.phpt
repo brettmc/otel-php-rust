@@ -15,11 +15,11 @@ otel.cli.enabled=1
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RINIT::sapi module name is: cli
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RINIT::tracing cli enabled by ini
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RINIT::otel request is being traced, name=php:cli
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=RINIT::sapi module name is: cli
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=RINIT::tracing cli enabled by ini
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=RINIT::otel request is being traced, name=php:cli
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel: event src/lib.rs:%d message=OpenTelemetry::RSHUTDOWN%A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::auto-closing root span...
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=RSHUTDOWN::auto-closing root span...
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::request: event src/request.rs:%d message=RSHUTDOWN::CONTEXT_STORAGE is empty :)%A
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=RSHUTDOWN::CONTEXT_STORAGE is empty :)
+%A

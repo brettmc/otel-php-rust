@@ -23,6 +23,7 @@ impl fmt::Debug for StringError {
 
 impl std::error::Error for StringError {}
 
+/// Convert a PHP exception to a vector of KeyValue attributes for OpenTelemetry.
 pub fn php_exception_to_attributes(exception: &mut ZObj) -> Vec<KeyValue> {
     let mut attributes = vec![];
     if let Some(message) = exception.call("getMessage", [])
