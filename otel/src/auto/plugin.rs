@@ -32,7 +32,6 @@ pub struct HandlerCallbacks {
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData) + Send + Sync>;
-//TODO exception does not need to be mutable?
 pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &mut ZVal, Option<&mut ZObj>) + Send + Sync>;
 pub type HandlerList = Vec<Arc<dyn Handler + Send + Sync>>;
 pub type HandlerSlice = [Arc<dyn Handler + Send + Sync>];
