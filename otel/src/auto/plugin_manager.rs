@@ -136,7 +136,7 @@ fn get_disabled_plugins() -> HashSet<String> {
         .collect()
 }
 
-fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name: &str) -> bool {
+fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], _plugin_name: &str) -> bool {
     let name_zstr = func.get_function_or_method_name();
     let function_name = match name_zstr.to_str() {
         Ok(name) => name,
@@ -148,12 +148,12 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name
     let method_part = parts.next();
 
     let observed_name_pair = if let Some(method) = method_part {
-        (class_part.map(|s| s.to_owned()), method.to_owned())
+        (class_part, method)
     } else {
-        (None, function_name.to_owned())
+        (None, function_name)
     };
 
-    if targets.iter().any(|target| target == &observed_name_pair) {
+    if targets.iter().any(|target| target.0 == observed_name_pair.0 && target.1 == observed_name_pair.1) {
         return true;
     }
 
@@ -168,8 +168,8 @@ fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name
     };
     for (target_class_name, target_method_name) in targets.iter() {
         if let Some(interface_name) = target_class_name {
-            if &observed_name_pair.1 == target_method_name {
-                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.clone()) {
+            if target_method_name == &observed_name_pair.1 {
+                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.to_string()) {
                     if ce.is_instance_of(&iface_ce) {
                         return true;
                     }
