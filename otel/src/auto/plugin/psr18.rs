@@ -138,53 +138,42 @@ impl Psr18SendRequestHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
+        retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
         let _guard = take_guard(exec_data);
-        //get the current span
         let context = Context::current();
         let span_ref = context.span();
         if let Some(exception) = exception {
             record_exception(&opentelemetry::Context::current(), exception);
+            return; //if there was an exception, we don't have a response to process
         }
 
-        let exec_data_ref = unsafe { &mut *exec_data };
-        match exec_data_ref.get_return_value_mut() {
-            Some(retval) => {
-                if !retval.get_type_info().is_object() {
-                    // no return value, nothing else to do
-                    return;
-                }
-                let response_obj: &mut ZObj = match retval.as_mut_z_obj() {
-                    Some(obj) => obj,
-                    None => {
-                        tracing::warn!("Psr18Handler: failed to convert return value to object");
-                        return;
-                    }
-                };
-
-                let status_code_zval = match response_obj.call("getStatusCode", &mut []) {
-                    Ok(zval) => zval,
-                    Err(_) => {
-                        tracing::warn!("Psr18Handler: failed to call getStatusCode()");
-                        return;
-                    }
-                };
-
-                let status_code = match status_code_zval.as_long() {
-                    Some(code) => code,
-                    None => {
-                        tracing::warn!("Psr18Handler: getStatusCode() did not return an integer");
-                        return;
-                    }
-                };
-
-                span_ref.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, status_code));
-            }
+        let response_obj: &mut ZObj = match retval.as_mut_z_obj() {
+            Some(obj) => obj,
             None => {
-                tracing::warn!("Psr18Handler: no return value found");
+                tracing::warn!("Psr18Handler: failed to convert return value to object");
+                return;
             }
-        }
+        };
+
+        let status_code_zval = match response_obj.call("getStatusCode", &mut []) {
+            Ok(zval) => zval,
+            Err(_) => {
+                tracing::warn!("Psr18Handler: failed to call getStatusCode()");
+                return;
+            }
+        };
+
+        let status_code = match status_code_zval.as_long() {
+            Some(code) => code,
+            None => {
+                tracing::warn!("Psr18Handler: getStatusCode() did not return an integer");
+                return;
+            }
+        };
+
+        span_ref.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, status_code));
+
     }
 }
