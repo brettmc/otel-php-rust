@@ -122,14 +122,14 @@ impl Zf1RouteHandler {
                 return;
             }
         };
-        tracing::debug!("Auto::Zf1::post - got local root span context");
         ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "zf1"));
 
-        let exec_data_ref = unsafe { &mut *exec_data };
+        // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
+        // instead use the first parameter of the execute_data (which is also the request object)
         let zf1_request_zval = if retval.get_type_info() != phper::types::TypeInfo::NULL {
             retval
         } else {
-            tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no return value found, getting first parameter");
+            let exec_data_ref = unsafe { &mut *exec_data };
             exec_data_ref.get_mut_parameter(0)
         };
 
