@@ -33,6 +33,7 @@ impl TestPlugin {
             handlers: vec![
                 Arc::new(DemoHandler),
                 Arc::new(DemoFunctionHandler),
+                Arc::new(DemoHelloHandler),
                 Arc::new(TestClassHandler),
             ],
         }
@@ -89,12 +90,41 @@ impl DemoHandler {
         _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
-        if let Some(_guard) = take_guard(exec_data) {
-            //do nothing, _guard will go out of scope at end of function
-        } else {
-            tracing::warn!("DemoHandler: No context guard found for post callback");
-            return;
+        take_guard(exec_data);
+    }
+}
+
+pub struct DemoHelloHandler;
+
+impl Handler for DemoHelloHandler {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
+        vec![
+            (Some("DemoClass".to_string()), "hello".to_string()),
+        ]
+    }
+    fn get_callbacks(&self) -> HandlerCallbacks {
+        HandlerCallbacks {
+            pre_observe: None,
+            post_observe: Some(Box::new(|exec_data, retval, exception| unsafe {
+                Self::post_callback(exec_data, retval, exception)
+            })),
         }
+    }
+}
+
+impl DemoHelloHandler {
+    unsafe extern "C" fn post_callback(
+        _exec_data: *mut ExecuteData,
+        retval: &mut ZVal,
+        _exception: Option<&mut ZObj>
+    ) {
+        tracing::debug!("DemoFunctionHandler: post_callback called");
+        // Print info about the return value
+        tracing::debug!("Return value type: {:?}", retval.get_type_info());
+        tracing::debug!("Return value (debug): {:?}", retval);
+
+        *retval = ZVal::from("goodbye");
+        tracing::debug!("Return value mutated to: {:?}", retval);
     }
 }
 
@@ -135,6 +165,7 @@ impl DemoFunctionHandler {
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("DemoFunctionHandler: post_callback called");
+        let _guard = take_guard(exec_data);
         //get current span
         let context = opentelemetry::Context::current();
         let span_ref = context.span();
@@ -142,12 +173,6 @@ impl DemoFunctionHandler {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
         span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
-        if let Some(_guard) = take_guard(exec_data) {
-            //do nothing, _guard will go out of scope at end of function
-        } else {
-            tracing::warn!("DemoFunctionHandler: No context guard found for post callback");
-            return;
-        }
     }
 }
 

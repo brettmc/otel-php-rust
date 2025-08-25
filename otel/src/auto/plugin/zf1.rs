@@ -126,11 +126,11 @@ impl Zf1RouteHandler {
 
         // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
         // instead use the first parameter of the execute_data (which is also the request object)
-        let zf1_request_zval: &mut ZVal = if retval.get_type_info() == phper::types::TypeInfo::NULL {
-            let exec_data_ref = unsafe {&mut *exec_data};
-            exec_data_ref.get_mut_parameter(0)
-        } else {
+        let zf1_request_zval = if retval.get_type_info() != phper::types::TypeInfo::NULL {
             retval
+        } else {
+            let exec_data_ref = unsafe { &mut *exec_data };
+            exec_data_ref.get_mut_parameter(0)
         };
 
         if let Some(zf1_request_obj) = zf1_request_zval.as_mut_z_obj() {
@@ -163,7 +163,6 @@ impl Zf1RouteHandler {
                 action.as_deref().unwrap_or("unknown_action")
             );
 
-            //let name = format!("{} {}", request.method.as_deref().unwrap_or("GET"), route_name_str);
             tracing::debug!("Auto::Zf1::updateName (Router_Interface::route)");
             ctx.span().update_name(span_name);
             if let Some(module) = &module {
@@ -175,6 +174,8 @@ impl Zf1RouteHandler {
             if let Some(action) = &action {
                 ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_ACTION_NAME, action.clone()));
             }
+        } else {
+            tracing::debug!("Auto::Zf1::post - zf1_request_zval could not be converted to ZObj");
         }
     }
 }
@@ -320,13 +321,15 @@ impl Zf1AdapterConnectHandler {
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
+        let mut _guard = None;
+        let did_start_span = execute_data::get_exec_data_flag(exec_data).unwrap_or(false);
+        if did_start_span {
+            _guard = take_guard(exec_data);
+        }
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
-        let did_start_span = execute_data::get_exec_data_flag(exec_data).unwrap_or(false);
-        if did_start_span {
-            take_guard(exec_data);
-        }
+
         execute_data::remove_exec_data_flag(exec_data);
     }
 }
@@ -377,6 +380,7 @@ impl Zf1AdapterPrepareHandler {
         retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
+        let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
@@ -426,7 +430,6 @@ impl Zf1AdapterPrepareHandler {
                 tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
             }
         }
-        take_guard(exec_data);
     }
 }
 
@@ -480,10 +483,10 @@ impl Zf1StatementExecuteHandler {
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
+        let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
-        take_guard(exec_data);
     }
 }
 

@@ -283,7 +283,6 @@ impl Handler for LaminasDbConnectHandler {
 
 impl LaminasDbConnectHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        let exec_data_ref = unsafe {&mut *exec_data};
         utils::start_and_activate_span(
             tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db"),
             "connect",
@@ -294,6 +293,7 @@ impl LaminasDbConnectHandler {
         let mut attributes = vec![];
 
         // get connection params
+        let exec_data_ref = unsafe {&mut *exec_data};
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
             if let Some(zv) = this_obj.call("getConnectionParameters", []).ok() {
                 if let Some(arr) = zv.as_z_arr() {
@@ -330,10 +330,10 @@ impl LaminasDbConnectHandler {
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
+        let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
-        take_guard(exec_data);
     }
 }
 
@@ -373,6 +373,7 @@ impl LaminasStatementPrepareHandler {
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Laminas::post (Statement::prepare) - post_callback called");
+        let _guard = take_guard(exec_data);
 
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
@@ -447,7 +448,6 @@ impl LaminasStatementPrepareHandler {
         let span = ctx.span();
         span.update_name(prepare_span_name);
         span.set_attributes(prepare_attributes);
-        take_guard(exec_data);
     }
 }
 
@@ -484,6 +484,7 @@ impl LaminasStatementExecuteHandler {
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
+        let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
@@ -506,8 +507,6 @@ impl LaminasStatementExecuteHandler {
                 );
             }
         }
-
-        take_guard(exec_data);
     }
 }
 
@@ -554,10 +553,10 @@ impl LaminasConnectionExecuteHandler {
         exception: Option<&mut ZObj>
     ) {
         tracing::debug!("Auto::Laminas::post (Connection::execute) - post_callback called");
+        let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
-        take_guard(exec_data);
     }
 }
 

@@ -94,13 +94,13 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         |ed, _| upstream_execute_ex(ed),
         |plugin_manager, exec_data, _retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
-                let retval_ptr: *mut sys::zval = unsafe { (*execute_data).return_value };
-                let mut fallback = ZVal::from(());
-                let retval: &mut ZVal = if retval_ptr.is_null() {
-                    &mut fallback
-                } else {
-                    unsafe { ZVal::from_mut_ptr(retval_ptr) }
+                //get return value via a pointer to avoid double-borrowing exec_data
+                let retval = unsafe {
+                    exec_data.get_return_value_mut_ptr()
+                        .as_mut()
+                        .unwrap_or_else(|| Box::leak(Box::new(ZVal::from(()))))
                 };
+
                 for hook in observer.post_hooks() {
                     hook(exec_data, retval, get_global_exception());
                 }
