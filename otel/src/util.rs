@@ -15,7 +15,9 @@ use std::ffi::CStr;
 pub fn zval_to_key_value(key: &str, value: &ZVal) -> Option<KeyValue> {
     let type_info = value.get_type_info();
     if type_info.is_string() {
-        return value.as_z_str().and_then(|z| z.to_str().ok()).map(|s| KeyValue::new(key.to_string(), s.to_string()));
+        return value.as_z_str()
+            .and_then(|z| z.to_str().ok())
+            .map(|s| KeyValue::new(key.to_string(), s.to_string()));
     }
     if type_info.is_long() {
         return value.as_long().map(|v| KeyValue::new(key.to_string(), v));
@@ -41,8 +43,8 @@ pub fn zval_arr_to_key_value_vec(arr: ZArray) -> Vec<KeyValue> {
         match key {
             IterKey::Index(_) => {}, // Skip integer keys
             IterKey::ZStr(zstr) => {
-                if let Some(key_str) = zstr.to_str().ok().map(|s| s.to_string()) {
-                    if let Some(kv) = zval_to_key_value(&key_str, value) {
+                if let Some(key_str) = zstr.to_str().ok() {
+                    if let Some(kv) = zval_to_key_value(key_str, value) {
                         result.push(kv);
                     }
                 }
