@@ -375,11 +375,12 @@ fn shutdown() {
     storage::clear_context_storage();
 }
 
-/// Ensure $_SERVER is initialized
+/// Ensure $_SERVER is initialized, which may not be true if auto_globals_jit is enabled.
 fn jit_initialization() {
     unsafe {
         let jit_initialization: u8 = pg!(auto_globals_jit).into();
         if jit_initialization != 0 {
+            tracing::debug!("JIT auto_globals_jit enabled, initializing $_SERVER");
             let mut server = "_SERVER".to_string();
             sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
         }
