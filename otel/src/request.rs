@@ -2,6 +2,7 @@ use anyhow::Context as _;
 use phper::{
     eg,
     ini::ini_get,
+    pg,
     sg,
     sys,
     arrays::{IterKey, ZArr},
@@ -49,6 +50,7 @@ pub fn on_request_init() {
     if module::is_disabled() {
         return;
     }
+    jit_initialization();
     logging::init_once();
     tracing::debug!("OpenTelemetry::RINIT");
     init_environment();
@@ -373,13 +375,22 @@ fn shutdown() {
     storage::clear_context_storage();
 }
 
+/// Ensure $_SERVER is initialized, which may not be true if auto_globals_jit is enabled.
+fn jit_initialization() {
+    unsafe {
+        let jit_initialization: u8 = pg!(auto_globals_jit).into();
+        if jit_initialization != 0 {
+            tracing::debug!("JIT auto_globals_jit enabled, initializing $_SERVER");
+            let mut server = "_SERVER".to_string();
+            sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
+        }
+    }
+}
+
 // @see https://github.com/apache/skywalking-php/blob/v0.8.0/src/request.rs#L152
 #[allow(static_mut_refs)]
 fn get_request_server<'a>() -> anyhow::Result<&'a ZArr> {
     unsafe {
-        // Ensure $_SERVER is initialized
-        let mut server = "_SERVER".to_string();
-        sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
         let symbol_table = ZArr::from_mut_ptr(&mut eg!(symbol_table));
         let carrier = symbol_table
             .get("_SERVER")

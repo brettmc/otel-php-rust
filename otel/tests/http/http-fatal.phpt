@@ -1,5 +1,5 @@
 --TEST--
-Test HTTP span with 500 error response
+Test HTTP span with fatal error
 --EXTENSIONS--
 otel
 --FILE--
