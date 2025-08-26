@@ -70,7 +70,7 @@ pub fn get_fqn(execute_data: &ExecuteData) -> Option<String> {
 
 fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     let filename = execute_data.func().get_filename();
-    let lineno = execute_data.get_lineno();
+    let lineno = execute_data.func().get_line_start();
     if filename.is_some() && lineno.is_some() {
         let file = filename.unwrap().to_str().unwrap_or("").to_string();
         let line = lineno.unwrap();
