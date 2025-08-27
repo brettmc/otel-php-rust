@@ -1,6 +1,6 @@
 [package]
 name = "otel"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2024"
 publish = false
 build = "build.rs"
@@ -17,8 +17,7 @@ strip = "debuginfo"
 
 [dependencies]
 #phper = "0.17.0"
-phper = { git = "https://github.com/phper-framework/phper.git", branch = "master" }
-#phper = { git = "https://github.com/brettmc/phper.git", branch = "execute_data_retval" }
+phper = { git = "https://github.com/phper-framework/phper.git", rev = "84adb0bf37890162df8fe4488a7bd009413e3ee9" }
 opentelemetry = { version = "0.30.0", features = ["internal-logs"] }
 opentelemetry-http = "0.30.0"
 opentelemetry-stdout = "0.30.0"
