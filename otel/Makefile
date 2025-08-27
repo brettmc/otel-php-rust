@@ -27,7 +27,8 @@ install: build
 	@echo "📌 To enable it, add 'extension=$(EXTENSION_NAME).so' to php.ini"
 clean:
 	cargo clean
-	rm -rf configure* config.h.* libtool Makefile.* run-tests.php build/ autom4te.cache/
+	rm -rf configure* config.h* libtool Makefile.* run-tests.php build/ autom4te.cache/
+	rm -rf acinclude.m4 config.log config.guess config.nice config.status config.sub install-sh ltmain.sh missing mkinstalldirs
 	rm -rf tests/auto/laminas/vendor/* tests/auto/laminas/composer.lock
 	rm -rf tests/auto/zf1/vendor/* tests/auto/zf1/composer.lock
 	rm -rf tests/auto/psr18/vendor/* tests/auto/psr18/composer.lock
@@ -39,11 +40,11 @@ update:
 	@echo "✅ Composer dependencies updated"
 clean-build-test: clean test-all
 test: build-test
-	@echo "Running functional tests..."
-	php run-tests.php -q --show-diff tests/phpt/
-test-all: build-test
-	@echo "Running all tests..."
+	@echo "Running tests..."
 	php run-tests.php -q tests/
+test-phpt: build-test
+	@echo "Running phpt tests..."
+	php run-tests.php -q --show-diff tests/phpt/
 test-export: build-test
 	@echo "Running live export tests..."
 	php run-tests.php -q --show-diff tests/otlp/

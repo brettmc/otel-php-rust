@@ -11,7 +11,7 @@ OTEL_SPAN_PROCESSOR=simple
 --SKIPIF--
 <?php
 if (PHP_VERSION_ID >= 80000 && PHP_VERSION_ID < 80200) {
-    die('skip: PHP 8.1 + 8.2 cannot observe internal functions');
+    die('skip: PHP 8.0 + 8.1 cannot observe internal functions');
 }
 --FILE--
 <?php
