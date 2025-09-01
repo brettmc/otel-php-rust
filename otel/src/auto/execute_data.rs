@@ -1,8 +1,14 @@
 use phper::{
+    alloc::{
+        RefClone,
+        ToRefOwned,
+    },
+    arrays::ZArray,
+    classes::ClassEntry,
     eg,
     objects::ZObj,
     strings::ZStr,
-    values::ExecuteData,
+    values::{ExecuteData, ZVal},
 };
 use opentelemetry::{
     KeyValue,
@@ -68,7 +74,7 @@ pub fn get_fqn(execute_data: &ExecuteData) -> Option<String> {
     }
 }
 
-fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
+pub fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     let filename = execute_data.func().get_filename();
     let lineno = execute_data.func().get_line_start();
     if filename.is_some() && lineno.is_some() {
@@ -78,6 +84,25 @@ fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     } else {
         None
     }
+}
+
+pub fn get_this_or_called_scope(execute_data: &mut ExecuteData) -> ZVal {
+    let function = execute_data.func();
+
+    if function.is_static() {
+        // Get called scope (if available)
+        if let Some(called_scope) = execute_data.get_called_scope() {
+            // Return class name as string
+            return ZVal::from(called_scope.get_name().to_str().unwrap_or(""));
+        }
+    } else {
+        // Get $this object (if available)
+        if let Some(zobj) = execute_data.get_this_mut() {
+            let mut owned = zobj.to_ref_owned();
+            return ZVal::from(owned.ref_clone());
+        }
+    }
+    ZVal::from(())
 }
 
 pub fn get_global_exception() -> Option<&'static mut ZObj> {
@@ -96,4 +121,15 @@ pub fn get_default_attributes(execute_data: &ExecuteData) -> Vec<KeyValue> {
     }
 
     attributes
+}
+
+/// Retrieve all arguments to a function call as a ZVal representing an array
+pub fn get_function_arguments(execute_data: &ExecuteData) -> ZVal {
+    let num_args = execute_data.num_args();
+    let mut arr = ZArray::new();
+    for i in 0..num_args {
+        let val = execute_data.get_parameter(i);
+        arr.insert((), val.clone());
+    }
+    ZVal::from(arr)
 }

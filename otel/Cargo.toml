@@ -17,7 +17,7 @@ strip = "debuginfo"
 
 [dependencies]
 #phper = "0.17.0"
-phper = { git = "https://github.com/phper-framework/phper.git", rev = "2e017856384de1bef4f96e8d72c97df486ae8a7f" }
+phper = { git = "https://github.com/brettmc/phper.git", branch = "add-function-methods" }
 opentelemetry = { version = "0.30.0", features = ["internal-logs"] }
 opentelemetry-http = "0.30.0"
 opentelemetry-stdout = "0.30.0"
@@ -37,7 +37,8 @@ regex = "1.11.1"
 
 [build-dependencies]
 cargo_metadata = "0.22.0"
-phper-sys = "0.15.3"
+#phper-sys = "0.15.3"
+phper-sys = { git = "https://github.com/brettmc/phper.git", branch = "add-function-methods" }
 
 [dev-dependencies]
 phper-test = "0.16.0"

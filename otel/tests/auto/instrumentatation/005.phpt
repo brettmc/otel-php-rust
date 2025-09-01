@@ -7,7 +7,7 @@ OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
-otel.log.level=warn
+otel.log.level=debug
 --FILE--
 <?php
 \OpenTelemetry\Instrumentation\hook(null, 'helloWorld', fn() => var_dump(func_get_args()), fn() => var_dump(func_get_args()));
@@ -30,7 +30,7 @@ array(8) {
   [3]=>
   string(10) "helloWorld"
   [4]=>
-  string(%d) "%s%etests%e005.php"
+  string(%d) "%s005.php"
   [5]=>
   int(4)
   [6]=>
