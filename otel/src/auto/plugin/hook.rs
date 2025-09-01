@@ -11,23 +11,35 @@ use phper::{
     objects::ZObj,
 };
 
-#[derive(Clone)]
-pub struct RegisteredHook {
-    pub class: Option<String>,
-    pub function: String,
-    pub pre: Option<ZVal>,
-    pub post: Option<ZVal>,
-}
-
 // Thread-local registry for hooks
 thread_local! {
-    static HOOK_REGISTRY: std::cell::RefCell<HashMap<(Option<String>, String), RegisteredHook>> = std::cell::RefCell::new(HashMap::new());
+    static HOOK_REGISTRY: std::cell::RefCell<HashMap<(Option<String>, String), (Vec<ZVal>, Vec<ZVal>)>> = std::cell::RefCell::new(HashMap::new());
 }
 
-pub fn add_hook(hook: RegisteredHook) {
-    let key = (hook.class.clone(), hook.function.clone());
+pub fn add_hook(
+    class: Option<String>,
+    function: String,
+    pre: Option<ZVal>,
+    post: Option<ZVal>,
+) {
+    let key = (class, function);
     HOOK_REGISTRY.with(|registry| {
-        registry.borrow_mut().insert(key, hook);
+        let mut reg = registry.borrow_mut();
+        reg.entry(key)
+            .and_modify(|(pre_hooks, post_hooks)| {
+                if let Some(pre_hook) = pre.clone() {
+                    pre_hooks.push(pre_hook);
+                }
+                if let Some(post_hook) = post.clone() {
+                    post_hooks.insert(0, post_hook);
+                }
+            })
+            .or_insert_with(|| {
+                (
+                    pre.clone().map_or_else(Vec::new, |h| vec![h]),
+                    post.clone().map_or_else(Vec::new, |h| vec![h]),
+                )
+            });
     });
 }
 
@@ -85,36 +97,18 @@ impl Handler for HookHandler {
 
 impl HookHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        tracing::debug!("HookHandler: pre_callback called");
         let exec_data_ref = unsafe { &mut *exec_data };
-        match get_function_and_class_name(exec_data_ref) {
-            Ok((function, class)) => {
-                let function = match function {
-                    Some(f) => f,
-                    None => {
-                        tracing::debug!("No function name found, exiting pre_callback");
-                        return;
+        if let Ok((function, class)) = get_function_and_class_name(exec_data_ref) {
+            if let Some(function) = function {
+                HOOK_REGISTRY.with(|registry| {
+                    if let Some((pre_hooks, _)) = registry.borrow().get(&(class.clone(), function.clone())) {
+                        for mut pre_hook in pre_hooks.clone() {
+                            if let Some(zobj) = pre_hook.as_mut_z_obj() {
+                                let _ = zobj.call("__invoke", []);
+                            }
+                        }
                     }
-                };
-                let pre_hook = HOOK_REGISTRY.with(|registry| {
-                    registry
-                        .borrow_mut()
-                        .get_mut(&(class.clone(), function.clone()))
-                        .and_then(|hook| hook.pre.as_mut().map(|z| z.clone()))
                 });
-                if let Some(mut pre_hook) = pre_hook {
-                    tracing::debug!("Found pre callback for {:?}::{:?}", class, function);
-                    if let Some(zobj) = pre_hook.as_mut_z_obj() {
-                        let _ = zobj.call("__invoke", []);
-                    } else {
-                        tracing::warn!("Pre-hook is not a callable object");
-                    }
-                } else {
-                    tracing::debug!("No hook registered for {:?}::{:?}", class, function);
-                }
-            }
-            Err(e) => {
-                tracing::debug!("Error getting function and class name: {:?}", e);
             }
         }
     }
@@ -124,36 +118,18 @@ impl HookHandler {
         _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
     ) {
-        tracing::debug!("HookHandler: post_callback called");
         let exec_data_ref = unsafe { &mut *exec_data };
-        match get_function_and_class_name(exec_data_ref) {
-            Ok((function, class)) => {
-                let function = match function {
-                    Some(f) => f,
-                    None => {
-                        tracing::debug!("No function name found, exiting post_callback");
-                        return;
+        if let Ok((function, class)) = get_function_and_class_name(exec_data_ref) {
+            if let Some(function) = function {
+                HOOK_REGISTRY.with(|registry| {
+                    if let Some((_, post_hooks)) = registry.borrow().get(&(class.clone(), function.clone())) {
+                        for mut post_hook in post_hooks.clone() {
+                            if let Some(zobj) = post_hook.as_mut_z_obj() {
+                                let _ = zobj.call("__invoke", []);
+                            }
+                        }
                     }
-                };
-                let post_hook = HOOK_REGISTRY.with(|registry| {
-                    registry
-                        .borrow_mut()
-                        .get_mut(&(class.clone(), function.clone()))
-                        .and_then(|hook| hook.post.as_mut().map(|z| z.clone()))
                 });
-                if let Some(mut post_hook) = post_hook {
-                    tracing::debug!("Found post callback for {:?}::{:?}", class, function);
-                    if let Some(zobj) = post_hook.as_mut_z_obj() {
-                        let _ = zobj.call("__invoke", []);
-                    } else {
-                        tracing::warn!("Post-hook is not a callable object");
-                    }
-                } else {
-                    tracing::debug!("No post hook registered for {:?}::{:?}", class, function);
-                }
-            }
-            Err(e) => {
-                tracing::debug!("Error getting function and class name: {:?}", e);
             }
         }
     }

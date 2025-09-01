@@ -1,4 +1,4 @@
-use crate::auto::plugin::hook::{add_hook, RegisteredHook};
+use crate::auto::plugin::hook::add_hook;
 use phper::functions::{Argument, ReturnType};
 use phper::modules::Module;
 use phper::types::{ArgumentTypeHint, ReturnTypeHint};
@@ -22,32 +22,16 @@ pub fn register_instrumentation_functions(module: &mut Module) {
                 let pre = args.get(2).cloned();
                 let post = args.get(3).cloned();
 
-                /*if let Some(mut pre_hook) = pre {
-                    if let Some(zobj) = pre_hook.as_mut_z_obj() {
-                        zobj.call("__invoke", [])?;
-                    } else {
-                        return Err(phper::Error::boxed("pre hook must be an object"));
-                    }
-                } else {
-                    return Err(phper::Error::boxed("pre hook is required"));
-                }*/
-
-                let hook = RegisteredHook {
-                    class: class.clone(),
-                    function: function.clone(),
-                    pre,
-                    post,
-                };
-                add_hook(hook);
+                add_hook(class.clone(), function.clone(), pre, post);
 
                 Ok::<_, phper::Error>(true)
             }
         )
-        .argument(Argument::new("class"))
-        .argument(Argument::new("function"))
-        .argument(Argument::new("pre").optional())
-        .argument(Argument::new("post").optional())
-        //.return_type(ReturnType::new(ReturnTypeHint::Bool))
+        .argument(Argument::new("class").optional().with_type_hint(ArgumentTypeHint::String))
+        .argument(Argument::new("function").with_type_hint(ArgumentTypeHint::String))
+        .argument(Argument::new("pre").optional().with_type_hint(ArgumentTypeHint::Callable))
+        .argument(Argument::new("post").optional().with_type_hint(ArgumentTypeHint::Callable))
+        .return_type(ReturnType::new(ReturnTypeHint::Bool))
     ;
 }
 

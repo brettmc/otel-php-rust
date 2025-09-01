@@ -13,25 +13,24 @@ otel.log.level=warn
 //use function OpenTelemetry\Instrumentation\hook;
 use OpenTelemetry\API\Trace\SpanExporter\Memory;
 
-function myTestFunction() {
-    var_dump('myTestFunction');
+function helloWorld() {
+    var_dump('HELLO');
 }
 
 OpenTelemetry\Instrumentation\hook(
     null,
-    'myTestFunction',
+    'helloWorld',
     function() {
-        var_dump('pre hook');
+        var_dump('PRE');
     },
     function() {
-        var_dump('post hook');
+        var_dump('POST');
     }
 );
 
-myTestFunction();
-$spans = Memory::getSpans();
+helloWorld();
 ?>
 --EXPECT--
-string(8) "pre hook"
-string(14) "myTestFunction"
-string(9) "post hook"
+string(3) "PRE"
+string(5) "HELLO"
+string(4) "POST"
