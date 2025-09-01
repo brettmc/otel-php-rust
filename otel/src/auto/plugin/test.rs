@@ -55,13 +55,13 @@ impl Plugin for TestPlugin {
 pub struct DemoHandler;
 
 impl Handler for DemoHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some("DemoClass"), "test"),
-            (Some("DemoClass"), "inner"),
-            (None, "phpversion"),
-            (Some("IDemo"), "foo"),
-            (Some("IDemo"), "bar"),
+            (Some("DemoClass".to_string()), "test".to_string()),
+            (Some("DemoClass".to_string()), "inner".to_string()),
+            (None, "phpversion".to_string()),
+            (Some("IDemo".to_string()), "foo".to_string()),
+            (Some("IDemo".to_string()), "bar".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -97,9 +97,9 @@ impl DemoHandler {
 pub struct DemoHelloHandler;
 
 impl Handler for DemoHelloHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some("DemoClass"), "hello"),
+            (Some("DemoClass".to_string()), "hello".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -131,9 +131,9 @@ impl DemoHelloHandler {
 pub struct DemoFunctionHandler;
 
 impl Handler for DemoFunctionHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (None, "demoFunction"),
+            (None, "demoFunction".to_string()),
         ]
     }
 
@@ -178,10 +178,10 @@ impl DemoFunctionHandler {
 
 pub struct TestClassHandler;
 impl Handler for TestClassHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"OpenTelemetry\Test\ITestClass"), "getString"),
-            (Some(r"OpenTelemetry\Test\ITestClass"), "throwException"),
+            (Some(r"OpenTelemetry\Test\ITestClass".to_string()), "getString".to_string()),
+            (Some(r"OpenTelemetry\Test\ITestClass".to_string()), "throwException".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {

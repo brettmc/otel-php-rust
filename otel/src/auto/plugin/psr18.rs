@@ -55,9 +55,9 @@ impl Plugin for Psr18Plugin {
 pub struct Psr18SendRequestHandler;
 
 impl Handler for Psr18SendRequestHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Psr\Http\Client\ClientInterface"), "sendRequest"),
+            (Some(r"Psr\Http\Client\ClientInterface".to_string()), "sendRequest".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {

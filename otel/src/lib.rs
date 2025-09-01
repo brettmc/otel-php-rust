@@ -10,6 +10,7 @@ pub mod class_registry;
 pub mod config;
 pub mod error;
 pub mod globals;
+pub mod instrumentation;
 pub mod request;
 pub mod logging;
 pub mod util;

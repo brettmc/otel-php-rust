@@ -5,6 +5,7 @@ use phper::{
 };
 
 // Submodules
+pub mod hook;
 pub mod laminas;
 pub mod psr18;
 #[cfg(feature = "test")]
@@ -22,7 +23,7 @@ pub trait Plugin: Send + Sync {
 
 pub trait Handler: Send + Sync {
     /// Should the function in execute data be observed by this plugin?
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)>;
+    fn get_targets(&self) -> Vec<(Option<String>, String)>;
     fn get_callbacks(&self) -> HandlerCallbacks;
 }
 

@@ -17,7 +17,7 @@ strip = "debuginfo"
 
 [dependencies]
 #phper = "0.17.0"
-phper = { git = "https://github.com/phper-framework/phper.git", rev = "84adb0bf37890162df8fe4488a7bd009413e3ee9" }
+phper = { git = "https://github.com/phper-framework/phper.git", rev = "2e017856384de1bef4f96e8d72c97df486ae8a7f" }
 opentelemetry = { version = "0.30.0", features = ["internal-logs"] }
 opentelemetry-http = "0.30.0"
 opentelemetry-stdout = "0.30.0"

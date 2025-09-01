@@ -27,9 +27,11 @@ use crate::{
         propagation::trace_context_propagator::make_trace_context_propagator_class,
     },
     globals::make_globals_class,
+    instrumentation::register_instrumentation_functions,
 };
 
 pub fn register_classes_and_interfaces(module: &mut Module) {
+    register_instrumentation_functions(module);
     // interfaces
     let scope_interface = module.add_interface(make_scope_interface());
     let context_interface = module.add_interface(make_context_interface());

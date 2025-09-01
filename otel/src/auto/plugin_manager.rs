@@ -75,6 +75,9 @@ impl PluginManager {
             #[cfg(feature="test")]
             self.plugins.push(Box::new(crate::auto::plugin::test::TestPlugin::new()));
         }
+        if !disabled.contains("hook") {
+            self.plugins.push(Box::new(crate::auto::plugin::hook::HookPlugin::new()));
+        }
     }
 
     pub fn plugins(&self) -> &Vec<Box<dyn Plugin + Send + Sync>> {
@@ -92,7 +95,6 @@ impl PluginManager {
             }
         }
 
-        // Build observer as before
         let mut observer = FunctionObserver::new();
         for plugin in &self.plugins {
             for handler in plugin.get_handlers() {
@@ -136,7 +138,7 @@ fn get_disabled_plugins() -> HashSet<String> {
         .collect()
 }
 
-fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], _plugin_name: &str) -> bool {
+fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name: &str) -> bool {
     let name_zstr = func.get_function_or_method_name();
     let function_name = match name_zstr.to_str() {
         Ok(name) => name,
@@ -148,9 +150,9 @@ fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], 
     let method_part = parts.next();
 
     let observed_name_pair = if let Some(method) = method_part {
-        (class_part, method)
+        (class_part.map(|s| s.to_string()), method.to_string())
     } else {
-        (None, function_name)
+        (None, function_name.to_string())
     };
 
     if targets.iter().any(|target| target.0 == observed_name_pair.0 && target.1 == observed_name_pair.1) {
@@ -169,7 +171,7 @@ fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], 
     for (target_class_name, target_method_name) in targets.iter() {
         if let Some(interface_name) = target_class_name {
             if target_method_name == &observed_name_pair.1 {
-                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.to_string()) {
+                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.clone()) {
                     if ce.is_instance_of(&iface_ce) {
                         return true;
                     }

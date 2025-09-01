@@ -97,9 +97,9 @@ impl Plugin for LaminasPlugin {
 pub struct LaminasApplicationRunHandler;
 
 impl Handler for LaminasApplicationRunHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Laminas\Mvc\Application"), "run"),
+            (Some(r"Laminas\Mvc\Application".to_string()), "run".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -140,9 +140,9 @@ impl LaminasApplicationRunHandler {
 pub struct LaminasCompleteRequestHandler;
 
 impl Handler for LaminasCompleteRequestHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Laminas\Mvc\Application"), "completeRequest"),
+            (Some(r"Laminas\Mvc\Application".to_string()), "completeRequest".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -200,9 +200,9 @@ impl LaminasCompleteRequestHandler {
 pub struct LaminasRouteHandler;
 
 impl Handler for LaminasRouteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Laminas\Mvc\MvcEvent"), "setRouteMatch"),
+            (Some(r"Laminas\Mvc\MvcEvent".to_string()), "setRouteMatch".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -264,9 +264,9 @@ impl LaminasRouteHandler {
 pub struct LaminasDbConnectHandler;
 
 impl Handler for LaminasDbConnectHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Laminas\Db\Adapter\Driver\AbstractConnection"), "connect"),
+            (Some(r"Laminas\Db\Adapter\Driver\AbstractConnection".to_string()), "connect".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -340,9 +340,9 @@ impl LaminasDbConnectHandler {
 pub struct LaminasStatementPrepareHandler;
 
 impl Handler for LaminasStatementPrepareHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Laminas\Db\Adapter\Driver\StatementInterface"), "prepare"),
+            (Some(r"Laminas\Db\Adapter\Driver\StatementInterface".to_string()), "prepare".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -454,9 +454,9 @@ impl LaminasStatementPrepareHandler {
 pub struct LaminasStatementExecuteHandler;
 
 impl Handler for LaminasStatementExecuteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Laminas\Db\Adapter\Driver\StatementInterface"), "execute"),
+            (Some(r"Laminas\Db\Adapter\Driver\StatementInterface".to_string()), "execute".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -513,9 +513,9 @@ impl LaminasStatementExecuteHandler {
 pub struct LaminasConnectionExecuteHandler;
 
 impl Handler for LaminasConnectionExecuteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
+    fn get_targets(&self) -> Vec<(Option<String>, String)> {
         vec![
-            (Some(r"Laminas\Db\Adapter\Driver\ConnectionInterface"), "execute"),
+            (Some(r"Laminas\Db\Adapter\Driver\ConnectionInterface".to_string()), "execute".to_string()),
         ]
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
