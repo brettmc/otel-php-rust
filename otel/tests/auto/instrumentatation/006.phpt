@@ -1,5 +1,5 @@
 --TEST--
-Check if hooks receives function information
+Check if hooks receives arguments and return value
 --EXTENSIONS--
 otel
 --ENV--
@@ -12,25 +12,27 @@ otel.log.level=warn
 <?php
 \OpenTelemetry\Instrumentation\hook(null, 'helloWorld', fn() => var_dump(func_get_args()), fn() => var_dump(func_get_args()));
 
-function helloWorld() {
-    var_dump('CALL');
+function helloWorld(string $a) {
+    return 42;
 }
 
-helloWorld();
+helloWorld('a');
 ?>
 --EXPECTF--
 array(8) {
   [0]=>
   NULL
   [1]=>
-  array(0) {
+  array(1) {
+    [0]=>
+    string(1) "a"
   }
   [2]=>
   NULL
   [3]=>
   string(10) "helloWorld"
   [4]=>
-  string(%d) "%s005.php"
+  string(%d) "%s/006.php"
   [5]=>
   int(4)
   [6]=>
@@ -40,15 +42,16 @@ array(8) {
   array(0) {
   }
 }
-string(4) "CALL"
 array(8) {
   [0]=>
   NULL
   [1]=>
-  array(0) {
+  array(1) {
+    [0]=>
+    string(1) "a"
   }
   [2]=>
-  NULL
+  int(42)
   [3]=>
   NULL
   [4]=>
@@ -56,7 +59,7 @@ array(8) {
   [5]=>
   string(10) "helloWorld"
   [6]=>
-  string(%d) "%s005.php"
+  string(%d) "%s/006.php"
   [7]=>
   int(4)
 }

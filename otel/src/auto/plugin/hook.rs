@@ -15,6 +15,8 @@ use phper::{
     values::{ExecuteData, ZVal},
     objects::ZObj,
 };
+use phper::alloc::{RefClone, ToRefOwned};
+use phper::arrays::ZArray;
 
 // Thread-local registry for hooks
 thread_local! {
@@ -71,7 +73,6 @@ impl Plugin for HookPlugin {
     }
     fn request_shutdown(&self) {
         tracing::debug!("Plugin::request_shutdown: {}", self.get_name());
-        // Clear the HOOK_REGISTRY
         HOOK_REGISTRY.with(|registry| {
             registry.borrow_mut().clear();
         });
@@ -110,26 +111,30 @@ impl HookHandler {
                     if let Some((pre_hooks, _)) = registry.borrow().get(&(class.clone(), function.clone())) {
                         let obj_zval = get_this_or_called_scope(exec_data_ref);
                         let arguments = get_function_arguments(exec_data_ref);
-                        let class_zval = ZVal::from(class.clone());
+                        let declaring_scope_zval = ZVal::from(class.clone());
                         let function_zval = ZVal::from(function.clone());
                         let filename_zval = ZVal::from(file.clone());
                         let lineno_zval = ZVal::from(line as i64);
+                        let withspan_zval = ZVal::from(ZArray::new());
+                        let attributes = ZVal::from(ZArray::new());
 
                         for mut pre_hook in pre_hooks.clone() {
                             // Debug print all values before calling the hook
                             tracing::debug!(
                                 "PreHook values: obj_zval={:?}, arguments={:?}, class_zval={:?}, function_zval={:?}, filename_zval={:?}, lineno_zval={:?}",
-                                obj_zval, arguments, class_zval, function_zval, filename_zval, lineno_zval
+                                obj_zval, arguments, declaring_scope_zval, function_zval, filename_zval, lineno_zval
                             );
                             if let Some(zobj) = pre_hook.as_mut_z_obj() {
                                 //object, params, class, function, filename, lineno
                                 let _ = zobj.call("__invoke", [
                                     obj_zval.clone(),
                                     arguments.clone(),
-                                    class_zval.clone(),
+                                    declaring_scope_zval.clone(),
                                     function_zval.clone(),
                                     filename_zval.clone(),
                                     lineno_zval.clone(),
+                                    withspan_zval.clone(),
+                                    attributes.clone(),
                                 ]);
                             }
                         }
@@ -141,18 +146,44 @@ impl HookHandler {
 
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
-        _retval: &mut ZVal,
-        _exception: Option<&mut ZObj>
+        retval: &mut ZVal,
+        exception: Option<&mut ZObj>
     ) {
         let exec_data_ref = unsafe { &mut *exec_data };
+        let (file, line) = get_file_and_line(exec_data_ref).unwrap_or_default();
         if let Ok((function, class)) = get_function_and_class_name(exec_data_ref) {
             if let Some(function) = function {
                 HOOK_REGISTRY.with(|registry| {
                     if let Some((_, post_hooks)) = registry.borrow().get(&(class.clone(), function.clone())) {
+                        let obj_zval = get_this_or_called_scope(exec_data_ref);
+                        let arguments = get_function_arguments(exec_data_ref);
+                        let exception_zval = match exception {
+                            Some(zobj) => ZVal::from(zobj.to_ref_owned().ref_clone()),
+                            None => ZVal::from(()),
+                        };
+                        let declaring_scope_zval = ZVal::from(class.clone());
+                        let function_zval = ZVal::from(function.clone());
+                        let filename_zval = ZVal::from(file.clone());
+                        let lineno_zval = ZVal::from(line as i64);
+
                         for mut post_hook in post_hooks.clone() {
+                            // Debug print all values before calling the hook
+                            tracing::debug!(
+                                "PostHook values: obj_zval={:?}, arguments={:?}, retval={:?}, exception={:?}",
+                                obj_zval, arguments, retval, exception_zval
+                            );
                             if let Some(zobj) = post_hook.as_mut_z_obj() {
-                                //object, params, ?returnval, ?exception
-                                let _ = zobj.call("__invoke", []);
+                                //object, params, ?returnval, ?exception, declaring scope, function name, filename, line number
+                                let _ = zobj.call("__invoke", [
+                                    obj_zval.clone(),
+                                    arguments.clone(),
+                                    retval.clone(),
+                                    exception_zval.clone(),
+                                    declaring_scope_zval.clone(),
+                                    function_zval.clone(),
+                                    filename_zval.clone(),
+                                    lineno_zval.clone(),
+                                ]);
                             }
                         }
                     }
