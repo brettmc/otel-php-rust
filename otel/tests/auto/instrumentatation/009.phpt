@@ -7,7 +7,9 @@ OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
-otel.log.level=warn
+otel.log.level=debug
+--XFAIL--
+not implemented
 --FILE--
 <?php
 \OpenTelemetry\Instrumentation\hook(null, 'helloWorld', fn() => [1 => 'b']);

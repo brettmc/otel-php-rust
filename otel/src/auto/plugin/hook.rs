@@ -138,15 +138,18 @@ impl HookHandler {
                                 ]) {
                                     if let Some(arr) = replaced.as_z_arr() {
                                         for (key, value) in arr.iter() {
+                                            tracing::debug!("PreHook returned modification: key={:?}, value={:?}", key, value);
                                             let idx_opt = match key {
                                                 phper::arrays::IterKey::Index(i) => Some(i as usize),
-                                                phper::arrays::IterKey::ZStr(_) => None, //ignore string keys
+                                                _ => None, //ignore string keys
                                             };
                                             if let Some(idx) = idx_opt {
+                                                exec_data_ref.ensure_parameter_slot(idx);
+                                                tracing::debug!("PreHook attempting to modify argument at index {}: {:?}", idx, value);
                                                 let zv = exec_data_ref.get_mut_parameter(idx);
+                                                tracing::debug!("PreHook: got mutable reference to parameter at index {} value={:?}", idx, zv);
                                                 *zv = value.clone();
                                             }
-                                            // Optionally, handle non-usize keys if needed
                                         }
                                     }
                                 }
@@ -188,7 +191,7 @@ impl HookHandler {
                             );
                             if let Some(zobj) = post_hook.as_mut_z_obj() {
                                 //object, params, ?returnval, ?exception, declaring scope, function name, filename, line number
-                                let _ = zobj.call("__invoke", [
+                                if let Ok(modified_return_value) = zobj.call("__invoke", [
                                     obj_zval.clone(),
                                     arguments.clone(),
                                     retval.clone(),
@@ -197,7 +200,9 @@ impl HookHandler {
                                     function_zval.clone(),
                                     filename_zval.clone(),
                                     lineno_zval.clone(),
-                                ]);
+                                ]) {
+                                    *retval = modified_return_value;
+                                }
                             }
                         }
                     }
