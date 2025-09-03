@@ -126,7 +126,7 @@ impl HookHandler {
                             );
                             if let Some(zobj) = pre_hook.as_mut_z_obj() {
                                 //object, params, class, function, filename, lineno
-                                let _ = zobj.call("__invoke", [
+                                if let Ok(replaced) = zobj.call("__invoke", [
                                     obj_zval.clone(),
                                     arguments.clone(),
                                     declaring_scope_zval.clone(),
@@ -135,7 +135,21 @@ impl HookHandler {
                                     lineno_zval.clone(),
                                     withspan_zval.clone(),
                                     attributes.clone(),
-                                ]);
+                                ]) {
+                                    if let Some(arr) = replaced.as_z_arr() {
+                                        for (key, value) in arr.iter() {
+                                            let idx_opt = match key {
+                                                phper::arrays::IterKey::Index(i) => Some(i as usize),
+                                                phper::arrays::IterKey::ZStr(_) => None, //ignore string keys
+                                            };
+                                            if let Some(idx) = idx_opt {
+                                                let zv = exec_data_ref.get_mut_parameter(idx);
+                                                *zv = value.clone();
+                                            }
+                                            // Optionally, handle non-usize keys if needed
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
