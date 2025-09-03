@@ -110,7 +110,6 @@ impl HookHandler {
                 HOOK_REGISTRY.with(|registry| {
                     if let Some((pre_hooks, _)) = registry.borrow().get(&(class.clone(), function.clone())) {
                         let obj_zval = get_this_or_called_scope(exec_data_ref);
-                        let arguments = get_function_arguments(exec_data_ref);
                         let declaring_scope_zval = ZVal::from(class.clone());
                         let function_zval = ZVal::from(function.clone());
                         let filename_zval = ZVal::from(file.clone());
@@ -119,6 +118,7 @@ impl HookHandler {
                         let attributes = ZVal::from(ZArray::new());
 
                         for mut pre_hook in pre_hooks.clone() {
+                            let arguments = get_function_arguments(exec_data_ref); //arguments can mutate
                             // Debug print all values before calling the hook
                             tracing::debug!(
                                 "PreHook values: obj_zval={:?}, arguments={:?}, class_zval={:?}, function_zval={:?}, filename_zval={:?}, lineno_zval={:?}",
