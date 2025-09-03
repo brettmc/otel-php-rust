@@ -4,7 +4,6 @@ use phper::{
         ToRefOwned,
     },
     arrays::ZArray,
-    classes::ClassEntry,
     eg,
     objects::ZObj,
     strings::ZStr,
@@ -106,7 +105,14 @@ pub fn get_this_or_called_scope(execute_data: &mut ExecuteData) -> ZVal {
 }
 
 pub fn get_global_exception() -> Option<&'static mut ZObj> {
-    unsafe { ZObj::try_from_mut_ptr(eg!(exception)) }
+    unsafe {
+        let obj = ZObj::try_from_mut_ptr(eg!(exception))?;
+        let name = obj.get_class().get_name().to_str().unwrap_or_default();
+        if name == "UnwindExit" {
+            return None;
+        }
+        Some(obj)
+    }
 }
 
 // Default auto-instrumentation attributes from ExecuteData
