@@ -30,7 +30,7 @@ pub fn extract_span_name_from_sql(sql: &str) -> Option<String> {
         if let Some(after_from) = after_from {
             // If FROM is followed by a parenthesis, it's a subquery, not a table
             if after_from.starts_with('(') {
-                return None;
+                return Some("SELECT".to_string());
             }
             // Otherwise, match the table name
             let table_re = Regex::new(r#"^[`"a-zA-Z0-9_\.]+"#).unwrap();
@@ -146,8 +146,13 @@ mod tests {
     #[test]
     fn test_select_with_subquery_in_from() {
         let sql = "SELECT * FROM (SELECT * FROM users) AS sub";
-        // Should not match the subquery, but the outer FROM (which is a subquery, so None)
-        assert_eq!(extract_span_name_from_sql(sql), None);
+        assert_eq!(extract_span_name_from_sql(sql), Some("SELECT".to_string()));
+    }
+
+    #[test]
+    fn test_multiline_subquery() {
+        let sql = "SELECT *\n  FROM\n  (\n    SELECT * FROM users\n)";
+        assert_eq!(extract_span_name_from_sql(sql), Some("SELECT".to_string()));
     }
 
     #[test]

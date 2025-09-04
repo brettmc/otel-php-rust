@@ -32,6 +32,7 @@ use std::{
 };
 use phper::{
     alloc::ToRefOwned,
+    arrays::ZArr,
     objects::ZObj,
     values::{
         ExecuteData,
@@ -281,6 +282,20 @@ impl Handler for LaminasDbConnectHandler {
     }
 }
 
+fn extract_laminas_db_namespace(arr: &phper::arrays::ZArr) -> String {
+    let keys = ["database", "dbname", "connection", "hostname", "instance", "connection_string"];
+    for key in keys.iter() {
+        if let Some(zv) = arr.get(*key) {
+            if let Some(val) = zv.as_z_str().and_then(|s| s.to_str().ok()) {
+                if !val.is_empty() {
+                    return val.to_string();
+                }
+            }
+        }
+    }
+    String::new()
+}
+
 impl LaminasDbConnectHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         utils::start_and_activate_span(
@@ -297,19 +312,17 @@ impl LaminasDbConnectHandler {
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
             if let Some(zv) = this_obj.call("getConnectionParameters", []).ok() {
                 if let Some(arr) = zv.as_z_arr() {
-                    if let Some(database) = arr.get("database") {
-                        tracing::debug!("Database: {:?}", database);
+                    let db_namespace = extract_laminas_db_namespace(arr);
+                    if !db_namespace.is_empty() {
+                        tracing::debug!("Database: {:?}", db_namespace);
                         attributes.push(KeyValue::new(
                             SemConv::trace::DB_NAMESPACE,
-                            database.as_z_str()
-                                .and_then(|s| s.to_str().ok())
-                                .unwrap_or_default()
-                                .to_string()
+                            db_namespace
                         ));
                     }
                     let system = arr.get("driver")
                         .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok()))
-                        .map(|driver| map_laminas_driver_to_semconv(driver))
+                        .map(|driver| map_laminas_driver_to_semconv(driver, arr))
                         .unwrap_or_default();
                     attributes.push(KeyValue::new(SemConv::trace::DB_SYSTEM_NAME, system.to_string()));
                     //add attributes to current span
@@ -542,7 +555,7 @@ impl LaminasConnectionExecuteHandler {
 
         attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql_str));
         let span_name = utils::extract_span_name_from_sql(sql_str)
-            .unwrap_or_else(|| "OTHER".to_string());
+            .unwrap_or_else(|| "execute".to_string());
 
         utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
     }
@@ -560,17 +573,41 @@ impl LaminasConnectionExecuteHandler {
     }
 }
 
-fn map_laminas_driver_to_semconv(driver: &str) -> &str {
+fn map_laminas_driver_to_semconv<'a>(driver: &'a str, connection_parameters: &'a ZArr) -> &'a str {
+    tracing::debug!("Mapping Laminas DB driver '{}' to semantic convention", driver);
     match driver.to_lowercase().as_str() {
         "mysqli" | "pdo_mysql" => "mysql",
         "pgsql" | "pdo_pgsql" => "postgresql",
         "sqlite" | "pdo_sqlite" => "sqlite",
         "oci8" | "pdo_oci" => "oracle",
-        "sqlsrv" | "pdo_sqlsrv" => "mssql",
+        "sqlsrv" | "pdo_sqlsrv" | "pdo_dblib" => "mssql",
         "ibm_db2" => "db2",
         "pdo_firebird" => "firebird",
-        "pdo_dblib" => "mssql",
         "pdo_odbc" => "odbc",
+        "pdo" => {
+            if let Some(dsn_zv) = connection_parameters.get("dsn") {
+                if let Some(dsn) = dsn_zv.as_z_str().and_then(|s| s.to_str().ok()) {
+                    if let Some(pos) = dsn.find(':') {
+                        match dsn[..pos].to_lowercase().as_str() {
+                            "mysql" => "mysql",
+                            "pgsql" => "postgresql",
+                            "sqlite" => "sqlite",
+                            "oci" | "oracle" => "oracle",
+                            "sqlsrv" => "mssql",
+                            "ibm" | "db2" => "db2",
+                            "firebird" => "firebird",
+                            _ => "other_sql",
+                        }
+                    } else {
+                        "other_sql"
+                    }
+                } else {
+                    "other_sql"
+                }
+            } else {
+                "other_sql"
+            }
+        },
         _ => "other_sql",
     }
 }
