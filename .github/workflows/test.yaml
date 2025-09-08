@@ -39,20 +39,21 @@ jobs:
 
       - name: Install dependencies
         working-directory: otel
-        run: |
-          pushd . && cd tests/auto/zf1 && composer update && popd
+        run: (cd tests/auto/zf1 && composer update --no-dev)
 
       - name: Install dependencies (7.1+)
         working-directory: otel
         if: matrix.php-version != '7.0'
-        run: |
-          pushd . && cd tests/auto/laminas && composer update && popd
+        run: (cd tests/auto/laminas && composer update --no-dev)
 
       - name: Install dependencies (7.2+)
         working-directory: otel
         if: matrix.php-version != '7.0' && matrix.php-version != '7.1'
-        run: |
-          pushd . && cd tests/auto/psr18 && composer update && popd
+        run: (cd tests/auto/psr18 && composer update --no-dev)
+
+      - name: Run cargo tests
+        working-directory: otel
+        run: cargo test --features test
 
       - name: Run tests
         working-directory: otel

@@ -41,6 +41,7 @@ update:
 clean-build-test: clean test-all
 test: build-test
 	@echo "Running tests..."
+	cargo test
 	php run-tests.php -q tests/
 test-phpt: build-test
 	@echo "Running phpt tests..."
