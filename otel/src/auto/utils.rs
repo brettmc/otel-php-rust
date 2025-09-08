@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn test_select_distinct() {
-        let sql = "select count(distinct(first_name)) * FROM users";
+        let sql = "select count(distinct(first_name)) FROM users";
         assert_eq!(extract_span_name_from_sql(sql), Some("SELECT users".to_string()));
     }
 
