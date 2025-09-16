@@ -7,12 +7,11 @@ use crate::{
             psr18::Psr18Plugin,
             zf1::Zf1Plugin,
         },
+        utils::should_trace,
     },
     config,
 };
 use phper::{
-    classes::ClassEntry,
-    functions::ZFunc,
     ini::ini_get,
     values::ExecuteData,
 };
@@ -98,7 +97,7 @@ impl PluginManager {
         let mut observer = FunctionObserver::new();
         for plugin in &self.plugins {
             for handler in plugin.get_handlers() {
-                if should_trace(execute_data.func(), &handler.get_targets(), plugin.get_name()) {
+                if should_trace(execute_data.func(), &handler.get_targets()) {
                     let callbacks = handler.get_callbacks();
                     if let Some(pre) = callbacks.pre_observe {
                         observer.add_pre_hook(Box::new(move |execute_data| {
@@ -136,49 +135,4 @@ fn get_disabled_plugins() -> HashSet<String> {
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect()
-}
-
-fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)], _plugin_name: &str) -> bool {
-    let name_zstr = func.get_function_or_method_name();
-    let function_name = match name_zstr.to_str() {
-        Ok(name) => name,
-        Err(_) => return false,
-    };
-
-    let mut parts = function_name.splitn(2, "::");
-    let class_part = parts.next();
-    let method_part = parts.next();
-
-    let observed_name_pair = if let Some(method) = method_part {
-        (class_part.map(|s| s.to_string()), method.to_string())
-    } else {
-        (None, function_name.to_string())
-    };
-
-    if targets.iter().any(|target| target.0 == observed_name_pair.0 && target.1 == observed_name_pair.1) {
-        return true;
-    }
-
-    if observed_name_pair.0.is_none() {
-        //tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
-        return false;
-    }
-
-    let ce = match func.get_class() {
-        Some(class_entry) => class_entry,
-        None => return false,
-    };
-    for (target_class_name, target_method_name) in targets.iter() {
-        if let Some(interface_name) = target_class_name {
-            if target_method_name == &observed_name_pair.1 {
-                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.clone()) {
-                    if ce.is_instance_of(&iface_ce) {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-
-    false
 }

@@ -17,6 +17,53 @@ use phper::{
     objects::ZObj,
 };
 use regex::Regex;
+use phper::classes::ClassEntry;
+use phper::functions::ZFunc;
+
+/// Determines if a function should be traced based on the provided targets.
+pub fn should_trace(func: &ZFunc, targets: &[(Option<String>, String)]) -> bool {
+    let name_zstr = func.get_function_or_method_name();
+    let function_name = match name_zstr.to_str() {
+        Ok(name) => name,
+        Err(_) => return false,
+    };
+
+    let mut parts = function_name.splitn(2, "::");
+    let class_part = parts.next();
+    let method_part = parts.next();
+
+    let observed_name_pair = if let Some(method) = method_part {
+        (class_part.map(|s| s.to_string()), method.to_string())
+    } else {
+        (None, function_name.to_string())
+    };
+
+    if targets.iter().any(|target| target.0 == observed_name_pair.0 && target.1 == observed_name_pair.1) {
+        return true;
+    }
+
+    if observed_name_pair.0.is_none() {
+        return false;
+    }
+
+    let ce = match func.get_class() {
+        Some(class_entry) => class_entry,
+        None => return false,
+    };
+    for (target_class_name, target_method_name) in targets.iter() {
+        if let Some(interface_name) = target_class_name {
+            if target_method_name == &observed_name_pair.1 {
+                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.clone()) {
+                    if ce.is_instance_of(&iface_ce) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
 
 pub fn extract_span_name_from_sql(sql: &str) -> Option<String> {
     let sql = sql.trim();

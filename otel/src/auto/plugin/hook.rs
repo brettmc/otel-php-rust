@@ -1,12 +1,14 @@
 use crate::{
     auto::{
         execute_data::{
+            ensure_parameter_slot,
             get_function_and_class_name,
             get_function_arguments,
             get_file_and_line,
             get_this_or_called_scope,
         },
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+        utils::should_trace,
     },
 };
 use std::sync::Arc;
@@ -103,61 +105,64 @@ impl Handler for HookHandler {
 
 impl HookHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+        tracing::trace!("HookHandler::pre_callback");
         let exec_data_ref = unsafe { &mut *exec_data };
         let (file, line) = get_file_and_line(exec_data_ref).unwrap_or_default();
-        if let Ok((function, class)) = get_function_and_class_name(exec_data_ref) {
-            if let Some(function) = function {
-                HOOK_REGISTRY.with(|registry| {
-                    if let Some((pre_hooks, _)) = registry.borrow().get(&(class.clone(), function.clone())) {
-                        let obj_zval = get_this_or_called_scope(exec_data_ref);
-                        let declaring_scope_zval = ZVal::from(class.clone());
-                        let function_zval = ZVal::from(function.clone());
-                        let filename_zval = ZVal::from(file.clone());
-                        let lineno_zval = ZVal::from(line as i64);
-                        let withspan_zval = ZVal::from(ZArray::new());
-                        let attributes = ZVal::from(ZArray::new());
+        if let Some((pre_hooks, _)) = find_hook_for_exec_data(exec_data_ref) {
+            let (function, class) = get_function_and_class_name(exec_data_ref).unwrap_or_default();
+            tracing::trace!("HookHandler::pre_callback: found hooks for {:?}::{:?}", class, function);
+            let obj_zval = get_this_or_called_scope(exec_data_ref);
+            let declaring_scope_zval = ZVal::from(class.clone());
+            let function_zval = ZVal::from(function.clone().unwrap_or_default());
+            let filename_zval = ZVal::from(file.clone());
+            let lineno_zval = ZVal::from(line as i64);
+            let withspan_zval = ZVal::from(ZArray::new());
+            let attributes = ZVal::from(ZArray::new());
 
-                        for mut pre_hook in pre_hooks.clone() {
-                            let arguments = get_function_arguments(exec_data_ref); //arguments can mutate
-                            // Debug print all values before calling the hook
-                            tracing::debug!(
-                                "PreHook values: obj_zval={:?}, arguments={:?}, class_zval={:?}, function_zval={:?}, filename_zval={:?}, lineno_zval={:?}",
-                                obj_zval, arguments, declaring_scope_zval, function_zval, filename_zval, lineno_zval
-                            );
-                            if let Some(zobj) = pre_hook.as_mut_z_obj() {
-                                //object, params, class, function, filename, lineno
-                                if let Ok(replaced) = zobj.call("__invoke", [
-                                    obj_zval.clone(),
-                                    arguments.clone(),
-                                    declaring_scope_zval.clone(),
-                                    function_zval.clone(),
-                                    filename_zval.clone(),
-                                    lineno_zval.clone(),
-                                    withspan_zval.clone(),
-                                    attributes.clone(),
-                                ]) {
-                                    if let Some(arr) = replaced.as_z_arr() {
-                                        for (key, value) in arr.iter() {
-                                            tracing::debug!("PreHook returned modification: key={:?}, value={:?}", key, value);
-                                            let idx_opt = match key {
-                                                phper::arrays::IterKey::Index(i) => Some(i as usize),
-                                                _ => None, //ignore string keys
-                                            };
-                                            if let Some(idx) = idx_opt {
-                                                exec_data_ref.ensure_parameter_slot(idx);
-                                                tracing::debug!("PreHook attempting to modify argument at index {}: {:?}", idx, value);
-                                                let zv = exec_data_ref.get_mut_parameter(idx);
-                                                tracing::debug!("PreHook: got mutable reference to parameter at index {} value={:?}", idx, zv);
-                                                *zv = value.clone();
-                                            }
-                                        }
-                                    }
+            for mut pre_hook in pre_hooks.clone() {
+                let arguments = get_function_arguments(exec_data_ref); //arguments can mutate
+                // Debug print all values before calling the hook
+                tracing::debug!(
+                    "PreHook values: obj_zval={:?}, arguments={:?}, class_zval={:?}, function_zval={:?}, filename_zval={:?}, lineno_zval={:?}",
+                    obj_zval, arguments, declaring_scope_zval, function_zval, filename_zval, lineno_zval
+                );
+                if let Some(zobj) = pre_hook.as_mut_z_obj() {
+                    //object, params, class, function, filename, lineno
+                    if let Ok(replaced) = zobj.call("__invoke", [
+                        obj_zval.clone(),
+                        arguments.clone(),
+                        declaring_scope_zval.clone(),
+                        function_zval.clone(),
+                        filename_zval.clone(),
+                        lineno_zval.clone(),
+                        withspan_zval.clone(),
+                        attributes.clone(),
+                    ]) {
+                        if let Some(arr) = replaced.as_z_arr() {
+                            for (key, value) in arr.iter() {
+                                tracing::debug!("PreHook returned modification: key={:?}, value={:?}", key, value);
+                                let idx_opt = match key {
+                                    phper::arrays::IterKey::Index(i) => Some(i as usize),
+                                    _ => None, //ignore string keys (todo: implement this)
+                                };
+                                if let Some(idx) = idx_opt {
+                                    ensure_parameter_slot(exec_data_ref, idx);
+                                    tracing::debug!("PreHook attempting to modify argument at index {}: {:?}", idx, value);
+                                    let zv = exec_data_ref.get_mut_parameter(idx);
+                                    tracing::debug!("PreHook: got mutable reference to parameter at index {} value={:?}", idx, zv);
+                                    *zv = value.clone();
+                                    //fetch the parameter again to verify
+                                    let zv_verify = exec_data_ref.get_parameter(idx);
+                                    tracing::debug!("PreHook: verified parameter at index {} is now value={:?}", idx, zv_verify);
                                 }
                             }
                         }
                     }
-                });
+                }
             }
+        } else {
+            let (function, class) = get_function_and_class_name(exec_data_ref).unwrap_or_default();
+            tracing::trace!("HookHandler::pre_callback: no pre-hooks found for {:?}::{:?}", class, function);
         }
     }
 
@@ -166,48 +171,73 @@ impl HookHandler {
         retval: &mut ZVal,
         exception: Option<&mut ZObj>
     ) {
+        tracing::trace!("HookHandler::post_callback");
         let exec_data_ref = unsafe { &mut *exec_data };
         let (file, line) = get_file_and_line(exec_data_ref).unwrap_or_default();
-        if let Ok((function, class)) = get_function_and_class_name(exec_data_ref) {
-            if let Some(function) = function {
-                HOOK_REGISTRY.with(|registry| {
-                    if let Some((_, post_hooks)) = registry.borrow().get(&(class.clone(), function.clone())) {
-                        let obj_zval = get_this_or_called_scope(exec_data_ref);
-                        let arguments = get_function_arguments(exec_data_ref);
-                        let exception_zval = match exception {
-                            Some(zobj) => ZVal::from(zobj.to_ref_owned().ref_clone()),
-                            None => ZVal::from(()),
-                        };
-                        let declaring_scope_zval = ZVal::from(class.clone());
-                        let function_zval = ZVal::from(function.clone());
-                        let filename_zval = ZVal::from(file.clone());
-                        let lineno_zval = ZVal::from(line as i64);
+        if let Some((_, post_hooks)) = find_hook_for_exec_data(exec_data_ref) {
+            let (function, class) = get_function_and_class_name(exec_data_ref).unwrap_or_default();
+            let obj_zval = get_this_or_called_scope(exec_data_ref);
+            let arguments = get_function_arguments(exec_data_ref);
+            let exception_zval = match exception {
+                Some(zobj) => ZVal::from(zobj.to_ref_owned().ref_clone()),
+                None => ZVal::from(()),
+            };
+            let declaring_scope_zval = ZVal::from(class.clone());
+            let function_zval = ZVal::from(function.clone().unwrap_or_default());
+            let filename_zval = ZVal::from(file.clone());
+            let lineno_zval = ZVal::from(line as i64);
 
-                        for mut post_hook in post_hooks.clone() {
-                            // Debug print all values before calling the hook
-                            tracing::debug!(
-                                "PostHook values: obj_zval={:?}, arguments={:?}, retval={:?}, exception={:?}",
-                                obj_zval, arguments, retval, exception_zval
-                            );
-                            if let Some(zobj) = post_hook.as_mut_z_obj() {
-                                //object, params, ?returnval, ?exception, declaring scope, function name, filename, line number
-                                if let Ok(modified_return_value) = zobj.call("__invoke", [
-                                    obj_zval.clone(),
-                                    arguments.clone(),
-                                    retval.clone(),
-                                    exception_zval.clone(),
-                                    declaring_scope_zval.clone(),
-                                    function_zval.clone(),
-                                    filename_zval.clone(),
-                                    lineno_zval.clone(),
-                                ]) {
-                                    *retval = modified_return_value;
-                                }
-                            }
-                        }
+            // Print all parameters for verification
+            tracing::debug!("arguments: {:?}", arguments);
+            let idx = 1;
+            let zv_verify = exec_data_ref.get_parameter(idx);
+            tracing::debug!("PostHook: verified parameter at index {} is now value={:?}", idx, zv_verify);
+
+            for mut post_hook in post_hooks.clone() {
+                // Debug print all values before calling the hook
+                tracing::debug!(
+                    "PostHook values: obj_zval={:?}, arguments={:?}, retval={:?}, exception={:?}",
+                    obj_zval, arguments, retval, exception_zval
+                );
+                if let Some(zobj) = post_hook.as_mut_z_obj() {
+                    //object, params, ?returnval, ?exception, declaring scope, function name, filename, line number
+                    if let Ok(modified_return_value) = zobj.call("__invoke", [
+                        obj_zval.clone(),
+                        arguments.clone(),
+                        retval.clone(),
+                        exception_zval.clone(),
+                        declaring_scope_zval.clone(),
+                        function_zval.clone(),
+                        filename_zval.clone(),
+                        lineno_zval.clone(),
+                    ]) {
+                        *retval = modified_return_value;
                     }
-                });
+                }
             }
+        } else {
+            tracing::warn!("HookHandler::post_callback: no post-hooks found for this function");
         }
     }
+}
+
+fn find_hook_for_exec_data(
+    exec_data: &ExecuteData,
+) -> Option<(Vec<ZVal>, Vec<ZVal>)> {
+    HOOK_REGISTRY.with(|registry| {
+        let registry = registry.borrow();
+        // Build targets from registry keys
+        let targets: Vec<(Option<String>, String)> = registry.keys().cloned().collect();
+        // Use should_trace to determine if this exec_data matches any hook
+        let func = exec_data.func();
+        if should_trace(func, &targets) {
+            // Find the first matching hook using should_trace logic
+            for (key, hooks) in registry.iter() {
+                if should_trace(func, &[key.clone()]) {
+                    return Some(hooks.clone());
+                }
+            }
+        }
+        None
+    })
 }

@@ -7,6 +7,18 @@ use phper::{
     eg,
     objects::ZObj,
     strings::ZStr,
+    sys::{
+        phper_zend_add_call_flag,
+        phper_zend_call_arg,
+        phper_zend_call_may_have_undef,
+        phper_zend_call_var_num,
+        phper_zend_call_num_args,
+        phper_zval_null,
+        zend_execute_data,
+        phper_zval_copy,
+        phper_zend_set_call_num_args,
+        phper_zval_undef,
+    },
     values::{ExecuteData, ZVal},
 };
 use opentelemetry::{
@@ -139,3 +151,44 @@ pub fn get_function_arguments(execute_data: &ExecuteData) -> ZVal {
     }
     ZVal::from(arr)
 }
+
+pub fn ensure_parameter_slot(execute_data: &mut ExecuteData, index: usize) {
+    let num_args = execute_data.num_args();
+    if index >= num_args {
+        tracing::debug!("Extending parameter slots from {} to {}", num_args, index + 1);
+        let ptr: *mut zend_execute_data = execute_data.as_mut_ptr();
+        unsafe {
+            let params_ptr = phper_zend_call_var_num(ptr, index as i32);
+            phper_zval_null(params_ptr);
+            (*ptr).This.u2.num_args = (index + 1) as u32;
+        }
+    }
+}
+
+pub fn set_parameter_slot(execute_data: &mut ExecuteData, index: usize, value: ZVal) {
+    let ptr: *mut zend_execute_data = execute_data.as_mut_ptr();
+    unsafe {
+        let num_args = phper_zend_call_num_args(ptr).try_into().unwrap();
+        let _arg_ptr = phper_zend_call_var_num(ptr, index as i32);
+        if index >= num_args {
+            tracing::debug!("Extending parameter slots from {} to {}", num_args, index + 1);
+            phper_zval_undef(phper_zend_call_arg(ptr, (index+1) as i32));
+            phper_zend_add_call_flag(ptr, phper_zend_call_may_have_undef());
+            phper_zend_set_call_num_args(ptr, (index + 1) as u32);
+            phper_zval_copy(phper_zend_call_var_num(ptr, (index+1) as i32), value.as_ptr());
+        } else {
+            tracing::debug!("Setting parameter slot {} (num_args={})", index, num_args);
+            phper_zval_copy(phper_zend_call_var_num(ptr, index as i32), value.as_ptr());
+        }
+    }
+}
+
+// let num_args = self.num_args();
+// if index >= num_args {
+// unsafe {
+// let params_ptr = phper_zend_call_var_num(self.as_mut_ptr(), index as i32);
+// phper_zval_null(params_ptr);
+// (*self.inner.func).common.num_args = (index + 1) as u32;
+// }
+// }
+

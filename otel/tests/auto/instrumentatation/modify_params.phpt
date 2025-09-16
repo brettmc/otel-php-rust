@@ -8,14 +8,12 @@ OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
---XFAIL--
-adding params not implemented
 --FILE--
 <?php
 OpenTelemetry\Instrumentation\hook(
     null,
     'hello',
-     function($obj, array $params) {
+    function($obj, array $params) {
         return [
           0 => null,  //make first param null
           2 => 'baz', //replace 3rd param
