@@ -8,7 +8,8 @@ OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
-
+--XFAIL--
+named params not implemented, warning not implemented
 --FILE--
 <?php
 OpenTelemetry\Instrumentation\hook(

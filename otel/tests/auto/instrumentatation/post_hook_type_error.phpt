@@ -8,7 +8,8 @@ OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
-
+--XFAIL--
+signature checking of callbacks not implemented
 --FILE--
 <?php
 class Foo

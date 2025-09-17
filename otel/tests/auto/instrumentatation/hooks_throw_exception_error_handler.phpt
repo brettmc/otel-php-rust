@@ -8,6 +8,8 @@ otel
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
+--XFAIL--
+exception isolation not ported from openteleletry-php-instrumentation
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
