@@ -1,11 +1,11 @@
 use crate::{
     auto::{
         execute_data::{
-            ensure_parameter_slot,
             get_function_and_class_name,
             get_function_arguments,
             get_file_and_line,
             get_this_or_called_scope,
+            set_parameter_slots, // updated import
         },
         plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
         utils::should_trace,
@@ -16,9 +16,9 @@ use std::collections::HashMap;
 use phper::{
     values::{ExecuteData, ZVal},
     objects::ZObj,
+    arrays::{ZArray},
 };
 use phper::alloc::{RefClone, ToRefOwned};
-use phper::arrays::ZArray;
 
 // Thread-local registry for hooks
 thread_local! {
@@ -52,6 +52,8 @@ pub fn add_hook(
     });
 }
 
+/// A plugin that manages hooks for function execution, allowing pre- and post-execution callbacks.
+/// This replicates opentelemetry-php-instrumentation's hook functionality.
 pub struct HookPlugin {
     handlers: HandlerList,
 }
@@ -139,23 +141,8 @@ impl HookHandler {
                         attributes.clone(),
                     ]) {
                         if let Some(arr) = replaced.as_z_arr() {
-                            for (key, value) in arr.iter() {
-                                tracing::debug!("PreHook returned modification: key={:?}, value={:?}", key, value);
-                                let idx_opt = match key {
-                                    phper::arrays::IterKey::Index(i) => Some(i as usize),
-                                    _ => None, //ignore string keys (todo: implement this)
-                                };
-                                if let Some(idx) = idx_opt {
-                                    ensure_parameter_slot(exec_data_ref, idx);
-                                    tracing::debug!("PreHook attempting to modify argument at index {}: {:?}", idx, value);
-                                    let zv = exec_data_ref.get_mut_parameter(idx);
-                                    tracing::debug!("PreHook: got mutable reference to parameter at index {} value={:?}", idx, zv);
-                                    *zv = value.clone();
-                                    //fetch the parameter again to verify
-                                    let zv_verify = exec_data_ref.get_parameter(idx);
-                                    tracing::debug!("PreHook: verified parameter at index {} is now value={:?}", idx, zv_verify);
-                                }
-                            }
+                            // Use set_parameter_slots to apply all replacements at once
+                            set_parameter_slots(exec_data_ref, arr.iter().map(|(k, v)| (k, v.clone())));
                         }
                     }
                 }

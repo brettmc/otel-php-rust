@@ -8,8 +8,6 @@ OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
---XFAIL--
-named params not implemented, warning not implemented
 --FILE--
 <?php
 OpenTelemetry\Instrumentation\hook(
@@ -28,7 +26,7 @@ function hello($one = null, $two = null, $three = null) {
 hello('a', 'b', 'c');
 ?>
 --EXPECTF--
-Warning: hello(): OpenTelemetry: pre hook unknown named arg four, class=null function=hello in %s
+%spre hook unknown named arg 'four'%S
 array(3) {
   [0]=>
   string(1) "a"

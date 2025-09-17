@@ -7,7 +7,7 @@ OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
-otel.log.level=debug
+otel.log.level=trace
 --XFAIL--
 not implemented
 --FILE--

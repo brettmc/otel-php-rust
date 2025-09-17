@@ -3,7 +3,7 @@ use phper::{
         RefClone,
         ToRefOwned,
     },
-    arrays::ZArray,
+    arrays::{InsertKey, ZArray, IterKey},
     eg,
     objects::ZObj,
     strings::ZStr,
@@ -13,7 +13,6 @@ use phper::{
         phper_zend_call_may_have_undef,
         phper_zend_call_var_num,
         phper_zend_call_num_args,
-        phper_zval_null,
         zend_execute_data,
         phper_zval_copy,
         phper_zend_set_call_num_args,
@@ -144,6 +143,7 @@ pub fn get_default_attributes(execute_data: &ExecuteData) -> Vec<KeyValue> {
 /// Retrieve all arguments to a function call as a ZVal representing an array
 pub fn get_function_arguments(execute_data: &ExecuteData) -> ZVal {
     let num_args = execute_data.num_args();
+    tracing::trace!("get_function_arguments: num_args={}", num_args);
     let mut arr = ZArray::new();
     for i in 0..num_args {
         let val = execute_data.get_parameter(i);
@@ -152,43 +152,73 @@ pub fn get_function_arguments(execute_data: &ExecuteData) -> ZVal {
     ZVal::from(arr)
 }
 
-pub fn ensure_parameter_slot(execute_data: &mut ExecuteData, index: usize) {
-    let num_args = execute_data.num_args();
-    if index >= num_args {
-        tracing::debug!("Extending parameter slots from {} to {}", num_args, index + 1);
-        let ptr: *mut zend_execute_data = execute_data.as_mut_ptr();
-        unsafe {
-            let params_ptr = phper_zend_call_var_num(ptr, index as i32);
-            phper_zval_null(params_ptr);
-            (*ptr).This.u2.num_args = (index + 1) as u32;
+// Returns Some(index) if the name matches a parameter, else None
+fn parameter_index_by_name(execute_data: &ExecuteData, name: &str) -> Option<usize> {
+    let arg_info_ptr = execute_data.common_arg_info();
+    let num_args = execute_data.common_num_args() as usize;
+
+    if !arg_info_ptr.is_null() {
+        for i in 0..num_args {
+            unsafe {
+                let info = arg_info_ptr.add(i);
+                // Convert the raw zend_string pointer to ZStr, then to &str
+                let param_name_ptr = (*info).name;
+                let param_name = if !param_name_ptr.is_null() {
+                    ZStr::from_ptr(param_name_ptr).to_str().ok()
+                } else {
+                    None
+                };
+                if let Some(param_name) = param_name {
+                    if param_name == name {
+                        return Some(i);
+                    }
+                }
+            }
         }
     }
+    None
 }
 
-pub fn set_parameter_slot(execute_data: &mut ExecuteData, index: usize, value: ZVal) {
-    let ptr: *mut zend_execute_data = execute_data.as_mut_ptr();
-    unsafe {
-        let num_args = phper_zend_call_num_args(ptr).try_into().unwrap();
-        let _arg_ptr = phper_zend_call_var_num(ptr, index as i32);
-        if index >= num_args {
-            tracing::debug!("Extending parameter slots from {} to {}", num_args, index + 1);
-            phper_zval_undef(phper_zend_call_arg(ptr, (index+1) as i32));
-            phper_zend_add_call_flag(ptr, phper_zend_call_may_have_undef());
-            phper_zend_set_call_num_args(ptr, (index + 1) as u32);
-            phper_zval_copy(phper_zend_call_var_num(ptr, (index+1) as i32), value.as_ptr());
-        } else {
-            tracing::debug!("Setting parameter slot {} (num_args={})", index, num_args);
-            phper_zval_copy(phper_zend_call_var_num(ptr, index as i32), value.as_ptr());
+pub fn set_parameter_slots<'a, I>(execute_data: &mut ExecuteData, replacements: I)
+where
+    I: IntoIterator<Item = (IterKey<'a>, ZVal)>
+{
+    for (key, value) in replacements {
+        match key {
+            IterKey::Index(index) => {
+                let ptr: *mut zend_execute_data = execute_data.as_mut_ptr();
+                unsafe {
+                    let num_args = phper_zend_call_num_args(ptr).try_into().unwrap();
+                    if index >= num_args {
+                        phper_zend_add_call_flag(ptr, phper_zend_call_may_have_undef());
+                        let before_num_args = phper_zend_call_num_args(ptr);
+                        phper_zend_set_call_num_args(ptr, (index + 1) as u32);
+                        let after_num_args = phper_zend_call_num_args(ptr);
+                        tracing::debug!("Num args before: {}, after: {}", before_num_args, after_num_args);
+                        for i in num_args..=index {
+                            tracing::debug!("Initializing parameter slot {}", i);
+                            phper_zval_undef(phper_zend_call_arg(ptr, i as i32));
+                        }
+                        phper_zval_copy(phper_zend_call_var_num(ptr, index as i32), value.as_ptr());
+                    } else {
+                        tracing::debug!("Setting parameter slot {} (num_args={})", index, num_args);
+                        phper_zval_copy(phper_zend_call_var_num(ptr, index as i32), value.as_ptr());
+                    }
+                }
+            }
+            IterKey::ZStr(s) => {
+                if let Some(index) = parameter_index_by_name(execute_data, s.to_str().unwrap_or("")) {
+                    let ptr: *mut zend_execute_data = execute_data.as_mut_ptr();
+                    unsafe {
+                        phper_zval_copy(phper_zend_call_var_num(ptr, index as i32), value.as_ptr());
+                    }
+                } else {
+                    tracing::warn!("pre hook unknown named arg '{}'", s.to_str().unwrap_or(""));
+                }
+            }
         }
     }
+    let exec_data_ref = &mut *execute_data;
+    let arguments = get_function_arguments(exec_data_ref);
+    tracing::debug!("arguments: {:?}", arguments);
 }
-
-// let num_args = self.num_args();
-// if index >= num_args {
-// unsafe {
-// let params_ptr = phper_zend_call_var_num(self.as_mut_ptr(), index as i32);
-// phper_zval_null(params_ptr);
-// (*self.inner.func).common.num_args = (index + 1) as u32;
-// }
-// }
-
