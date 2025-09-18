@@ -124,7 +124,7 @@ impl HookHandler {
             for mut pre_hook in pre_hooks.clone() {
                 let arguments = get_function_arguments(exec_data_ref); //arguments can mutate
                 // Debug print all values before calling the hook
-                tracing::debug!(
+                tracing::trace!(
                     "PreHook values: obj_zval={:?}, arguments={:?}, class_zval={:?}, function_zval={:?}, filename_zval={:?}, lineno_zval={:?}",
                     obj_zval, arguments, declaring_scope_zval, function_zval, filename_zval, lineno_zval
                 );
@@ -147,6 +147,8 @@ impl HookHandler {
                     }
                 }
             }
+            tracing::trace!("HookHandler::post_callback: calling handle_missing_default_args");
+            crate::auto::execute_data::handle_missing_default_args(exec_data_ref);
         } else {
             let (function, class) = get_function_and_class_name(exec_data_ref).unwrap_or_default();
             tracing::trace!("HookHandler::pre_callback: no pre-hooks found for {:?}::{:?}", class, function);

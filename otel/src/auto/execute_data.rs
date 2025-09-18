@@ -3,7 +3,7 @@ use phper::{
         RefClone,
         ToRefOwned,
     },
-    arrays::{InsertKey, ZArray, IterKey},
+    arrays::{ZArray, IterKey},
     eg,
     objects::ZObj,
     strings::ZStr,
@@ -221,4 +221,67 @@ where
     let exec_data_ref = &mut *execute_data;
     let arguments = get_function_arguments(exec_data_ref);
     tracing::debug!("arguments: {:?}", arguments);
+}
+
+/// Replicates otel_observer.c logic for handling missing default arguments after argument mutation.
+/// Should be called after all pre hooks have run and arguments may have been added.
+pub fn handle_missing_default_args(execute_data: &mut ExecuteData) {
+    use phper::sys::{
+        phper_zend_call_info,
+        phper_zend_call_may_have_undef,
+        zend_handle_undef_args,
+        phper_zend_call_num_args,
+        phper_zend_call_var_num,
+    };
+    const FAILURE: i32 = -1;
+    let ptr = execute_data.as_mut_ptr();
+    tracing::info!("handle_missing_default_args: called for execute_data={:p}", ptr);
+    unsafe {
+        let call_info = phper_zend_call_info(ptr);
+        let may_have_undef = phper_zend_call_may_have_undef();
+        tracing::info!(
+            "handle_missing_default_args: call_info=0x{:x}, may_have_undef=0x{:x}, call_info & may_have_undef = {}",
+            call_info,
+            may_have_undef,
+            (call_info & may_have_undef) != 0
+        );
+        if (call_info & may_have_undef) != 0 {
+            // Save and temporarily set EG(exception)
+            let eg_exception = phper::eg!(exception);
+            tracing::info!("handle_missing_default_args: EG(exception) before = {:p}", eg_exception);
+            // Use 1_usize as the invalid pointer value, cast to *mut _
+            phper::eg!(exception) = 1_usize as *mut _;
+            tracing::info!("handle_missing_default_args: EG(exception) temporarily set to invalid pointer");
+            let undef_result = zend_handle_undef_args(ptr);
+            tracing::info!("handle_missing_default_args: zend_handle_undef_args returned {}", undef_result);
+            if undef_result == FAILURE {
+                let arg_count = phper_zend_call_num_args(ptr);
+                tracing::warn!("handle_missing_default_args: zend_handle_undef_args FAILURE, arg_count={}", arg_count);
+                for i in 0..arg_count {
+                    let arg = phper_zend_call_var_num(ptr, i as i32);
+                    // Inline Z_ISUNDEF_P: check if arg's type is IS_UNDEF (0)
+                    let type_info = (*arg).u1.type_info;
+                    tracing::debug!(
+                        "handle_missing_default_args: arg[{}] at {:p} type_info={}",
+                        i, arg, type_info
+                    );
+                    if type_info != 0 {
+                        tracing::debug!("handle_missing_default_args: arg[{}] is defined, skipping", i);
+                        continue;
+                    }
+                    // Inline ZVAL_NULL: set type to IS_NULL (1), clear value
+                    tracing::debug!("handle_missing_default_args: arg[{}] is UNDEF, setting to NULL", i);
+                    (*arg).u1.type_info = 1; // IS_NULL
+                    (*arg).value = std::mem::zeroed();
+                }
+            } else {
+                tracing::info!("handle_missing_default_args: zend_handle_undef_args succeeded");
+            }
+            // Restore EG(exception)
+            phper::eg!(exception) = eg_exception;
+            tracing::info!("handle_missing_default_args: EG(exception) restored to {:p}", eg_exception);
+        } else {
+            tracing::info!("handle_missing_default_args: call_info & may_have_undef == 0, skipping");
+        }
+    }
 }
