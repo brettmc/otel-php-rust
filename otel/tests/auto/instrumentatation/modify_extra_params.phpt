@@ -10,7 +10,7 @@ otel
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --XFAIL--
-not implemented
+not implemented (not actually used by any existing instumentation?)
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
