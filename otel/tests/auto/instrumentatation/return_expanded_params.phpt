@@ -8,8 +8,6 @@ OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
---XFAIL--
-expanding params does not work
 --FILE--
 <?php
 \OpenTelemetry\Instrumentation\hook(null, 'helloWorld', function($obj, array $params) {
