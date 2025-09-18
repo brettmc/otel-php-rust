@@ -123,26 +123,48 @@ impl HookHandler {
 
             for mut pre_hook in pre_hooks.clone() {
                 let arguments = get_function_arguments(exec_data_ref); //arguments can mutate
-                // Debug print all values before calling the hook
                 tracing::trace!(
                     "PreHook values: obj_zval={:?}, arguments={:?}, class_zval={:?}, function_zval={:?}, filename_zval={:?}, lineno_zval={:?}",
                     obj_zval, arguments, declaring_scope_zval, function_zval, filename_zval, lineno_zval
                 );
                 if let Some(zobj) = pre_hook.as_mut_z_obj() {
                     //object, params, class, function, filename, lineno
-                    if let Ok(replaced) = zobj.call("__invoke", [
-                        obj_zval.clone(),
-                        arguments.clone(),
-                        declaring_scope_zval.clone(),
-                        function_zval.clone(),
-                        filename_zval.clone(),
-                        lineno_zval.clone(),
-                        withspan_zval.clone(),
-                        attributes.clone(),
-                    ]) {
-                        if let Some(arr) = replaced.as_z_arr() {
-                            // Use set_parameter_slots to apply all replacements at once
-                            set_parameter_slots(exec_data_ref, arr.iter().map(|(k, v)| (k, v.clone())));
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        zobj.call("__invoke", [
+                            obj_zval.clone(),
+                            arguments.clone(),
+                            declaring_scope_zval.clone(),
+                            function_zval.clone(),
+                            filename_zval.clone(),
+                            lineno_zval.clone(),
+                            withspan_zval.clone(),
+                            attributes.clone(),
+                        ])
+                    }));
+                    match result {
+                        Ok(Ok(replaced)) => {
+                            if let Some(arr) = replaced.as_z_arr() {
+                                set_parameter_slots(exec_data_ref, arr.iter().map(|(k, v)| (k, v.clone())));
+                            }
+                        },
+                        Ok(Err(e)) => {
+                            // Exception thrown in PHP
+                            let msg = e.to_string();
+                            let class_str = class.clone().unwrap_or_else(|| "null".to_string());
+                            let func_str = function.clone().unwrap_or_default();
+                            tracing::warn!(
+                                "OpenTelemetry: pre hook threw exception, class={} function={} message={} in {}:{}",
+                                class_str, func_str, msg, file, line
+                            );
+                        },
+                        Err(_) => {
+                            // Rust panic in hook
+                            let class_str = class.clone().unwrap_or_else(|| "null".to_string());
+                            let func_str = function.clone().unwrap_or_default();
+                            tracing::warn!(
+                                "OpenTelemetry: pre hook panicked, class={} function={} in {}:{}",
+                                class_str, func_str, file, line
+                            );
                         }
                     }
                 }
@@ -176,31 +198,50 @@ impl HookHandler {
             let filename_zval = ZVal::from(file.clone());
             let lineno_zval = ZVal::from(line as i64);
 
-            // Print all parameters for verification
             tracing::debug!("arguments: {:?}", arguments);
             let idx = 1;
             let zv_verify = exec_data_ref.get_parameter(idx);
             tracing::debug!("PostHook: verified parameter at index {} is now value={:?}", idx, zv_verify);
 
             for mut post_hook in post_hooks.clone() {
-                // Debug print all values before calling the hook
                 tracing::debug!(
                     "PostHook values: obj_zval={:?}, arguments={:?}, retval={:?}, exception={:?}",
                     obj_zval, arguments, retval, exception_zval
                 );
                 if let Some(zobj) = post_hook.as_mut_z_obj() {
-                    //object, params, ?returnval, ?exception, declaring scope, function name, filename, line number
-                    if let Ok(modified_return_value) = zobj.call("__invoke", [
-                        obj_zval.clone(),
-                        arguments.clone(),
-                        retval.clone(),
-                        exception_zval.clone(),
-                        declaring_scope_zval.clone(),
-                        function_zval.clone(),
-                        filename_zval.clone(),
-                        lineno_zval.clone(),
-                    ]) {
-                        *retval = modified_return_value;
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        zobj.call("__invoke", [
+                            obj_zval.clone(),
+                            arguments.clone(),
+                            retval.clone(),
+                            exception_zval.clone(),
+                            declaring_scope_zval.clone(),
+                            function_zval.clone(),
+                            filename_zval.clone(),
+                            lineno_zval.clone(),
+                        ])
+                    }));
+                    match result {
+                        Ok(Ok(modified_return_value)) => {
+                            *retval = modified_return_value;
+                        },
+                        Ok(Err(e)) => {
+                            let msg = e.to_string();
+                            let class_str = class.clone().unwrap_or_else(|| "null".to_string());
+                            let func_str = function.clone().unwrap_or_default();
+                            tracing::warn!(
+                                "OpenTelemetry: post hook threw exception, class={} function={} message={} in {}:{}",
+                                class_str, func_str, msg, file, line
+                            );
+                        },
+                        Err(_) => {
+                            let class_str = class.clone().unwrap_or_else(|| "null".to_string());
+                            let func_str = function.clone().unwrap_or_default();
+                            tracing::warn!(
+                                "OpenTelemetry: post hook panicked, class={} function={} in {}:{}",
+                                class_str, func_str, file, line
+                            );
+                        }
                     }
                 }
             }

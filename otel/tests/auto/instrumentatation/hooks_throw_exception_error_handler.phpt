@@ -8,8 +8,6 @@ otel
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
---XFAIL--
-exception isolation not ported from openteleletry-php-instrumentation
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
@@ -32,7 +30,7 @@ function helloWorld() {
 helloWorld();
 ?>
 --EXPECTF--
-Warning: helloWorld(): OpenTelemetry: pre hook threw exception, class=null function=helloWorld message=pre in %s
+%sOpenTelemetry: pre hook threw exception, class=null function=helloWorld message=pre in %s
 
 Fatal error: Uncaught Error: test in %s
 Stack trace:

@@ -8,8 +8,6 @@ OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
---XFAIL--
-exception isolation not ported from openteleletry-php-instrumentation
 --FILE--
 <?php
 function helloWorld($argument) {
@@ -29,9 +27,8 @@ helloWorld();
 ?>
 --EXPECTF--
 
-Warning: helloWorld(): OpenTelemetry: pre hook threw exception, class=null function=helloWorld message=pre in %s
-
-Warning: helloWorld(): OpenTelemetry: post hook threw exception, class=null function=helloWorld message=post in %s
+%sOpenTelemetry: pre hook threw exception, class=null function=helloWorld message=pre in %s
+%sOpenTelemetry: post hook threw exception, class=null function=helloWorld message=post in %s
 
 Fatal error: Uncaught ArgumentCountError: Too few arguments to function helloWorld(), 0 passed in %s
 Stack trace:
