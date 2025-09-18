@@ -2,14 +2,14 @@
 Test UnwindExit in post handler does not leak otel_exception_state memory
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php echo 'skip no otel_exception_state in rust'; ?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
---XFAIL--
-not implemented
 --FILE--
 <?php
 

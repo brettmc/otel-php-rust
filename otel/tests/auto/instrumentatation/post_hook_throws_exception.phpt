@@ -2,14 +2,14 @@
 Check if throwing an exception in post hook after IO operation will finish gracefully
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php echo 'skip does not segfault in rust'; ?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
 otel.log.level=warn
---XFAIL--
-does not segfault in Rust (win?)
 --FILE--
 <?php
 \OpenTelemetry\Instrumentation\hook(
