@@ -18,6 +18,12 @@ use OpenTelemetry\API\Logs\MemoryLogsExporter;
 $logger = Globals::loggerProvider()->getLogger("my_logger", '0.1', 'schema.url', ['one' => 1]);
 $record = new LogRecord('test');
 $record->setSeverityNumber(9); //info
+$record
+    ->setSeverityText('Info')
+    ->setAttribute('a_bool', true)
+    ->setAttribute('an_int', 1)
+    ->setAttribute('a_float', 1.1)
+    ->setAttribute('a_string', 'string');
 $logger->emit($record);
 var_dump(MemoryLogsExporter::count());
 $exported = MemoryLogsExporter::getLogs()[0];
@@ -31,22 +37,35 @@ array(8) {
   ["severity_number"]=>
   int(9)
   ["severity_text"]=>
-  string(0) ""
+  string(4) "Info"
   ["timestamp"]=>
   int(0)
   ["observed_timestamp"]=>
   int(%d)
   ["attributes"]=>
-  array(0) {
+  array(4) {
+    ["a_bool"]=>
+    string(13) "Boolean(true)"
+    ["an_int"]=>
+    string(6) "Int(1)"
+    ["a_float"]=>
+    string(11) "Double(1.1)"
+    ["a_string"]=>
+    string(23) "String(Owned("string"))"
   }
   ["instrumentation_scope"]=>
-  array(3) {
+  array(4) {
     ["name"]=>
     string(9) "my_logger"
     ["version"]=>
     string(3) "0.1"
     ["schema_url"]=>
     string(10) "schema.url"
+    ["attributes"]=>
+    array(1) {
+      ["one"]=>
+      string(6) "I64(1)"
+    }
   }
   ["resource"]=>
   array(8) {
