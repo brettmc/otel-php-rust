@@ -12,6 +12,7 @@ pub mod error;
 pub mod globals;
 pub mod request;
 pub mod logging;
+pub mod logs;
 pub mod util;
 pub mod module;
 pub mod auto;

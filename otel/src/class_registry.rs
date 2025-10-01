@@ -19,14 +19,19 @@ use crate::{
         status_code::make_status_code_interface,
         tracer::make_tracer_class,
         tracer_interface::make_tracer_interface,
-        tracer_provider::{
-            make_tracer_provider_class,
-        },
+        tracer_provider::make_tracer_provider_class,
         tracer_provider_interface::make_tracer_provider_interface,
         span_context::make_span_context_class,
         propagation::trace_context_propagator::make_trace_context_propagator_class,
     },
     globals::make_globals_class,
+    logs::{
+        logger_interface::make_logger_interface,
+        logger::make_logger_class,
+        log_record::make_log_record_class,
+        logger_provider::make_logger_provider_class,
+        logger_provider_interface::make_logger_provider_interface,
+    },
 };
 
 pub fn register_classes_and_interfaces(module: &mut Module) {
@@ -40,6 +45,8 @@ pub fn register_classes_and_interfaces(module: &mut Module) {
     let span_interface = module.add_interface(make_span_interface());
 
     // co-dependent classes
+    let logger_interface = module.add_interface(make_logger_interface());
+    let logger_provider_interface = module.add_interface(make_logger_provider_interface());
     let mut scope_class_entity = new_scope_class();
     let mut context_class_entity = new_context_class();
     let mut storage_class_entity = new_storage_class();
@@ -61,6 +68,10 @@ pub fn register_classes_and_interfaces(module: &mut Module) {
 
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone(), tracer_interface));
     let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone(), tracer_provider_interface));
-    let _globals_class = module.add_class(make_globals_class(tracer_provider_class.clone(), trace_context_propagator_class.clone()));
+    let logger_class = module.add_class(make_logger_class(logger_interface));
+    let logger_provider_class = module.add_class(make_logger_provider_class(logger_class.clone(), logger_provider_interface.clone()));
+    let _globals_class = module.add_class(make_globals_class(tracer_provider_class.clone(), trace_context_propagator_class.clone(), logger_provider_class.clone()));
     let _status_code_interface = module.add_interface(make_status_code_interface());
+
+    let _log_record_class = module.add_class(make_log_record_class());
 }
