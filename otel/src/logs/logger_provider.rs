@@ -18,7 +18,7 @@ use opentelemetry::{
 use opentelemetry_stdout::LogExporter as StdoutLogExporter;
 use opentelemetry_sdk::{
     logs::{
-        SimpleLogProcessor, InMemoryLogExporter,
+        SimpleLogProcessor,
         BatchConfigBuilder,
         BatchLogProcessor,
         SdkLoggerProvider,
@@ -28,7 +28,10 @@ use opentelemetry_sdk::{
 use once_cell::sync::{Lazy, OnceCell};
 use tokio::runtime::Runtime;
 use crate::{
-    logs::logger::LoggerClass,
+    logs::{
+        logger::LoggerClass,
+        memory_exporter::MEMORY_EXPORTER,
+    },
     request,
     util,
 };
@@ -80,17 +83,18 @@ pub fn init_once() {
     let mut builder = SdkLoggerProvider::builder().with_resource(resource);
 
     let exporter_type = env::var("OTEL_LOGS_EXPORTER").unwrap_or_else(|_| "otlp".to_string());
-    let use_simple = env::var("OTEL_BLRP_TYPE").as_deref() == Ok("simple");
+    let use_simple = env::var("OTEL_LOGS_PROCESSOR").as_deref() == Ok("simple");
 
     if exporter_type == "none" {
         tracing::debug!("Using no-op log exporter");
         // No exporter, just build the provider
     } else if exporter_type == "console" {
-        tracing::debug!("Using Console log exporter");
         let exporter = StdoutLogExporter::default();
         if use_simple {
+            tracing::debug!("Using Simple log processor with Console exporter");
             builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
         } else {
+            tracing::debug!("Using Batch log processor with Console exporter");
             let batch_config = BatchConfigBuilder::default().build();
             let batch = BatchLogProcessor::builder(exporter)
                 .with_batch_config(batch_config)
@@ -98,11 +102,12 @@ pub fn init_once() {
             builder = builder.with_log_processor(batch);
         }
     } else if exporter_type == "memory" {
-        tracing::debug!("Using in-memory log exporter");
-        let exporter = InMemoryLogExporter::default();
+        let exporter = MEMORY_EXPORTER.lock().unwrap().clone();
         if use_simple {
+            tracing::debug!("Using Simple log processor with in-memory exporter");
             builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
         } else {
+            tracing::debug!("Using Batch log processor with in-memory exporter");
             let batch_config = BatchConfigBuilder::default().build();
             let batch = BatchLogProcessor::builder(exporter)
                 .with_batch_config(batch_config)

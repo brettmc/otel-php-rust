@@ -31,6 +31,7 @@ use crate::{
         log_record::make_log_record_class,
         logger_provider::make_logger_provider_class,
         logger_provider_interface::make_logger_provider_interface,
+        memory_exporter::make_logs_memory_exporter_class,
     },
 };
 
@@ -60,6 +61,7 @@ pub fn register_classes_and_interfaces(module: &mut Module) {
     let context_class = module.add_class(context_class_entity);
     let _storage_class = module.add_class(storage_class_entity);
     let _in_memory_exporter_class = module.add_class(make_memory_exporter_class());
+    let _logs_memory_exporter_class = module.add_class(make_logs_memory_exporter_class());
 
     let span_class = module.add_class(make_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
     let non_recording_span_class = module.add_class(make_non_recording_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
