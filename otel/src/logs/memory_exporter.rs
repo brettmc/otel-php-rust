@@ -65,15 +65,22 @@ pub fn make_logs_memory_exporter_class() -> ClassEntity<()> {
             }
             // Attributes
             let mut attributes = ZArray::new();
-            // for kv in log.record.attributes.iter() {
-            //     attributes.insert(kv.key.as_str(), format!("{:?}", kv.value));
-            // }
+            for (key, value) in log.record.attributes_iter() {
+                attributes.insert(key.as_str(), format!("{:?}", value));
+            }
             arr.insert("attributes", attributes);
             // Instrumentation scope
             let mut scope = ZArray::new();
             scope.insert("name", log.instrumentation.name());
             scope.insert("version", log.instrumentation.version().as_deref().unwrap_or(""));
             scope.insert("schema_url", log.instrumentation.schema_url().as_deref().unwrap_or(""));
+            // Scope attributes
+            let mut scope_attributes = ZArray::new();
+            for kv in log.instrumentation.attributes() {
+                scope_attributes.insert(kv.key.as_str(), format!("{:?}", kv.value));
+            }
+            scope.insert("attributes", scope_attributes);
+
             arr.insert("instrumentation_scope", scope);
             // Resource (sorted by key)
             let mut resource = ZArray::new();
