@@ -199,9 +199,6 @@ impl HookHandler {
             let lineno_zval = ZVal::from(line as i64);
 
             tracing::debug!("arguments: {:?}", arguments);
-            let idx = 1;
-            let zv_verify = exec_data_ref.get_parameter(idx);
-            tracing::debug!("PostHook: verified parameter at index {} is now value={:?}", idx, zv_verify);
 
             for mut post_hook in post_hooks.clone() {
                 tracing::debug!(

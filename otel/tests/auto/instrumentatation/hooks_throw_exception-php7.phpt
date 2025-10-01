@@ -1,0 +1,42 @@
+--TEST--
+Check if exceptions thrown in hooks are isolated and logged
+--EXTENSIONS--
+otel
+--SKIPIF--
+<?php if (version_compare(PHP_VERSION, '8.0.0', '>=')) {
+    echo "skip PHP 7.x required";
+} ?>
+--ENV--
+OTEL_TRACES_EXPORTER=memory
+OTEL_SPAN_PROCESSOR=simple
+--INI--
+otel.cli.enabled=1
+otel.log.level=warn
+--FILE--
+<?php
+\OpenTelemetry\Instrumentation\hook(
+    null,
+    'helloWorld',
+    function() { throw new Exception('thrown in pre');},
+    function() { throw new Exception('thrown in post');}
+);
+
+//TODO exception from pre hook stops observed function from executing
+function helloWorld() {
+    var_dump('function');
+    throw new Exception('original');
+}
+
+try {
+    helloWorld();
+} catch (Exception $e) {
+    var_dump($e->getMessage());
+    var_dump($e->getPrevious());
+}
+?>
+--EXPECTF--
+%sOpenTelemetry: pre hook threw exception, class=null function=helloWorld message=thrown in pre in %s
+string(8) "function"
+%sOpenTelemetry: post hook threw exception, class=null function=helloWorld message=thrown in post in %s
+string(8) "original"
+NULL

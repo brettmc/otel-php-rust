@@ -2,6 +2,8 @@
 Check if calling die or exit will finish gracefully
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php if (version_compare(PHP_VERSION, '8.0.0', '<')) echo 'skip requires php 8.0+'; ?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
@@ -14,7 +16,7 @@ otel.log.level=warn
 use function OpenTelemetry\Instrumentation\hook;
 
 class TestClass {
-    public static function countFunction(): void
+    public static function countFunction()
     {
        for ($i = 1; $i <= 300; $i++) {
             if ($i === 200) {
@@ -28,17 +30,17 @@ hook(
     'TestClass',
     'countFunction',
     null,
-    post: static function ($object, array $params, mixed $ret, ?\Throwable $exception ) {}
+    static function ($object, array $params, $ret, \Throwable $exception ) {}
 );
 
 try{
-TestClass::countFunction();
+    TestClass::countFunction();
 }
-catch(Exception) {}
+catch(Exception $e) {}
 // Comment out line below and revert fix in order to trigger segfault
 // reproduction frequency depends on platform
-catch(TypeError) {}
+catch(TypeError $t) {}
 ?>
 
---EXPECT--
-exit!
+--EXPECTF--
+exit!%smessage=OpenTelemetry: post hook threw exception, class=TestClass function=countFunction message=%s: Argument #4 ($exception) must be of type Throwable, null given%s

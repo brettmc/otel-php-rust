@@ -4,7 +4,7 @@
  * Run the PHP built-in web server in a shell, send an HTTP request to it.
  * The server output and response are captured and printed.
  */
-function run_server(string $file, array $options, string $path = ''): void {
+function run_server(string $file, array $options, string $path = '') {
     $host = '127.0.0.1';
     $port = 8080;
     $docRoot = __DIR__;

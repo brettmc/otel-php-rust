@@ -2,6 +2,8 @@
 Check if pre hook can expand params of function if they are part of function definition
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php if (version_compare(PHP_VERSION, '8.0.0', '<')) echo 'skip requires php 8.0+'; ?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple

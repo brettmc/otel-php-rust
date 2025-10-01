@@ -1,10 +1,12 @@
 --TEST--
 Check if post hook can returned modified clone
-----DESCRIPTION--
+--DESCRIPTION--
 A different object might be returned than the one provided to post hook. For example, PSR-7 messages are immutable and modifying
 one creates a new instance.
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php if (version_compare(PHP_VERSION, '8.0.0', '<')) echo 'skip requires php 8.0+'; ?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple

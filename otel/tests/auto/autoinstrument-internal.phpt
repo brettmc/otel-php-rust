@@ -27,15 +27,15 @@ Span #0
 	Instrumentation Scope
 		Name         : "php.otel.auto.test"
 
-	Name        : phpversion
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
+	Name         : phpversion
+	TraceId      : %s
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : %s
+	Kind         : Internal
+	Start time   : %s
+	End time     : %s
+	Status       : Unset
 	Attributes:
-		 ->  code.function.name: String(Owned("phpversion"))
+		 ->  code.function.name: String(Owned("phpversion"))%A
 string(%d) "%s"

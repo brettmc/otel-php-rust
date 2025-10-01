@@ -1,7 +1,7 @@
 --TEST--
 Check if hooks are invoked for internal functions
 --SKIPIF--
-<?php if (PHP_VERSION_ID >= 80000 && PHP_VERSION_ID < 80200) die('skip requires PHP 7.x or 8.2+'); ?>
+<?php if (PHP_VERSION_ID < 80200) die('skip requires PHP 8.2+'); ?>
 --EXTENSIONS--
 otel
 --ENV--

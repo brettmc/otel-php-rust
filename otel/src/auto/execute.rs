@@ -94,7 +94,8 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         |ed, _| upstream_execute_ex(ed),
         |plugin_manager, exec_data, _retval| {
             if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
-                //get return value via a pointer to avoid double-borrowing exec_data
+                //get return value via a pointer to avoid double-borrowing exec_data. Note that in php 7.x, if
+                //the return value is not used, it can be optimized away, so we need to provide a fallback value.
                 let retval = unsafe {
                     exec_data.get_return_value_mut_ptr()
                         .as_mut()

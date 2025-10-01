@@ -2,6 +2,10 @@
 Check if exceptions thrown in hooks are isolated and logged
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php if (version_compare(PHP_VERSION, '8.0.0', '<')) {
+    echo "skip PHP 8.0+ required";
+} ?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple

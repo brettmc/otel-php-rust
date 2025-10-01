@@ -8,7 +8,6 @@ use phper::{
     objects::ZObj,
     strings::ZStr,
     sys::{
-        IS_UNDEF,
         phper_zend_add_call_flag,
         phper_zend_call_arg,
         phper_zend_call_num_args,
@@ -17,8 +16,6 @@ use phper::{
         phper_zend_set_call_num_args,
         phper_zval_copy,
         phper_zval_undef,
-        phper_zval_null,
-        phper_z_type_p,
         zend_execute_data,
     },
     values::{ExecuteData, ZVal},
@@ -29,6 +26,12 @@ use opentelemetry::{
 use std::{
     cell::RefCell,
     collections::HashMap,
+};
+#[cfg(otel_observer_supported)]
+use phper::sys::{
+    IS_UNDEF,
+    phper_zval_null,
+    phper_z_type_p,
 };
 
 // Storage for communication between pre and post hooks, using exec_data as key
@@ -223,16 +226,18 @@ where
 
     // Write back all arguments
     let ptr: *mut zend_execute_data = execute_data.as_mut_ptr();
-    unsafe {
-        let old_num_args = phper_zend_call_num_args(ptr);
-        if args.len() > old_num_args as usize {
+    let old_num_args = unsafe { phper_zend_call_num_args(ptr) };
+    if args.len() > old_num_args as usize {
+        unsafe {
             phper_zend_add_call_flag(ptr, phper_zend_call_may_have_undef());
             phper_zend_set_call_num_args(ptr, args.len() as u32);
             for i in old_num_args as usize..args.len() {
                 phper_zval_undef(phper_zend_call_arg(ptr, i as i32));
             }
         }
-        for (i, val) in args.iter().enumerate() {
+    }
+    for (i, val) in args.iter().enumerate() {
+        unsafe {
             phper_zval_copy(phper_zend_call_var_num(ptr, i as i32), val.as_ptr());
         }
     }
@@ -240,7 +245,9 @@ where
 }
 
 /// Replicates otel_observer.c logic for handling missing default arguments after argument mutation.
-/// Should be called after all pre hooks have run and arguments may have been added.
+/// Should be called after all pre hooks have run and arguments may have been added. Only required for
+/// PHP 8.0+ where named function arguments are supported.
+#[cfg(otel_observer_supported)]
 pub fn handle_missing_default_args(execute_data: &mut ExecuteData) {
     use phper::sys::{
         phper_zend_call_info,

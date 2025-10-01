@@ -12,10 +12,14 @@ fn main() {
 
     println!("cargo::rustc-check-cfg=cfg(otel_observer_supported)");
     println!("cargo::rustc-check-cfg=cfg(otel_observer_not_supported)");
+    println!("cargo::rustc-check-cfg=cfg(php8)");
+    println!("cargo::rustc-check-cfg=cfg(php7)");
     if PHP_MAJOR_VERSION >= 8 {
         println!("cargo::rustc-cfg=otel_observer_supported");
+        println!("cargo::rustc-cfg=php8");
     } else {
         println!("cargo::rustc-cfg=otel_observer_not_supported");
+        println!("cargo::rustc-cfg=php7");
     }
 
     //get metadata about interesting dependencies

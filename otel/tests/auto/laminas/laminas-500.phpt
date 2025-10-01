@@ -23,7 +23,7 @@ run_server('auto/laminas/public/index.php', $options, 'tick/tick');
 --EXPECTF--
 Warning: %s HTTP request failed! HTTP/%s 500 Internal Server Error
  in %s
-==== Response ====
+==== Response ====%A
 ==== Server Output ====%A
 Spans
 Resource
@@ -32,15 +32,15 @@ Span #0
 	Instrumentation Scope
 		Name         : "php.otel.auto.laminas"
 
-	Name        : Application::run
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Error { description: "" }
+	Name         : Application::run
+	TraceId      : %s
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : %s
+	Kind         : Internal
+	Start time   : %s
+	End time     : %s
+	Status       : Error { description: "" }
 	Attributes:
 		 ->  code.function.name: String(Owned("Laminas\\Mvc\\Application::run"))
 		 ->  code.file.path: String(Owned("%s/laminas/laminas-mvc/src/Application.php"))
@@ -58,15 +58,15 @@ Span #0
 	Instrumentation Scope
 		Name         : "php:rinit"
 
-	Name        : GET ticktick
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Server
-	Start time: %s
-	End time: %s
-	Status: Error { description: "" }
+	Name         : GET ticktick
+	TraceId      : %s
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : None (root span)
+	Kind         : Server
+	Start time   : %s
+	End time     : %s
+	Status       : Error { description: "" }
 	Attributes:
 		 ->  url.full: String(Owned("/tick/tick"))
 		 ->  http.request.method: String(Owned("GET"))

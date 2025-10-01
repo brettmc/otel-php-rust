@@ -44,10 +44,6 @@ _Only works for PHP versions supported by PIE (8.1+)_
 
 `php pie.phar install brettmc/otel-php-rust:<version>`
 
-### PECL
-
-todo
-
 ### Manual
 
 ```shell
@@ -84,6 +80,8 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc.), but has only
 
 * Auto-instrumentation of userland and internal code
   - using either Zend Observer API (PHP 8.0+), or zend_execute_ex/zend_execute_internal (PHP 7.x)
+* Hook userland/internal functions and methods
+  - compatible with opentelemetry-php-instrumentation but also works with 7.x
 * Start a span in RINIT, use `traceparent` headers, set HTTP response code in RSHUTDOWN
 * TracerProvider created in RINIT (so that child processes have a working instance)
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
@@ -139,6 +137,8 @@ set in the environment (todo: could be relaxed to allow setting all OpenTelemetr
 By installing the extension and providing the basic [SDK configuration](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.46.0/specification/configuration/sdk-environment-variables.md#general-sdk-configuration)
 that opentelemetry expects, each HTTP request will generate an HTTP server root span. There are some initial
 auto-instrumentation plugins for some legacy frameworks.
+
+Exposes `OpenTelemetry\Instrumentation\hook`, compatible with [opentelemetry-php-instrumentation](https://github.com/open-telemetry/opentelemetry-php-instrumentation).
 
 ### Manual instrumentation
 

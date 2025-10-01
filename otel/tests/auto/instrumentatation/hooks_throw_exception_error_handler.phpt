@@ -5,6 +5,10 @@ If the extension internally logs errors/warnings in a way that set_error_handler
 exceptions/errors may cause the process to crash or hang if raising a throwable was not safe at that moment.
 --EXTENSIONS--
 otel
+--SKIPIF--
+<?php if (version_compare(PHP_VERSION, '8.0.0', '<')) {
+    echo "skip PHP 8.0+ required";
+} ?>
 --ENV--
 OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple

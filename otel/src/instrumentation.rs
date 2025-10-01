@@ -4,7 +4,7 @@ use phper::modules::Module;
 use phper::types::{ArgumentTypeHint, ReturnTypeHint};
 
 pub fn register_instrumentation_functions(module: &mut Module) {
-    module.add_function(
+    let func = module.add_function(
         r"OpenTelemetry\Instrumentation\hook",
             |args| -> Result<bool, phper::Error> {
                 let class = args.get(0)
@@ -27,11 +27,17 @@ pub fn register_instrumentation_functions(module: &mut Module) {
                 Ok::<_, phper::Error>(true)
             }
         )
-        .argument(Argument::new("class").optional().with_type_hint(ArgumentTypeHint::String))
-        .argument(Argument::new("function").with_type_hint(ArgumentTypeHint::String))
-        .argument(Argument::new("pre").optional().with_type_hint(ArgumentTypeHint::Callable))
-        .argument(Argument::new("post").optional().with_type_hint(ArgumentTypeHint::Callable))
-        .return_type(ReturnType::new(ReturnTypeHint::Bool))
+        .argument(Argument::new("class").optional().allow_null().with_type_hint(ArgumentTypeHint::String));
+
+        #[cfg(php8)]
+        func.argument(Argument::new("function").with_type_hint(ArgumentTypeHint::String));
+
+        #[cfg(php7)]
+        func.argument(Argument::new("function").optional().with_type_hint(ArgumentTypeHint::String));
+
+        func.argument(Argument::new("pre").optional().allow_null().with_type_hint(ArgumentTypeHint::Callable))
+            .argument(Argument::new("post").optional().allow_null().with_type_hint(ArgumentTypeHint::Callable))
+            .return_type(ReturnType::new(ReturnTypeHint::Bool))
     ;
 }
 

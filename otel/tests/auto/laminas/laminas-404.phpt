@@ -32,15 +32,15 @@ Span #0
 	Instrumentation Scope
 		Name         : "php.otel.auto.laminas"
 
-	Name        : Application::run
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: %s
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Error { description: "error-router-no-match" }
+	Name         : Application::run
+	TraceId      : %s
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : %s
+	Kind         : Internal
+	Start time   : %s
+	End time     : %s
+	Status       : Error { description: "error-router-no-match" }
 	Attributes:
 		 ->  code.function.name: String(Owned("Laminas\\Mvc\\Application::run"))
 		 ->  code.file.path: String(Owned("%s/laminas/laminas-mvc/src/Application.php"))
@@ -56,15 +56,15 @@ Span #0
 	Instrumentation Scope
 		Name         : "php:rinit"
 
-	Name        : GET
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Server
-	Start time: %s
-	End time: %s
-	Status: Unset
+	Name         : GET
+	TraceId      : %s
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : None (root span)
+	Kind         : Server
+	Start time   : %s
+	End time     : %s
+	Status       : Unset
 	Attributes:
 		 ->  url.full: String(Owned("/does-not-exist"))
 		 ->  http.request.method: String(Owned("GET"))

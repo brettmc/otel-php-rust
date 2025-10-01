@@ -11,7 +11,7 @@ OTEL_TRACES_EXPORTER=memory
 OTEL_SPAN_PROCESSOR=simple
 --INI--
 otel.cli.enabled=1
-otel.log.level=warn
+otel.log.level=trace
 --XFAIL--
 not implemented
 --FILE--
@@ -20,7 +20,7 @@ not implemented
     null,
     'array_slice',
     pre: function($obj, array $params) {
-        $params[2] = 1; //only slice 1 value, instead of "remainder"
+        //$params[2] = 1; //only slice 1 value, instead of "remainder"
         return $params;
     },
     post: fn() => null //does not fail without post callback
