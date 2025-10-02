@@ -48,10 +48,12 @@ pub fn make_logger_class(
                 log_record.set_body(body.clone());
             }
             if let Some(ref severity_text) = record_state.severity_text {
+                //TODO avoid leaking memory here (Cow<'static, str>)
                 let static_str: &'static str = Box::leak(severity_text.clone().into_boxed_str());
                 log_record.set_severity_text(static_str);
             }
             if let Some(ref event_name) = record_state.event_name {
+                //TODO avoid leaking memory here (Cow<'static, str>)
                 let static_str: &'static str = Box::leak(event_name.clone().into_boxed_str());
                 log_record.set_event_name(static_str);
             }

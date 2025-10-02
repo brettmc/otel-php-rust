@@ -4,6 +4,8 @@ Force auto root span for CLI, check context is empty when finished
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=none
+OTEL_LOGS_EXPORTER=none
+OTEL_METRICS_EXPORTER=none
 --INI--
 otel.log.level="trace"
 otel.log.file="/dev/stdout"

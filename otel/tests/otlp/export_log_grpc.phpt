@@ -1,5 +1,5 @@
 --TEST--
-Export a log: http/protobuf
+Export a log: grpc
 --EXTENSIONS--
 otel
 --INI--
