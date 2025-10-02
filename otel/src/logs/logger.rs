@@ -15,6 +15,36 @@ pub type LoggerClass = StateClass<Option<SdkLogger>>;
 
 const LOGGER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\Logger";
 
+fn map_severity_text(text: &str) -> &'static str {
+    match text {
+        "TRACE" => "TRACE",
+        "TRACE2" => "TRACE2",
+        "TRACE3" => "TRACE3",
+        "TRACE4" => "TRACE4",
+        "DEBUG" => "DEBUG",
+        "DEBUG2" => "DEBUG2",
+        "DEBUG3" => "DEBUG3",
+        "DEBUG4" => "DEBUG4",
+        "INFO" => "INFO",
+        "INFO2" => "INFO2",
+        "INFO3" => "INFO3",
+        "INFO4" => "INFO4",
+        "WARN" => "WARN",
+        "WARN2" => "WARN2",
+        "WARN3" => "WARN3",
+        "WARN4" => "WARN4",
+        "ERROR" => "ERROR",
+        "ERROR2" => "ERROR2",
+        "ERROR3" => "ERROR3",
+        "ERROR4" => "ERROR4",
+        "FATAL" => "FATAL",
+        "FATAL2" => "FATAL2",
+        "FATAL3" => "FATAL3",
+        "FATAL4" => "FATAL4",
+        _ => "INFO", // fallback to INFO or another default
+    }
+}
+
 pub fn make_logger_class(
     logger_interface: Interface,
 ) -> ClassEntity<Option<SdkLogger>> {
@@ -48,8 +78,7 @@ pub fn make_logger_class(
                 log_record.set_body(body.clone());
             }
             if let Some(ref severity_text) = record_state.severity_text {
-                //TODO avoid leaking memory here (Cow<'static, str>)
-                let static_str: &'static str = Box::leak(severity_text.clone().into_boxed_str());
+                let static_str: &'static str = map_severity_text(severity_text.as_str());
                 log_record.set_severity_text(static_str);
             }
             if let Some(ref event_name) = record_state.event_name {
