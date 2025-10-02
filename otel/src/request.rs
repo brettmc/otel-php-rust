@@ -32,6 +32,7 @@ use crate::{
     config,
     context::storage,
     logging,
+    logs::logger_provider,
     module,
     error::php_error_to_attributes,
     trace::{local_root_span, tracer_provider},
@@ -61,6 +62,7 @@ pub fn on_request_init() {
     }
 
     tracer_provider::init_once();
+    logger_provider::init_once();
     global::set_text_map_propagator(TraceContextPropagator::new());
 
     init();

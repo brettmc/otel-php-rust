@@ -4,6 +4,8 @@ Activate context
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=none
+OTEL_LOGS_EXPORTER=none
+OTEL_METRICS_EXPORTER=none
 --FILE--
 <?php
 use OpenTelemetry\Context\Context;

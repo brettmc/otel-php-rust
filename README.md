@@ -44,10 +44,6 @@ _Only works for PHP versions supported by PIE (8.1+)_
 
 `php pie.phar install brettmc/otel-php-rust:<version>`
 
-### PECL
-
-todo
-
 ### Manual
 
 ```shell
@@ -142,6 +138,8 @@ auto-instrumentation plugins for some legacy frameworks.
 
 ### Manual instrumentation
 
+#### Tracing
+
 Basic usage:
 ```php
 $provider = \OpenTelemetry\API\Globals::tracerProvider();
@@ -168,6 +166,34 @@ $scope = $root->activate();
 $root->end();
 $scope->detach();
 ```
+
+## Logs
+```php
+use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Logs\LogRecord;
+
+$logger = Globals::loggerProvider()->getLogger("my_logger", '0.1');
+$record = new LogRecord('hello otel');
+$record
+    ->setSeverityNumber(9) //info
+    ->setSeverityText('Info')
+    ->setEventName('my_event')
+    ->setTimestamp((int) (microtime(true) * 1e9))
+    ->setAttributes([
+        'a_bool' => true,
+        'an_int' => 1,
+        'a_float' => 1.1,
+        'a_string' => 'foo',
+        'string_array' => ['one', 'two', 'three'],
+        'int_array' => [1, 2, 3],
+        'float_array' => [1.1, 2.2, 3.3],
+        'bool_array' => [true, false, true],
+    ]);
+$logger->emit($record);
+```
+
+Note that if there is an active span when the log record is emitted, the span context
+will be associated with the log record.
 
 ## Plugins
 

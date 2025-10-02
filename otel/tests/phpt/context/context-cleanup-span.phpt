@@ -4,6 +4,8 @@ Internal context storage empty after use
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=memory
+OTEL_LOGS_EXPORTER=none
+OTEL_METRICS_EXPORTER=none
 --INI--
 otel.log.level=debug
 otel.log.file="/dev/stdout"

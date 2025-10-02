@@ -4,6 +4,8 @@ Activate context
 otel
 --ENV--
 OTEL_TRACES_EXPORTER=none
+OTEL_LOGS_EXPORTER=none
+OTEL_METRICS_EXPORTER=none
 --INI--
 otel.log.level=debug
 otel.log.file="/dev/stdout"
