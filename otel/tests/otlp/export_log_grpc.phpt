@@ -28,6 +28,10 @@ $record
         'an_int' => 1,
         'a_float' => 1.1,
         'a_string' => 'foo',
+        'string_array' => ['one', 'two', 'three'],
+        'int_array' => [1, 2, 3],
+        'float_array' => [1.1, 2.2, 3.3],
+        'bool_array' => [true, false, true],
     ])
     ->setAttribute('another_string', 'bar');
 $logger->emit($record);

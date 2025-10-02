@@ -32,25 +32,81 @@ pub struct LogRecordState {
 
 pub type LogRecordClass = StateClass<LogRecordState>;
 
-fn insert_attribute(state: &mut LogRecordState, key: String, value_zval: &phper::values::ZVal) -> Result<(), phper::Error> {
-    let any_value = if let Ok(s) = value_zval.expect_z_str() {
-        AnyValue::String(s.to_str()?.to_owned().into())
-    } else if let Ok(i) = value_zval.expect_long() {
-        AnyValue::Int(i)
-    } else if let Ok(f) = value_zval.expect_double() {
-        AnyValue::Double(f)
-    } else if let Ok(b) = value_zval.expect_bool() {
-        AnyValue::Boolean(b)
+fn zval_to_value(zval: &phper::values::ZVal) -> Option<opentelemetry::Value> {
+    use opentelemetry::{Array, Value};
+    if let Ok(s) = zval.expect_z_str() {
+        Some(Value::String(s.to_str().ok()?.to_owned().into()))
+    } else if let Ok(i) = zval.expect_long() {
+        Some(Value::I64(i))
+    } else if let Ok(f) = zval.expect_double() {
+        Some(Value::F64(f))
+    } else if let Ok(b) = zval.expect_bool() {
+        Some(Value::Bool(b))
+    } else if let Ok(arr) = zval.expect_z_arr() {
+        // Try to collect as homogeneous array
+        let mut bools = Vec::new();
+        let mut i64s = Vec::new();
+        let mut f64s = Vec::new();
+        let mut strings = Vec::new();
+        let mut value_type = None;
+
+        for (_, v) in arr.iter() {
+            if let Ok(b) = v.expect_bool() {
+                if value_type.is_none() || value_type == Some("bool") {
+                    bools.push(b);
+                    value_type = Some("bool");
+                    continue;
+                }
+            }
+            if let Ok(i) = v.expect_long() {
+                if value_type.is_none() || value_type == Some("i64") {
+                    i64s.push(i);
+                    value_type = Some("i64");
+                    continue;
+                }
+            }
+            if let Ok(f) = v.expect_double() {
+                if value_type.is_none() || value_type == Some("f64") {
+                    f64s.push(f);
+                    value_type = Some("f64");
+                    continue;
+                }
+            }
+            if let Ok(s) = v.expect_z_str() {
+                if value_type.is_none() || value_type == Some("string") {
+                    strings.push(s.to_str().unwrap_or("").to_owned().into());
+                    value_type = Some("string");
+                    continue;
+                }
+            }
+            // If we get here, it's a mixed or unsupported type
+            tracing::warn!("Unsupported or mixed array element type in attribute array, skipping attribute: {:?}", v);
+            return None;
+        }
+
+        let array_value = match value_type {
+            Some("bool") => Value::Array(Array::Bool(bools)),
+            Some("i64") => Value::Array(Array::I64(i64s)),
+            Some("f64") => Value::Array(Array::F64(f64s)),
+            Some("string") => Value::Array(Array::String(strings)),
+            _ => {
+                tracing::warn!("Empty or unsupported array for attribute, skipping.");
+                return None;
+            }
+        };
+        Some(array_value)
     } else {
-        AnyValue::String(format!("{:?}", value_zval).into())
-    };
-    // Convert AnyValue to opentelemetry::Value
-    let value = match any_value {
-        AnyValue::String(s) => opentelemetry::Value::String(s),
-        AnyValue::Int(i) => opentelemetry::Value::I64(i),
-        AnyValue::Double(f) => opentelemetry::Value::F64(f),
-        AnyValue::Boolean(b) => opentelemetry::Value::Bool(b),
-        _ => todo!(),
+        None
+    }
+}
+
+fn insert_attribute(state: &mut LogRecordState, key: String, value_zval: &phper::values::ZVal) -> Result<(), phper::Error> {
+    let value = match zval_to_value(value_zval) {
+        Some(val) => val,
+        None => {
+            tracing::warn!("Unsupported attribute value type for key '{}', skipping: {:?}", key, value_zval);
+            return Ok(());
+        }
     };
     state.attributes.push(KeyValue::new(key, value));
     Ok(())

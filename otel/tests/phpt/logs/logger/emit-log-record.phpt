@@ -35,6 +35,10 @@ $record
         'an_int' => 1,
         'a_float' => 1.1,
         'a_string' => 'foo',
+        'string_array' => ['one', 'two', 'three'],
+        'int_array' => [1, 2, 3],
+        'float_array' => [1.1, 2.2, 3.3],
+        'bool_array' => [true, false, true],
     ])
     ->setAttribute('another_string', 'bar');
 $logger->emit($record);
@@ -69,7 +73,7 @@ array(12) {
   ["observed_timestamp"]=>
   string(%d) "%d-%d-%dT%s"
   ["attributes"]=>
-  array(5) {
+  array(9) {
     ["a_bool"]=>
     string(13) "Boolean(true)"
     ["an_int"]=>
@@ -78,6 +82,14 @@ array(12) {
     string(11) "Double(1.1)"
     ["a_string"]=>
     string(20) "String(Owned("foo"))"
+    ["string_array"]=>
+    string(82) "String(Owned("Array(String([Owned(\"one\"), Owned(\"two\"), Owned(\"three\")]))"))"
+    ["int_array"]=>
+    string(38) "String(Owned("Array(I64([1, 2, 3]))"))"
+    ["float_array"]=>
+    string(44) "String(Owned("Array(F64([1.1, 2.2, 3.3]))"))"
+    ["bool_array"]=>
+    string(49) "String(Owned("Array(Bool([true, false, true]))"))"
     ["another_string"]=>
     string(20) "String(Owned("bar"))"
   }
