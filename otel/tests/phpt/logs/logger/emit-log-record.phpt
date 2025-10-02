@@ -3,7 +3,8 @@ Emit a log record from a logger
 --EXTENSIONS--
 otel
 --ENV--
-OTEL_TRACES_EXPORTER=none
+OTEL_TRACES_PROCESSOR=simple
+OTEL_TRACES_EXPORTER=memory
 OTEL_LOGS_PROCESSOR=simple
 OTEL_LOGS_EXPORTER=memory
 --INI--
@@ -15,35 +16,60 @@ use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Logs\LogRecord;
 use OpenTelemetry\API\Logs\MemoryLogsExporter;
 
+$builder = Globals::tracerProvider()->getTracer("my_tracer")->spanBuilder('root');
+$span = $builder->startSpan();
+$scope = $span->activate();
+
+$traceId = $span->getContext()->getTraceId();
+$spanId = $span->getContext()->getSpanId();
+
 $logger = Globals::loggerProvider()->getLogger("my_logger", '0.1', 'schema.url', ['one' => 1]);
 $record = new LogRecord('test');
-$record->setSeverityNumber(9); //info
 $record
+    ->setSeverityNumber(9) //info
     ->setSeverityText('Info')
-    ->setAttribute('a_bool', true)
-    ->setAttribute('an_int', 1)
-    ->setAttribute('a_float', 1.1)
-    ->setAttribute('a_string', 'string');
+    ->setEventName('my_event')
+    ->setTimestamp((int) (microtime(true) * 1e9))
+    ->setAttributes([
+        'a_bool' => true,
+        'an_int' => 1,
+        'a_float' => 1.1,
+        'a_string' => 'foo',
+    ])
+    ->setAttribute('another_string', 'bar');
 $logger->emit($record);
+$span->end();
+$scope->detach();
+
 var_dump(MemoryLogsExporter::count());
 $exported = MemoryLogsExporter::getLogs()[0];
 var_dump($exported);
+assert($exported['trace_id'] === $traceId);
+assert($exported['span_id'] === $spanId);
 ?>
 --EXPECTF--
 int(1)
-array(8) {
+array(12) {
   ["body"]=>
   string(27) "Some(String(Owned("test")))"
   ["severity_number"]=>
   int(9)
   ["severity_text"]=>
   string(4) "Info"
+  ["event_name"]=>
+  string(8) "my_event"
+  ["trace_id"]=>
+  string(32) "%s"
+  ["span_id"]=>
+  string(16) "%s"
+  ["trace_flags"]=>
+  int(1)
   ["timestamp"]=>
-  int(0)
+  string(%d) "%d-%d-%dT%s"
   ["observed_timestamp"]=>
-  int(%d)
+  string(%d) "%d-%d-%dT%s"
   ["attributes"]=>
-  array(4) {
+  array(5) {
     ["a_bool"]=>
     string(13) "Boolean(true)"
     ["an_int"]=>
@@ -51,7 +77,9 @@ array(8) {
     ["a_float"]=>
     string(11) "Double(1.1)"
     ["a_string"]=>
-    string(23) "String(Owned("string"))"
+    string(20) "String(Owned("foo"))"
+    ["another_string"]=>
+    string(20) "String(Owned("bar"))"
   }
   ["instrumentation_scope"]=>
   array(4) {
@@ -70,20 +98,20 @@ array(8) {
   ["resource"]=>
   array(8) {
     ["host.name"]=>
-    string(29) "String(Owned("%s"))"
+    string(%d) "String(Owned("%s"))"
     ["process.pid"]=>
-    string(22) "String(Owned("%d"))"
+    string(%d) "String(Owned("%d"))"
     ["process.runtime.name"]=>
-    string(20) "String(Owned("cli"))"
+    string(%d) "String(Owned("cli"))"
     ["process.runtime.version"]=>
-    string(23) "String(Owned("%d.%d.%d"))"
+    string(%d) "String(Owned("%d.%d.%d"))"
     ["service.name"]=>
-    string(33) "String(Static("unknown_service"))"
+    string(%d) "String(Static("unknown_service"))"
     ["telemetry.sdk.language"]=>
-    string(21) "String(Static("php"))"
+    string(%d) "String(Static("php"))"
     ["telemetry.sdk.name"]=>
-    string(26) "String(Static("ext-otel"))"
+    string(%d) "String(Static("ext-otel"))"
     ["telemetry.sdk.version"]=>
-    string(24) "String(Static("%d.%d.%d"))"
+    string(%d) "String(Static("%d.%d.%d"))"
   }
 }

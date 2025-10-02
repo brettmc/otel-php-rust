@@ -1,11 +1,14 @@
+use chrono::{DateTime, Utc};
 use phper::{
+    arrays::ZArray,
     classes::{ClassEntity, StateClass, Visibility},
+    functions::ReturnType,
+    types::ReturnTypeHint,
 };
-use phper::functions::ReturnType;
-use phper::types::ReturnTypeHint;
-use phper::arrays::ZArray;
-use std::sync::Mutex;
-use std::convert::Infallible;
+use std::{
+    convert::Infallible,
+    sync::Mutex,
+};
 use once_cell::sync::Lazy;
 use opentelemetry_sdk::logs::InMemoryLogExporter;
 
@@ -46,20 +49,42 @@ pub fn make_logs_memory_exporter_class() -> ClassEntity<()> {
             // Severity text
             let severity_text = log.record.severity_text().unwrap_or("");
             arr.insert("severity_text", severity_text);
+            arr.insert(
+                "event_name",
+                log.record.event_name().unwrap_or(""),
+            );
+            // Trace context
+            if let Some(trace_context) = log.record.trace_context() {
+                arr.insert("trace_id", format!("{:032x}", trace_context.trace_id));
+                arr.insert("span_id", format!("{:016x}", trace_context.span_id));
+                if let Some(flags) = trace_context.trace_flags {
+                    arr.insert("trace_flags", flags.to_u8() as i64);
+                }
+            }
             // Timestamp
             let timestamp = log
                 .record
                 .timestamp()
                 .and_then(|ts| ts.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_micros() as i64)
-                .unwrap_or(0);
-            arr.insert("timestamp", timestamp);
+                .and_then(|d| {
+                    let secs = d.as_secs() as i64;
+                    let nsecs = d.subsec_nanos();
+                    DateTime::<Utc>::from_timestamp(secs, nsecs).map(|dt| dt.to_rfc3339())
+                });
+            if let Some(ts) = timestamp {
+                arr.insert("timestamp", ts);
+            }
+
             // Observed timestamp
             let observed_timestamp = log
                 .record
                 .observed_timestamp()
                 .and_then(|ts| ts.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_micros() as i64);
+                .and_then(|d| {
+                    let secs = d.as_secs() as i64;
+                    let nsecs = d.subsec_nanos();
+                    DateTime::<Utc>::from_timestamp(secs, nsecs).map(|dt| dt.to_rfc3339())
+                });
             if let Some(ts) = observed_timestamp {
                 arr.insert("observed_timestamp", ts);
             }

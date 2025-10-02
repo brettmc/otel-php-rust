@@ -25,8 +25,7 @@ use opentelemetry_sdk::{
     },
     Resource,
 };
-use once_cell::sync::{Lazy, OnceCell};
-use tokio::runtime::Runtime;
+use once_cell::sync::Lazy;
 use crate::{
     logs::{
         logger::LoggerClass,
@@ -34,6 +33,7 @@ use crate::{
     },
     request,
     util,
+    runtime::init_tokio_runtime,
 };
 use opentelemetry_otlp::{
     Protocol,
@@ -45,7 +45,6 @@ pub const LOGGER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\LoggerProv
 
 pub type LoggerProviderClass = StateClass<()>;
 
-static TOKIO_RUNTIME: OnceCell<Runtime> = OnceCell::new();
 static LOGGER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkLoggerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NOOP_LOGGER_PROVIDER: Lazy<Arc<SdkLoggerProvider>> = Lazy::new(|| {
     Arc::new(SdkLoggerProvider::builder()
@@ -134,13 +133,7 @@ pub fn init_once() {
             }
         } else {
             tracing::debug!("Using gRPC log exporter with tokio runtime");
-            if TOKIO_RUNTIME.get().is_none() {
-                tracing::debug!("Creating tokio runtime");
-                let runtime = Runtime::new().expect("Failed to create Tokio runtime required for gRPC export");
-                TOKIO_RUNTIME.set(runtime).expect("Tokio runtime already set");
-                tracing::debug!("tokio runtime initialized");
-            }
-            let runtime = TOKIO_RUNTIME.get().expect("Tokio runtime not initialized");
+            let runtime = init_tokio_runtime();
             let exporter = runtime.block_on(async {
                 OtlpLogExporter::builder()
                     .with_tonic()

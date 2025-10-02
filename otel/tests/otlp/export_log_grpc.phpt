@@ -18,7 +18,18 @@ use OpenTelemetry\API\Logs\LogRecord;
 
 $logger = Globals::loggerProvider()->getLogger("my_logger", '0.1', 'schema.url', ['one' => 1]);
 $record = new LogRecord('test');
-$record->setSeverityNumber(9); //info
+$record
+    ->setSeverityNumber(9) //info
+    ->setSeverityText('Info')
+    ->setEventName('my_event')
+    ->setTimestamp((int)(microtime(true) * 1e9))
+    ->setAttributes([
+        'a_bool' => true,
+        'an_int' => 1,
+        'a_float' => 1.1,
+        'a_string' => 'foo',
+    ])
+    ->setAttribute('another_string', 'bar');
 $logger->emit($record);
 
 var_dump('done');

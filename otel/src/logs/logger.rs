@@ -48,20 +48,30 @@ pub fn make_logger_class(
                 log_record.set_body(body.clone());
             }
             if let Some(ref severity_text) = record_state.severity_text {
-                // Avoid passing a reference to a value tied to the closure's lifetime.
-                // Clone to a String, then get a &'static str via Box leak (safe for log record lifetime).
                 let static_str: &'static str = Box::leak(severity_text.clone().into_boxed_str());
                 log_record.set_severity_text(static_str);
             }
+            if let Some(ref event_name) = record_state.event_name {
+                let static_str: &'static str = Box::leak(event_name.clone().into_boxed_str());
+                log_record.set_event_name(static_str);
+            }
+            if let (Some(trace_id), Some(span_id)) = (record_state.trace_id, record_state.span_id) {
+                log_record.set_trace_context(
+                    trace_id,
+                    span_id,
+                    record_state.trace_flags,
+                );
+            }
+            if let Some(timestamp) = record_state.timestamp {
+                log_record.set_timestamp(timestamp);
+            }
             if !record_state.attributes.is_empty() {
                 for attr in &record_state.attributes {
-                    // attr.value is opentelemetry::Value, but add_attribute expects AnyValue
                     let any_value = match &attr.value {
                         opentelemetry::Value::String(s) => opentelemetry::logs::AnyValue::String(s.clone()),
                         opentelemetry::Value::Bool(b) => opentelemetry::logs::AnyValue::Boolean(*b),
                         opentelemetry::Value::I64(i) => opentelemetry::logs::AnyValue::Int(*i),
                         opentelemetry::Value::F64(f) => opentelemetry::logs::AnyValue::Double(*f),
-                        // Add more variants if needed
                         _ => opentelemetry::logs::AnyValue::String(format!("{:?}", attr.value).into()),
                     };
                     log_record.add_attribute(attr.key.clone(), any_value);
