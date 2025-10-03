@@ -3,7 +3,12 @@ use phper::{
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
 };
-use std::convert::Infallible;
+use std::{
+    collections::HashSet,
+    convert::Infallible,
+    sync::Mutex,
+};
+use once_cell::sync::Lazy;
 use opentelemetry::logs::{
     Logger,
     LogRecord,
@@ -14,6 +19,55 @@ use crate::logs::log_record::{LOG_RECORD_CLASS_NAME, LogRecordState};
 pub type LoggerClass = StateClass<Option<SdkLogger>>;
 
 const LOGGER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\Logger";
+static EVENT_NAMES: Lazy<Mutex<HashSet<&'static str>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+
+/// Intern event names to avoid leaking memory since opentelemetry-rust requires &'static str
+/// This only reduces memory leaks by re-using event names, but does not eliminate them
+fn get_or_intern_event_name(name: &str) -> &'static str {
+    let mut set = EVENT_NAMES.lock().unwrap();
+    if let Some(&existing) = set.get(name) {
+        existing
+    } else {
+        let leaked: &'static str = Box::leak(name.to_owned().into_boxed_str());
+        set.insert(leaked);
+        leaked
+    }
+}
+
+/// Map severity text to static str using opentelemetry::logs::Severity
+fn map_severity_text(text: &str) -> Option<&'static str> {
+    use opentelemetry::logs::Severity;
+    match text {
+        "TRACE" => Some(Severity::Trace.name()),
+        "TRACE2" => Some(Severity::Trace2.name()),
+        "TRACE3" => Some(Severity::Trace3.name()),
+        "TRACE4" => Some(Severity::Trace4.name()),
+        "DEBUG" => Some(Severity::Debug.name()),
+        "DEBUG2" => Some(Severity::Debug2.name()),
+        "DEBUG3" => Some(Severity::Debug3.name()),
+        "DEBUG4" => Some(Severity::Debug4.name()),
+        "INFO" => Some(Severity::Info.name()),
+        "INFO2" => Some(Severity::Info2.name()),
+        "INFO3" => Some(Severity::Info3.name()),
+        "INFO4" => Some(Severity::Info4.name()),
+        "WARN" => Some(Severity::Warn.name()),
+        "WARN2" => Some(Severity::Warn2.name()),
+        "WARN3" => Some(Severity::Warn3.name()),
+        "WARN4" => Some(Severity::Warn4.name()),
+        "ERROR" => Some(Severity::Error.name()),
+        "ERROR2" => Some(Severity::Error2.name()),
+        "ERROR3" => Some(Severity::Error3.name()),
+        "ERROR4" => Some(Severity::Error4.name()),
+        "FATAL" => Some(Severity::Fatal.name()),
+        "FATAL2" => Some(Severity::Fatal2.name()),
+        "FATAL3" => Some(Severity::Fatal3.name()),
+        "FATAL4" => Some(Severity::Fatal4.name()),
+        _ => {
+            tracing::warn!("Unknown severity text: {}", text);
+            None
+        }
+    }
+}
 
 pub fn make_logger_class(
     logger_interface: Interface,
@@ -29,13 +83,10 @@ pub fn make_logger_class(
     class
         .add_method("emit", Visibility::Public, |this, arguments| {
             tracing::debug!("Logger::emit called");
-            // Get the logger
             let logger: &SdkLogger = this.as_state().as_ref().unwrap();
 
-            // Get the LogRecordClass object from PHP
             let record_zval = &arguments[0];
             let record_obj = record_zval.expect_z_obj();
-            // SAFETY: Only safe if the object is a LogRecordClass (guaranteed by PHP type hint)
             let record_state = unsafe { record_obj?.as_state_obj::<LogRecordState>().as_state() };
 
             // Build the log record using the logger's builder
@@ -48,13 +99,12 @@ pub fn make_logger_class(
                 log_record.set_body(body.clone());
             }
             if let Some(ref severity_text) = record_state.severity_text {
-                //TODO avoid leaking memory here (Cow<'static, str>)
-                let static_str: &'static str = Box::leak(severity_text.clone().into_boxed_str());
-                log_record.set_severity_text(static_str);
+                if let Some(static_str) = map_severity_text(severity_text.as_str()) {
+                    log_record.set_severity_text(static_str);
+                }
             }
             if let Some(ref event_name) = record_state.event_name {
-                //TODO avoid leaking memory here (Cow<'static, str>)
-                let static_str: &'static str = Box::leak(event_name.clone().into_boxed_str());
+                let static_str: &'static str = get_or_intern_event_name(event_name.as_str());
                 log_record.set_event_name(static_str);
             }
             if let (Some(trace_id), Some(span_id)) = (record_state.trace_id, record_state.span_id) {
