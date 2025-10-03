@@ -13,5 +13,5 @@ OTEL_SDK_DISABLED=false
 ?>
 --EXPECTF--
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] %s message=OpenTelemetry::RINIT: SDK disabled, skipping initialization
 %A
