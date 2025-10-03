@@ -81,6 +81,7 @@ This should cover cli-based PHP runtimes (roadrunner, react, etc.), but has only
 * Auto-instrumentation of userland and internal code
   - using either Zend Observer API (PHP 8.0+), or zend_execute_ex/zend_execute_internal (PHP 7.x)
 * Start a span in RINIT, use `traceparent` headers, set HTTP response code in RSHUTDOWN
+* Exclude URLs from being traced: `OTEL_PHP_EXCLUDED_URLS=/health*,/ping`
 * TracerProvider created in RINIT (so that child processes have a working instance)
 * Spans can be built through a SpanBuilder, some updates made (not all implemented yet), and `end()`ed
 * Spans can be `activate()`d, and scope detached

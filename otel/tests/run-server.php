@@ -4,7 +4,7 @@
  * Run the PHP built-in web server in a shell, send an HTTP request to it.
  * The server output and response are captured and printed.
  */
-function run_server(string $file, array $options, string $path = ''): void {
+function run_server(string $file, array $options, string $path = '', string $env = '', string $log_level = 'warn'): void {
     $host = '127.0.0.1';
     $port = 8080;
     $docRoot = __DIR__;
@@ -14,8 +14,8 @@ function run_server(string $file, array $options, string $path = ''): void {
     // Start the PHP built-in web server
     $cmd = sprintf(
         '%s php %s -S %s:%d -t %s %s > %s 2>&1 & echo $!',
-        'OTEL_TRACES_EXPORTER=console OTEL_SPAN_PROCESSOR=simple',
-        '-d extension=otel.so -d otel.log.level=warn',
+        'OTEL_TRACES_EXPORTER=console OTEL_LOGS_EXPORTER=console OTEL_LOGS_PROCESSOR=simple OTEL_SPAN_PROCESSOR=simple ' . $env,
+        '-d extension=otel.so -d otel.log.level=' . $log_level,
         $host,
         $port,
         escapeshellarg($docRoot),
@@ -25,6 +25,11 @@ function run_server(string $file, array $options, string $path = ''): void {
     //echo $cmd;
     $pid = shell_exec($cmd);
     usleep(500000); // Wait for server to start
+
+    //strip leading slash from $path
+    if (substr($path, 0, 1) === '/') {
+        $path = substr($path, 1);
+    }
 
     // Make an HTTP request to the server
     $url = "http://$host:$port/$path";

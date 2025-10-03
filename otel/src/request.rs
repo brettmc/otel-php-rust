@@ -57,7 +57,7 @@ pub fn on_request_init() {
     init_environment();
 
     if is_disabled() {
-        tracing::debug!("OpenTelemetry::RINIT: OTEL_SDK_DISABLED is set to true, skipping initialization");
+        tracing::debug!("OpenTelemetry::RINIT: SDK disabled, skipping initialization");
         return;
     }
 
@@ -81,8 +81,17 @@ pub fn on_request_shutdown() {
     }
 }
 
-/// Check if OpenTelemetry is disabled for the current request (by env or .env)
+/// Check if OpenTelemetry is disabled for the current request (by env, .env or excluded URL)
 pub fn is_disabled() -> bool {
+    let request_details = get_request_details();
+
+    // Check for excluded URL before creating root span
+    if let Some(ref uri) = request_details.uri {
+        if is_excluded_url(uri) {
+            tracing::debug!("RINIT::excluded URL matched '{}'", uri);
+            return true;
+        }
+    }
     match std::env::var("OTEL_SDK_DISABLED") {
         Ok(val) => val == "true",
         Err(_) => false,
@@ -251,6 +260,57 @@ fn find_dotenv() -> Option<PathBuf> {
             None
         }
         None => env_in_dir(script_dir),
+    }
+}
+
+/// Returns true if the given URI matches any pattern in the excluded URLs list.
+/// Patterns support '*' as a wildcard (prefix/suffix/anywhere).
+fn is_excluded_url(uri: &str) -> bool {
+    match std::env::var("OTEL_PHP_EXCLUDED_URLS") {
+        Ok(list) => {
+            tracing::debug!("is_excluded_url: OTEL_PHP_EXCLUDED_URLS='{}'", list);
+            list.split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .any(|pattern| {
+                    if pattern.contains('*') {
+                        let parts: Vec<&str> = pattern.split('*').collect();
+                        let mut pos = 0;
+                        let mut matched = true;
+                        for (i, part) in parts.iter().enumerate() {
+                            if part.is_empty() {
+                                continue;
+                            }
+                            if i == 0 {
+                                if !uri.starts_with(part) {
+                                    matched = false;
+                                    break;
+                                }
+                                pos += part.len();
+                            } else if i == parts.len() - 1 {
+                                if !uri.ends_with(part) {
+                                    matched = false;
+                                    break;
+                                }
+                            } else {
+                                if let Some(idx) = uri[pos..].find(*part) {
+                                    pos += idx + part.len();
+                                } else {
+                                    matched = false;
+                                    break;
+                                }
+                            }
+                        }
+                        matched
+                    } else {
+                        let eq = uri == pattern;
+                        eq
+                    }
+                })
+        }
+        Err(_) => {
+            false
+        },
     }
 }
 
