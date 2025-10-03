@@ -303,14 +303,13 @@ fn is_excluded_url(uri: &str) -> bool {
                         }
                         matched
                     } else {
-                        let eq = uri == pattern;
-                        eq
+                        uri == pattern
                     }
                 })
         }
         Err(_) => {
             false
-        },
+        }
     }
 }
 
