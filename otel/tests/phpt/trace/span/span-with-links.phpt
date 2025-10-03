@@ -28,15 +28,15 @@ Resource
 Span #0
 	Instrumentation Scope
 %A
-	Name        : root
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Internal
-	Start time: %s
-	End time: %s
-	Status: Unset
+	Name         : root
+	TraceId      : %s
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : None (root span)
+	Kind         : Internal
+	Start time   : %s
+	End time     : %s
+	Status       : Unset
 	Links:
 	Link #0
 	TraceId: 2b4ef3412d587ce6e7880fb27a316b8c

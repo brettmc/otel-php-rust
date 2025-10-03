@@ -33,15 +33,15 @@ Resource
 Span #0
 	Instrumentation Scope
 %A
-	Name        : GET
-	TraceId     : e77388f01a826e2de7afdcd1eefc034e
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: d6ba64af4fa59b65
-	Kind        : Server
-	Start time: %s
-	End time: %s
-	Status: Unset
+	Name         : GET
+	TraceId      : e77388f01a826e2de7afdcd1eefc034e
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : d6ba64af4fa59b65
+	Kind         : Server
+	Start time   : %s
+	End time     : %s
+	Status       : Unset
 	Attributes:
 		 ->  url.full: String(Owned("/"))
 		 ->  http.request.method: String(Owned("GET"))%A

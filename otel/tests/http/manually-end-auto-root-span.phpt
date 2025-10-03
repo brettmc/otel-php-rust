@@ -31,15 +31,15 @@ Resource
 Span #0
 	Instrumentation Scope
 %A
-	Name        : OPTIONS
-	TraceId     : %s
-	SpanId      : %s
-	TraceFlags  : TraceFlags(1)
-	ParentSpanId: 0000000000000000
-	Kind        : Server
-	Start time: %s
-	End time: %s
-	Status: Unset
+	Name         : OPTIONS
+	TraceId      : %s
+	SpanId       : %s
+	TraceFlags   : TraceFlags(1)
+	ParentSpanId : None (root span)
+	Kind         : Server
+	Start time   : %s
+	End time     : %s
+	Status       : Unset
 	Attributes:
 		 ->  url.full: String(Owned("/"))
 		 ->  http.request.method: String(Owned("OPTIONS"))%A
