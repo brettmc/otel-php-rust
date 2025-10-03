@@ -4,8 +4,8 @@ Test laminas db statement prepare+execute span name for db operations
 otel
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 70100 || PHP_VERSION_ID >= 80400) {
-    die('skip requires PHP 7.1 -> 8.3');
+if (PHP_VERSION_ID < 70100 || PHP_VERSION_ID >= 80300) {
+    die('skip requires PHP 7.1 -> 8.2');
 }
 ?>
 --ENV--
