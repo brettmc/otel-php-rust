@@ -27,7 +27,7 @@ $logger = Globals::loggerProvider()->getLogger("my_logger", '0.1', 'schema.url',
 $record = new LogRecord('test');
 $record
     ->setSeverityNumber(9) //info
-    ->setSeverityText('Info')
+    ->setSeverityText('INFO2') //must be a valid severity text
     ->setEventName('my_event')
     ->setTimestamp((int) (microtime(true) * 1e9))
     ->setAttributes([
@@ -59,7 +59,7 @@ array(12) {
   ["severity_number"]=>
   int(9)
   ["severity_text"]=>
-  string(4) "Info"
+  string(5) "INFO2"
   ["event_name"]=>
   string(8) "my_event"
   ["trace_id"]=>
