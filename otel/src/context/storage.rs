@@ -45,7 +45,7 @@ pub fn current_context() -> Arc<Context> {
 
 pub fn resolve_context(instance_id: Option<u64>) -> Arc<Context> {
     match instance_id {
-        Some(id) => get_context_instance(Some(id)).expect("context not found"),
+        Some(id) => get_context_instance(Some(id)).unwrap_or_else(|| Arc::new(Context::current())),
         None => Arc::new(Context::current()),
     }
 }
