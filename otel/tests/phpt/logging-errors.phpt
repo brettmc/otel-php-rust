@@ -23,5 +23,6 @@ Globals::tracerProvider()
 Globals::tracerProvider()->forceFlush();
 ?>
 --EXPECTF--
-[%s] [ERROR] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportError message= name=BatchSpanProcessor.ExportError error=Operation failed: %s
+%A
+[%s] [ERROR] [pid=%d] [ThreadId(%d)] opentelemetry_sdk: BatchSpanProcessor.ExportError name=BatchSpanProcessor.ExportError error=Operation failed: %s
 %A

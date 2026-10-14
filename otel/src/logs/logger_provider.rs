@@ -115,39 +115,39 @@ pub fn init_once() {
         }
     } else {
         // Default to OTLP exporter
-        if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
+        let exporter = if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
             tracing::debug!("Using http/protobuf log exporter");
-            let exporter = OtlpLogExporter::builder()
+            OtlpLogExporter::builder()
                 .with_http()
                 .with_protocol(Protocol::HttpBinary)
                 .build()
-                .expect("Failed to create OTLP http log exporter");
-            if use_simple {
-                builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
-            } else {
-                let batch_config = BatchConfigBuilder::default().build();
-                let batch = BatchLogProcessor::builder(exporter)
-                    .with_batch_config(batch_config)
-                    .build();
-                builder = builder.with_log_processor(batch);
-            }
         } else {
             tracing::debug!("Using gRPC log exporter with tokio runtime");
             let runtime = init_tokio_runtime();
-            let exporter = runtime.block_on(async {
+            runtime.block_on(async {
                 OtlpLogExporter::builder()
                     .with_tonic()
                     .build()
-                    .expect("Failed to create OTLP grpc log exporter")
-            });
-            if use_simple {
-                builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
-            } else {
-                let batch_config = BatchConfigBuilder::default().build();
-                let batch = BatchLogProcessor::builder(exporter)
-                    .with_batch_config(batch_config)
-                    .build();
-                builder = builder.with_log_processor(batch);
+            })
+        };
+        match exporter {
+            Ok(exporter) => {
+                if use_simple {
+                    builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
+                } else {
+                    let batch_config = BatchConfigBuilder::default().build();
+                    let batch = BatchLogProcessor::builder(exporter)
+                        .with_batch_config(batch_config)
+                        .build();
+                    builder = builder.with_log_processor(batch);
+                }
+            }
+            // a misconfigured exporter must not take down the PHP process; fall
+            // back to not exporting, and leave the config error in the log
+            Err(err) => {
+                tracing::error!("Failed to create OTLP log exporter, logging is disabled: {}", err);
+                providers.insert(key, NOOP_LOGGER_PROVIDER.clone());
+                return;
             }
         }
     }

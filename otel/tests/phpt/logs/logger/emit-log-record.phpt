@@ -118,7 +118,7 @@ array(12) {
     ["process.runtime.version"]=>
     string(%d) "String(Owned("%d.%d.%d"))"
     ["service.name"]=>
-    string(%d) "String(Static("unknown_service"))"
+    string(%d) "String(Owned("unknown_service:%s"))"
     ["telemetry.sdk.language"]=>
     string(%d) "String(Static("php"))"
     ["telemetry.sdk.name"]=>

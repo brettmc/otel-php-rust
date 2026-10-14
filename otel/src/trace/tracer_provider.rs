@@ -110,31 +110,35 @@ pub fn init_once() {
             builder = builder.with_batch_exporter(exporter);
         }
     } else {
-        if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
+        let exporter = if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
             tracing::debug!("Using http/protobuf trace exporter");
-            let exporter = OtlpSpanExporter::builder()
+            OtlpSpanExporter::builder()
                 .with_http()
                 .with_protocol(Protocol::HttpBinary)
                 .build()
-                .expect("Failed to create OTLP http exporter");
-            if use_simple_exporter {
-                builder = builder.with_simple_exporter(exporter);
-            } else {
-                builder = builder.with_batch_exporter(exporter);
-            }
         } else {
             tracing::debug!("Using gRPC trace exporter with tokio runtime");
             let runtime = init_tokio_runtime();
-            let exporter = runtime.block_on(async {
+            runtime.block_on(async {
                 OtlpSpanExporter::builder()
                     .with_tonic()
                     .build()
-                    .expect("Failed to create OTLP grpc exporter")
-            });
-            if use_simple_exporter {
-                builder = builder.with_simple_exporter(exporter);
-            } else {
-                builder = builder.with_batch_exporter(exporter);
+            })
+        };
+        match exporter {
+            Ok(exporter) => {
+                if use_simple_exporter {
+                    builder = builder.with_simple_exporter(exporter);
+                } else {
+                    builder = builder.with_batch_exporter(exporter);
+                }
+            }
+            // a misconfigured exporter must not take down the PHP process; fall
+            // back to not exporting, and leave the config error in the log
+            Err(err) => {
+                tracing::error!("Failed to create OTLP trace exporter, tracing is disabled: {}", err);
+                providers.insert(key, NOOP_TRACER_PROVIDER.clone());
+                return;
             }
         }
     }
