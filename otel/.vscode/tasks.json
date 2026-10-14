@@ -1,0 +1,369 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}",
+    "env": {
+      // run-tests.php colourises FAIL/PASS; the escape codes stop the
+      // phpt problem matcher below from recognising the line
+      "NO_COLOR": "1"
+    }
+  },
+  "presentation": {
+    "echo": true,
+    "reveal": "always",
+    "panel": "dedicated",
+    "clear": true
+  },
+  "tasks": [
+    {
+      "label": "cargo: check",
+      "detail": "cargo check, without building the extension",
+      "type": "shell",
+      "command": "make check",
+      "group": "build",
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "cargo: clippy",
+      "detail": "clippy over lib + tests — lists what the editor only underlines",
+      "type": "shell",
+      "command": "make clippy",
+      "group": "build",
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "build: extension (debug)",
+      "detail": "phpize + cargo build --features test, then copy to modules/otel.so",
+      "type": "shell",
+      "command": "make build-test",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "build: extension (release)",
+      "detail": "cargo build --release",
+      "type": "shell",
+      "command": "make build",
+      "group": "build",
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "test: cargo + phpt",
+      "detail": "cargo test, then the phpt suite (make test)",
+      "type": "shell",
+      "command": "make test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$rustc",
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "test: phpt",
+      "detail": "phpt tests only, with diffs",
+      "type": "shell",
+      "command": "make test-phpt",
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "test: auto-instrumentation",
+      "detail": "tests/auto \u2014 run 'composer: update test fixtures' once first",
+      "type": "shell",
+      "command": "make test-auto",
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "test: otlp export",
+      "detail": "tests/otlp \u2014 exports to the `collector` service over grpc + http/protobuf",
+      "type": "shell",
+      "command": "make test-export",
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "test: http (cli-server)",
+      "detail": "tests/http \u2014 spins up a cli-server and checks root span creation",
+      "type": "shell",
+      "command": "make test-http",
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "test: everything",
+      "detail": "phpt, auto-instrumentation, otlp and http suites in one run-tests.php invocation",
+      "type": "shell",
+      "command": "make build-test && php run-tests.php -q --show-diff tests/phpt/ tests/auto/ tests/otlp/ tests/http/",
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "test: current phpt file",
+      "detail": "run just the .phpt file open in the editor",
+      "type": "shell",
+      "command": "php run-tests.php -q --show-diff '${relativeFile}'",
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "test: JUnit report",
+      "detail": "write a JUnit XML report of every suite to otel/junit.xml",
+      "type": "shell",
+      "command": "make build-test && TEST_PHP_JUNIT=junit.xml php run-tests.php -q tests/phpt/ tests/auto/ tests/otlp/ tests/http/",
+      "group": "test",
+      "problemMatcher": [
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "composer: update test fixtures",
+      "detail": "composer update for the laminas, zf1 and psr18 test applications",
+      "type": "shell",
+      "command": "make update",
+      "problemMatcher": []
+    },
+    {
+      "label": "extension info (--ri)",
+      "detail": "build, then print the extension's runtime info",
+      "type": "shell",
+      "command": "make ri",
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "extension reflection (--re)",
+      "detail": "build, then print the classes/functions the extension registers",
+      "type": "shell",
+      "command": "make re",
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "clean",
+      "detail": "empty target/ + remove phpize output and composer fixtures",
+      "type": "shell",
+      "command": "make clean",
+      "problemMatcher": []
+    },
+    {
+      "label": "clean, build and test everything",
+      "detail": "make clean-build-test — full rebuild from scratch, then every suite",
+      "type": "shell",
+      "command": "make clean-build-test",
+      "group": "test",
+      "problemMatcher": [
+        "$rustc",
+        {
+          "owner": "phpt",
+          "source": "run-tests.php",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "severity": "error",
+          "pattern": [
+            {
+              // run-tests.php prints "TEST n/m [file]\r" before the verdict, so
+              // FAIL lands mid-line on the same physical line -- hence \b, not ^.
+              // kind:"file" is required because there is no line/location group:
+              // run-tests.php reports a whole-file verdict, not a line number.
+              "kind": "file",
+              "regexp": "\\b(FAIL|BORK|LEAK)\\s+(.*?)\\s+\\[([^\\]]+\\.phpt)\\]\\s*$",
+              "message": 2,
+              "file": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

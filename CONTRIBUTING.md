@@ -6,6 +6,15 @@ Using docker + compose, `Dockerfile` provides PHP 7.0-8.4 + rust environment to 
 test in. I've added `Makefile`s to make things easier, and written some tests using PHP's
 [phpt](https://qa.php.net/phpt_details.php).
 
+### Dev containers
+
+Alternatively, there is a dev container per PHP version (7.4-8.5) in
+[.devcontainer](.devcontainer), each with the rust toolchain, PHP debug symbols, a
+collector for the `otlp` tests. Each version gets its own
+cargo `target/`, so no `make clean` is needed when switching between them.
+Opening one builds its image for you, via `.devcontainer/build-image.sh`.
+See [.devcontainer/README.md](.devcontainer/README.md).
+
 Quick-start:
 
 * `git clone <this repo>`
@@ -34,6 +43,9 @@ Note that a couple of tests are skipped because they check for logs written duri
 ## Building and running the tests
 
 * `make check` - runs `cargo check` to ensure the code compiles without building
+* `make clippy` - runs `cargo clippy` over the lib and tests. Some clippy lints are
+  deny-by-default and reported as errors that `make check` does not catch, so it is
+  worth running before opening a PR.
 * `make build` - builds the extension for release (smaller, but not stripped)
 * `make build-test` - builds the extension for testing (larger, but with debug symbols)
 * `make install` - build a release, copy it to the PHP extensions directory

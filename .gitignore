@@ -1,5 +1,7 @@
 .idea
-.vscode
+# shared tasks are committed (otel/.vscode/tasks.json); personal editor state is not
+**/.vscode/*
+!**/.vscode/tasks.json
 .cargo
 vendor/
 otel/demo/

@@ -1,0 +1,19 @@
+# PHP 7.4 overrides. Merged on top of ../compose.base.yaml.
+#
+# A distinct project name keeps each version's containers, network and
+# collector separate, so several dev containers can run side by side.
+name: otel-php-rust-php74
+
+services:
+  php:
+    image: otel-php-rust-dev:7.4
+    volumes:
+      # phper generates version-specific bindings under target/, so each PHP
+      # version gets its own volume. This avoids the `make clean` that
+      # CONTRIBUTING.md requires when switching versions, and keeps each
+      # version's build cache warm.
+      - target:/workspace/otel/target
+
+volumes:
+  target:
+    name: otel-php-rust-target-php74
