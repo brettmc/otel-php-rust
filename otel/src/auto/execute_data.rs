@@ -71,9 +71,8 @@ pub fn get_fqn(execute_data: &ExecuteData) -> Option<String> {
 fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     let filename = execute_data.func().get_filename();
     let lineno = execute_data.func().get_line_start();
-    if filename.is_some() && lineno.is_some() {
-        let file = filename.unwrap().to_str().unwrap_or("").to_string();
-        let line = lineno.unwrap();
+    if let (Some(filename), Some(line)) = (filename, lineno) {
+        let file = filename.to_str().unwrap_or("").to_string();
         Some((file, line))
     } else {
         None

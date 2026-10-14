@@ -22,7 +22,7 @@ use opentelemetry::Context;
 const LOCAL_ROOT_SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\LocalRootSpan";
 
 thread_local! {
-    static LOCAL_ROOT_SPAN_ID: RefCell<Option<u64>> = RefCell::new(None);
+    static LOCAL_ROOT_SPAN_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
 }
 
 pub fn make_local_root_span_class(

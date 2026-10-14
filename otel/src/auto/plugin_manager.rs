@@ -85,11 +85,10 @@ impl PluginManager {
         let fqn = get_fqn(execute_data)?;
 
         // Check cache
-        if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
-            if let Some(observer) = cache.read().expect("Failed to acquire read lock on function observer cache").get(&fqn).cloned() {
-                tracing::trace!("Using cached observer for function: {}", fqn);
-                return Some(observer);
-            }
+        if let Some(cache) = FUNCTION_OBSERVER_CACHE.get()
+            && let Some(observer) = cache.read().expect("Failed to acquire read lock on function observer cache").get(&fqn).cloned() {
+            tracing::trace!("Using cached observer for function: {}", fqn);
+            return Some(observer);
         }
 
         // Build observer as before
@@ -122,6 +121,12 @@ impl PluginManager {
         } else {
             None
         }
+    }
+}
+
+impl Default for PluginManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -167,14 +172,11 @@ fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], 
         None => return false,
     };
     for (target_class_name, target_method_name) in targets.iter() {
-        if let Some(interface_name) = target_class_name {
-            if target_method_name == &observed_name_pair.1 {
-                if let Ok(iface_ce) = ClassEntry::from_globals(interface_name.to_string()) {
-                    if ce.is_instance_of(&iface_ce) {
-                        return true;
-                    }
-                }
-            }
+        if let Some(interface_name) = target_class_name
+            && target_method_name == &observed_name_pair.1
+            && let Ok(iface_ce) = ClassEntry::from_globals(interface_name)
+            && ce.is_instance_of(iface_ce) {
+            return true;
         }
     }
 

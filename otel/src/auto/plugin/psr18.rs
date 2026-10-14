@@ -43,6 +43,12 @@ impl Psr18Plugin {
     }
 }
 
+impl Default for Psr18Plugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Plugin for Psr18Plugin {
     fn get_handlers(&self) -> &HandlerSlice {
         &self.handlers
@@ -83,36 +89,29 @@ impl Psr18SendRequestHandler {
 
         //TODO add more SemConv attributes...
         if let Some(request_obj) = request_zval.as_mut_z_obj() {
-            if let Ok(mut uri_zval) = request_obj.call("getUri", []) {
-                if let Some(uri_obj) = uri_zval.as_mut_z_obj() {
-                    if let Ok(uri_str_zval) = uri_obj.call("__toString", []) {
-                        if let Some(uri_str) = uri_str_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                            attributes.push(KeyValue::new(SemConv::trace::URL_FULL, uri_str.to_owned()));
-                        }
+            if let Ok(mut uri_zval) = request_obj.call("getUri", [])
+                && let Some(uri_obj) = uri_zval.as_mut_z_obj() {
+                if let Ok(uri_str_zval) = uri_obj.call("__toString", [])
+                    && let Some(uri_str) = uri_str_zval.as_z_str().and_then(|s| s.to_str().ok()) {
+                        attributes.push(KeyValue::new(SemConv::trace::URL_FULL, uri_str.to_owned()));
                     }
-                    uri_obj.call("getScheme", [])
-                        .ok()
-                        .and_then(|scheme_zval| scheme_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
-                        .map(|scheme| attributes.push(KeyValue::new(SemConv::trace::URL_SCHEME, scheme)));
-                    uri_obj.call("getPath", [])
-                        .ok()
-                        .and_then(|path_zval| path_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
-                        .map(|path| attributes.push(KeyValue::new(SemConv::trace::URL_PATH, path)));
-                    uri_obj.call("getHost", [])
-                        .ok()
-                        .and_then(|host_zval| host_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned()))
-                        .map(|host| attributes.push(KeyValue::new(SemConv::trace::SERVER_ADDRESS, host)));
-                    uri_obj.call("getPort", [])
-                        .ok()
-                        .and_then(|port_zval| port_zval.as_long())
-                        .map(|port| attributes.push(KeyValue::new(SemConv::trace::SERVER_PORT, port)));
-                }
+                if let Some(scheme) = uri_obj.call("getScheme", [])
+                    .ok()
+                    .and_then(|scheme_zval| scheme_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned())) { attributes.push(KeyValue::new(SemConv::trace::URL_SCHEME, scheme)) }
+                if let Some(path) = uri_obj.call("getPath", [])
+                    .ok()
+                    .and_then(|path_zval| path_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned())) { attributes.push(KeyValue::new(SemConv::trace::URL_PATH, path)) }
+                if let Some(host) = uri_obj.call("getHost", [])
+                    .ok()
+                    .and_then(|host_zval| host_zval.as_z_str()?.to_str().ok().map(|s| s.to_owned())) { attributes.push(KeyValue::new(SemConv::trace::SERVER_ADDRESS, host)) }
+                if let Some(port) = uri_obj.call("getPort", [])
+                    .ok()
+                    .and_then(|port_zval| port_zval.as_long()) { attributes.push(KeyValue::new(SemConv::trace::SERVER_PORT, port)) }
             }
-            if let Ok(method_zval) = request_obj.call("getMethod", []) {
-                if let Some(method_str) = method_zval.as_z_str().and_then(|s| s.to_str().ok()) {
-                    attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, method_str.to_owned()));
-                    name = method_str.to_string();
-                }
+            if let Ok(method_zval) = request_obj.call("getMethod", [])
+                && let Some(method_str) = method_zval.as_z_str().and_then(|s| s.to_str().ok()) {
+                attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, method_str.to_owned()));
+                name = method_str.to_string();
             }
         }
 

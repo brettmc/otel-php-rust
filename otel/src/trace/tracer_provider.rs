@@ -45,7 +45,10 @@ const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvide
 
 pub type TracerProviderClass = StateClass<()>;
 
-static TRACER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+/// (pid, "service_name:resource_attributes")
+type ProviderKey = (u32, String);
+
+static TRACER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     Arc::new(SdkTracerProvider::builder()
         .with_resource(Resource::builder_empty().build())
@@ -54,7 +57,7 @@ static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
 });
 
 //tracer provider per (service_name, resource_attributes) pair (from .env, if enabled)
-fn get_tracer_provider_key() -> (u32, String) {
+fn get_tracer_provider_key() -> ProviderKey {
     let pid = process::id();
     let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_default();
     let resource_attrs = env::var("OTEL_RESOURCE_ATTRIBUTES").unwrap_or_default();
@@ -157,7 +160,7 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
     let providers = TRACER_PROVIDERS.lock().unwrap();
     let key = get_tracer_provider_key();
     if let Some(provider) = providers.get(&key) {
-        return provider.clone();
+        provider.clone()
     } else {
         tracing::warn!("no tracer provider initialized for key {:?}, using no-op", key);
         NOOP_TRACER_PROVIDER.clone()
@@ -217,13 +220,11 @@ pub fn make_tracer_provider_class(
 
             let version = arguments.get(1)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let schema_url = arguments.get(2)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let attributes = arguments.get(3)
                 .and_then(|arg| arg.as_z_arr())

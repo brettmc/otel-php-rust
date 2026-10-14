@@ -98,10 +98,9 @@ pub fn make_logger_class(
             if let Some(ref body) = record_state.body {
                 log_record.set_body(body.clone());
             }
-            if let Some(ref severity_text) = record_state.severity_text {
-                if let Some(static_str) = map_severity_text(severity_text.as_str()) {
-                    log_record.set_severity_text(static_str);
-                }
+            if let Some(ref severity_text) = record_state.severity_text
+                && let Some(static_str) = map_severity_text(severity_text.as_str()) {
+                log_record.set_severity_text(static_str);
             }
             if let Some(ref event_name) = record_state.event_name {
                 let static_str: &'static str = get_or_intern_event_name(event_name.as_str());

@@ -45,14 +45,17 @@ pub const LOGGER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\LoggerProv
 
 pub type LoggerProviderClass = StateClass<()>;
 
-static LOGGER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkLoggerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+/// (pid, "service_name:resource_attributes")
+type ProviderKey = (u32, String);
+
+static LOGGER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NOOP_LOGGER_PROVIDER: Lazy<Arc<SdkLoggerProvider>> = Lazy::new(|| {
     Arc::new(SdkLoggerProvider::builder()
         .with_resource(Resource::builder_empty().build())
         .build())
 });
 
-fn get_logger_provider_key() -> (u32, String) {
+fn get_logger_provider_key() -> ProviderKey {
     let pid = process::id();
     let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_default();
     let resource_attrs = env::var("OTEL_RESOURCE_ATTRIBUTES").unwrap_or_default();
@@ -164,7 +167,7 @@ pub fn get_logger_provider() -> Arc<SdkLoggerProvider> {
     let providers = LOGGER_PROVIDERS.lock().unwrap();
     let key = get_logger_provider_key();
     if let Some(provider) = providers.get(&key) {
-        return provider.clone();
+        provider.clone()
     } else {
         tracing::warn!("no logger provider initialized for key {:?}, using no-op", key);
         NOOP_LOGGER_PROVIDER.clone()
@@ -209,13 +212,11 @@ pub fn make_logger_provider_class(
 
             let version = arguments.get(1)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let schema_url = arguments.get(2)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let attributes = arguments.get(3)
                 .and_then(|arg| arg.as_z_arr())
