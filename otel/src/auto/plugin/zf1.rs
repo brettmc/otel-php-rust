@@ -77,6 +77,12 @@ impl Zf1Plugin {
     }
 }
 
+impl Default for Zf1Plugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Plugin for Zf1Plugin {
     fn get_handlers(&self) -> &HandlerSlice {
         &self.handlers
@@ -229,16 +235,15 @@ impl Zf1SendResponseHandler {
 
                 let mut status_description = "exception".to_string();
 
-                if let Some(exception) = exceptions.first_mut() {
-                    if let Some(exception_obj) = exception.as_mut_z_obj() {
-                        if let Ok(throwable) = phper::errors::ThrowObject::new(exception_obj.to_ref_owned()) {
-                            ctx.span().record_error(&throwable);
-                        }
-                        status_description = exception_obj.call("getMessage", [])
-                            .ok()
-                            .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
-                            .unwrap_or(status_description);
+                if let Some(exception) = exceptions.first_mut()
+                    && let Some(exception_obj) = exception.as_mut_z_obj() {
+                    if let Ok(throwable) = phper::errors::ThrowObject::new(exception_obj.to_ref_owned()) {
+                        ctx.span().record_error(&throwable);
                     }
+                    status_description = exception_obj.call("getMessage", [])
+                        .ok()
+                        .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
+                        .unwrap_or(status_description);
                 }
                 if http_response_code >= 500 {
                     ctx.span().set_status(opentelemetry::trace::Status::error(status_description));
@@ -286,26 +291,25 @@ impl Zf1AdapterConnectHandler {
             let span_name = "connect".to_string();
             let mut execute_attributes = vec![];
             let mut attributes = vec![];
-            if class_name.is_some() {
-                execute_attributes.push(KeyValue::new(SemConv::trace::DB_SYSTEM_NAME, map_adapter_class_to_db_system(&class_name.unwrap())));
+            if let Some(class_name) = &class_name {
+                execute_attributes.push(KeyValue::new(SemConv::trace::DB_SYSTEM_NAME, map_adapter_class_to_db_system(class_name)));
             }
 
             let config = this_obj.get_property("_config");
-            if let Some(arr) = config.as_z_arr() {
-                if let Some(dbname) = arr.get("dbname") {
-                    tracing::debug!("Database: {:?}", dbname);
-                    execute_attributes.push(KeyValue::new(
-                        SemConv::trace::DB_NAMESPACE,
-                        dbname.as_z_str()
-                            .and_then(|s| s.to_str().ok())
-                            .unwrap_or_default()
-                            .to_string()
-                    ));
-                }
+            if let Some(arr) = config.as_z_arr()
+                && let Some(dbname) = arr.get("dbname") {
+                tracing::debug!("Database: {:?}", dbname);
+                execute_attributes.push(KeyValue::new(
+                    SemConv::trace::DB_NAMESPACE,
+                    dbname.as_z_str()
+                        .and_then(|s| s.to_str().ok())
+                        .unwrap_or_default()
+                        .to_string()
+                ));
             }
             attributes.extend_from_slice(&execute_attributes);
 
-            utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+            unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
 
             let connection_id = get_object_id(this_obj);
             CONNECTION_ATTRS.lock().unwrap().insert(connection_id, ConnectionInfo {
@@ -365,7 +369,7 @@ impl Zf1AdapterPrepareHandler {
             if let Ok(sql) = sql_str.to_str() {
                 // Add SQL query as an attribute
                 attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
-                let sql_name = utils::extract_span_name_from_sql(&sql)
+                let sql_name = utils::extract_span_name_from_sql(sql)
                     .unwrap_or_else(|| "OTHER".to_string());
                 span_name = format!("prepare {}", sql_name);
             }
@@ -373,7 +377,7 @@ impl Zf1AdapterPrepareHandler {
             tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
         }
 
-        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -405,7 +409,7 @@ impl Zf1AdapterPrepareHandler {
             let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
             if let Some(sql_str) = sql_zval.as_z_str() {
                 if let Ok(sql) = sql_str.to_str() {
-                    let sql_name = utils::extract_span_name_from_sql(&sql)
+                    let sql_name = utils::extract_span_name_from_sql(sql)
                         .unwrap_or_else(|| "OTHER".to_string());
                     let execute_span_name = sql_name.clone();
                     let prepare_span_name = format!("prepare {}", sql_name.clone());
@@ -471,11 +475,11 @@ impl Zf1StatementExecuteHandler {
             }
         }
 
-        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
-        if link.is_some() {
+        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
+        if let Some(link) = link {
             opentelemetry::Context::current()
                 .span()
-                .add_link(link.unwrap(), vec![]);
+                .add_link(link, vec![]);
         }
     }
     unsafe extern "C" fn post_callback(

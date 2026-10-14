@@ -1,0 +1,37 @@
+{
+  // The Cargo workspace is otel/, not the repository root. rust-analyzer would
+  // find it anyway -- its discovery reads one level down when the root has no
+  // Cargo.toml -- but naming it here is explicit, and it disables that search.
+  // The path is relative, so this works on the host and in a dev container.
+  "rust-analyzer.linkedProjects": [
+    "otel/Cargo.toml"
+  ],
+  // Match `make clippy` exactly, so the editor and CI agree. Without this
+  // rust-analyzer runs plain `cargo check` and misses every clippy lint;
+  // without `--features test` it also skips the #[cfg(feature = "test")] code.
+  // Don't add either flag to check.extraArgs: rust-analyzer passes
+  // --features from cargo.features and --all-targets from check.allTargets
+  // (default true) on its own, and cargo >= 1.99 rejects a repeated
+  // --all-targets, which kills flycheck before it emits any diagnostics.
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.cargo.features": [
+    "test"
+  ],
+  // clippy reports far more warnings than errors here, and the Problems
+  // panel sorts by file position by default, which buries the errors
+  // among them. Sort by severity so deny-level lints come first.
+  "problems.sortOrder": "severity",
+  // .phpt is php-src's own test format and no extension provides a grammar
+  // for it; mapping it to PHP highlights the --FILE-- section, which is the
+  // bulk of most tests. The non-PHP headers then look like stray text, and
+  // the exclude below keeps the language server from reporting errors in them.
+  "files.associations": {
+    "*.phpt": "php"
+  },
+  "intelephense.files.exclude": [
+    "**/tests/**/*.phpt"
+  ],
+  // the root Makefile has no configure step for the Makefile Tools extension
+  // to run, and its prompt on every open is noise
+  "makefile.configureOnOpen": false
+}

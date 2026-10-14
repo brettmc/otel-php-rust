@@ -43,10 +43,9 @@ pub fn zval_arr_to_key_value_vec(arr: ZArray) -> Vec<KeyValue> {
         match key {
             IterKey::Index(_) => {}, // Skip integer keys
             IterKey::ZStr(zstr) => {
-                if let Some(key_str) = zstr.to_str().ok() {
-                    if let Some(kv) = zval_to_key_value(key_str, value) {
-                        result.push(kv);
-                    }
+                if let Ok(key_str) = zstr.to_str()
+                    && let Some(kv) = zval_to_key_value(key_str, value) {
+                    result.push(kv);
                 }
             },
         };

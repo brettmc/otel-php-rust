@@ -7,9 +7,13 @@ services:
         PHP_VERSION: ${PHP_VERSION}
     image: php-rust:${PHP_VERSION}
     volumes:
-    - ./otel/:/usr/src/myapp
+    # the whole repository, mounted at the same path the dev containers use,
+    # so a shell from `make bash` sees the same tree at the same place
+    - ./:/workspace
     - ./otel/.cargo/registry:/home/php-rust/.cargo/registry
     - ./otel/.cargo/git:/home/php-rust/.cargo/git
+    # the extension is built here, so this is where a shell should start
+    working_dir: /workspace/otel
     user: php-rust
   collector:
     image: otel/opentelemetry-collector-contrib

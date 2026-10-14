@@ -45,7 +45,10 @@ const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvide
 
 pub type TracerProviderClass = StateClass<()>;
 
-static TRACER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+/// (pid, "service_name:resource_attributes")
+type ProviderKey = (u32, String);
+
+static TRACER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
     Arc::new(SdkTracerProvider::builder()
         .with_resource(Resource::builder_empty().build())
@@ -54,7 +57,7 @@ static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
 });
 
 //tracer provider per (service_name, resource_attributes) pair (from .env, if enabled)
-fn get_tracer_provider_key() -> (u32, String) {
+fn get_tracer_provider_key() -> ProviderKey {
     let pid = process::id();
     let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_default();
     let resource_attrs = env::var("OTEL_RESOURCE_ATTRIBUTES").unwrap_or_default();
@@ -110,31 +113,35 @@ pub fn init_once() {
             builder = builder.with_batch_exporter(exporter);
         }
     } else {
-        if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
+        let exporter = if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
             tracing::debug!("Using http/protobuf trace exporter");
-            let exporter = OtlpSpanExporter::builder()
+            OtlpSpanExporter::builder()
                 .with_http()
                 .with_protocol(Protocol::HttpBinary)
                 .build()
-                .expect("Failed to create OTLP http exporter");
-            if use_simple_exporter {
-                builder = builder.with_simple_exporter(exporter);
-            } else {
-                builder = builder.with_batch_exporter(exporter);
-            }
         } else {
             tracing::debug!("Using gRPC trace exporter with tokio runtime");
             let runtime = init_tokio_runtime();
-            let exporter = runtime.block_on(async {
+            runtime.block_on(async {
                 OtlpSpanExporter::builder()
                     .with_tonic()
                     .build()
-                    .expect("Failed to create OTLP grpc exporter")
-            });
-            if use_simple_exporter {
-                builder = builder.with_simple_exporter(exporter);
-            } else {
-                builder = builder.with_batch_exporter(exporter);
+            })
+        };
+        match exporter {
+            Ok(exporter) => {
+                if use_simple_exporter {
+                    builder = builder.with_simple_exporter(exporter);
+                } else {
+                    builder = builder.with_batch_exporter(exporter);
+                }
+            }
+            // a misconfigured exporter must not take down the PHP process; fall
+            // back to not exporting, and leave the config error in the log
+            Err(err) => {
+                tracing::error!("Failed to create OTLP trace exporter, tracing is disabled: {}", err);
+                providers.insert(key, NOOP_TRACER_PROVIDER.clone());
+                return;
             }
         }
     }
@@ -153,7 +160,7 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
     let providers = TRACER_PROVIDERS.lock().unwrap();
     let key = get_tracer_provider_key();
     if let Some(provider) = providers.get(&key) {
-        return provider.clone();
+        provider.clone()
     } else {
         tracing::warn!("no tracer provider initialized for key {:?}, using no-op", key);
         NOOP_TRACER_PROVIDER.clone()
@@ -213,13 +220,11 @@ pub fn make_tracer_provider_class(
 
             let version = arguments.get(1)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let schema_url = arguments.get(2)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let attributes = arguments.get(3)
                 .and_then(|arg| arg.as_z_arr())

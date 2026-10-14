@@ -1,7 +1,10 @@
 {
   "version": "2.0.0",
   "options": {
-    "cwd": "${workspaceFolder}",
+    // every task below runs a target from otel/Makefile, but the workspace
+    // opens at the repository root, so each one needs the extension directory
+    // rather than ${workspaceFolder} itself
+    "cwd": "${workspaceFolder}/otel",
     "env": {
       // run-tests.php colourises FAIL/PASS; the escape codes stop the
       // phpt problem matcher below from recognising the line
@@ -74,7 +77,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -104,7 +107,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -134,7 +137,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -164,7 +167,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -194,7 +197,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -224,7 +227,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -246,7 +249,11 @@
       "label": "test: current phpt file",
       "detail": "run just the .phpt file open in the editor",
       "type": "shell",
-      "command": "php run-tests.php -q --show-diff '${relativeFile}'",
+      // ${file}, not ${relativeFile}: the latter is relative to the workspace
+      // root and so would carry an `otel/` prefix that this task's cwd already
+      // supplies. run-tests.php realpath()s its arguments, so an absolute path
+      // is fine, and it still reports the verdict relative to its own cwd.
+      "command": "php run-tests.php -q --show-diff '${file}'",
       "group": "test",
       "problemMatcher": [
         {
@@ -254,7 +261,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -284,7 +291,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [
@@ -347,7 +354,7 @@
           "source": "run-tests.php",
           "fileLocation": [
             "relative",
-            "${workspaceFolder}"
+            "${workspaceFolder}/otel"
           ],
           "severity": "error",
           "pattern": [

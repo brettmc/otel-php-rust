@@ -36,7 +36,7 @@ pub fn make_memory_exporter_class() -> ClassEntity<()> {
         let mut result = ZArray::new();
         let exporter = MEMORY_EXPORTER.lock().unwrap();
         let spans = exporter.get_finished_spans().unwrap_or_default();
-        for (_i, span) in spans.iter().enumerate() {
+        for span in spans.iter() {
             let mut arr = ZArray::new();
             arr.insert("name", &*span.name);
             let mut span_context = ZArray::new();
@@ -52,9 +52,9 @@ pub fn make_memory_exporter_class() -> ClassEntity<()> {
             let end_time = span.end_time.duration_since(std::time::UNIX_EPOCH).unwrap().as_micros();
             arr.insert("end_time", end_time as i64);
             let mut scope = ZArray::new();
-            scope.insert("name", &*span.instrumentation_scope.name());
-            scope.insert("version", span.instrumentation_scope.version().as_deref().unwrap_or(""));
-            scope.insert("schema_url", span.instrumentation_scope.schema_url().as_deref().unwrap_or(""));
+            scope.insert("name", span.instrumentation_scope.name());
+            scope.insert("version", span.instrumentation_scope.version().unwrap_or(""));
+            scope.insert("schema_url", span.instrumentation_scope.schema_url().unwrap_or(""));
             let mut scope_attributes = ZArray::new();
             for kv in span.instrumentation_scope.attributes() {
                 match &kv.value {

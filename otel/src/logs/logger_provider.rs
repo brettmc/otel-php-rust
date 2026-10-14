@@ -45,14 +45,17 @@ pub const LOGGER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\LoggerProv
 
 pub type LoggerProviderClass = StateClass<()>;
 
-static LOGGER_PROVIDERS: Lazy<Mutex<HashMap<(u32, String), Arc<SdkLoggerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+/// (pid, "service_name:resource_attributes")
+type ProviderKey = (u32, String);
+
+static LOGGER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NOOP_LOGGER_PROVIDER: Lazy<Arc<SdkLoggerProvider>> = Lazy::new(|| {
     Arc::new(SdkLoggerProvider::builder()
         .with_resource(Resource::builder_empty().build())
         .build())
 });
 
-fn get_logger_provider_key() -> (u32, String) {
+fn get_logger_provider_key() -> ProviderKey {
     let pid = process::id();
     let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_default();
     let resource_attrs = env::var("OTEL_RESOURCE_ATTRIBUTES").unwrap_or_default();
@@ -115,39 +118,39 @@ pub fn init_once() {
         }
     } else {
         // Default to OTLP exporter
-        if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
+        let exporter = if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
             tracing::debug!("Using http/protobuf log exporter");
-            let exporter = OtlpLogExporter::builder()
+            OtlpLogExporter::builder()
                 .with_http()
                 .with_protocol(Protocol::HttpBinary)
                 .build()
-                .expect("Failed to create OTLP http log exporter");
-            if use_simple {
-                builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
-            } else {
-                let batch_config = BatchConfigBuilder::default().build();
-                let batch = BatchLogProcessor::builder(exporter)
-                    .with_batch_config(batch_config)
-                    .build();
-                builder = builder.with_log_processor(batch);
-            }
         } else {
             tracing::debug!("Using gRPC log exporter with tokio runtime");
             let runtime = init_tokio_runtime();
-            let exporter = runtime.block_on(async {
+            runtime.block_on(async {
                 OtlpLogExporter::builder()
                     .with_tonic()
                     .build()
-                    .expect("Failed to create OTLP grpc log exporter")
-            });
-            if use_simple {
-                builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
-            } else {
-                let batch_config = BatchConfigBuilder::default().build();
-                let batch = BatchLogProcessor::builder(exporter)
-                    .with_batch_config(batch_config)
-                    .build();
-                builder = builder.with_log_processor(batch);
+            })
+        };
+        match exporter {
+            Ok(exporter) => {
+                if use_simple {
+                    builder = builder.with_log_processor(SimpleLogProcessor::new(exporter));
+                } else {
+                    let batch_config = BatchConfigBuilder::default().build();
+                    let batch = BatchLogProcessor::builder(exporter)
+                        .with_batch_config(batch_config)
+                        .build();
+                    builder = builder.with_log_processor(batch);
+                }
+            }
+            // a misconfigured exporter must not take down the PHP process; fall
+            // back to not exporting, and leave the config error in the log
+            Err(err) => {
+                tracing::error!("Failed to create OTLP log exporter, logging is disabled: {}", err);
+                providers.insert(key, NOOP_LOGGER_PROVIDER.clone());
+                return;
             }
         }
     }
@@ -164,7 +167,7 @@ pub fn get_logger_provider() -> Arc<SdkLoggerProvider> {
     let providers = LOGGER_PROVIDERS.lock().unwrap();
     let key = get_logger_provider_key();
     if let Some(provider) = providers.get(&key) {
-        return provider.clone();
+        provider.clone()
     } else {
         tracing::warn!("no logger provider initialized for key {:?}, using no-op", key);
         NOOP_LOGGER_PROVIDER.clone()
@@ -209,13 +212,11 @@ pub fn make_logger_provider_class(
 
             let version = arguments.get(1)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let schema_url = arguments.get(2)
                 .and_then(|arg| arg.as_z_str())
-                .map(|s| s.to_str().ok().map(|s| s.to_string()))
-                .flatten();
+                .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
             let attributes = arguments.get(3)
                 .and_then(|arg| arg.as_z_arr())

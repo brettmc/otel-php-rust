@@ -71,3 +71,9 @@ impl FunctionObserver {
         !self.pre_hooks.is_empty() || !self.post_hooks.is_empty()
     }
 }
+
+impl Default for FunctionObserver {
+    fn default() -> Self {
+        Self::new()
+    }
+}

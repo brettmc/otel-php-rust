@@ -120,7 +120,7 @@ pub fn make_span_class(
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
             let key = arguments[0].expect_z_str()?.to_str()?.to_string();
             let value = &arguments[1];
-            if let Some(kv) = util::zval_to_key_value(&key, &value) {
+            if let Some(kv) = util::zval_to_key_value(&key, value) {
                 let instance_id = get_instance_id(this);
                 if let Some(span) = this.as_mut_state().as_mut() {
                     span.set_attribute(kv.clone());
@@ -209,10 +209,9 @@ pub fn make_span_class(
                     match key {
                         IterKey::Index(_) => {}, // Skip integer keys
                         IterKey::ZStr(zstr) => {
-                            if let Some(key_str) = zstr.to_str().ok().map(|s| s.to_string()) {
-                                if let Some(kv) = util::zval_to_key_value(&key_str, value) {
-                                    attributes.push(kv);
-                                }
+                            if let Some(key_str) = zstr.to_str().ok().map(|s| s.to_string())
+                                && let Some(kv) = util::zval_to_key_value(&key_str, value) {
+                                attributes.push(kv);
                             }
                         },
                     };
@@ -304,7 +303,7 @@ pub fn make_span_class(
             let instance_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
             let mut object = span_class_clone.init_object()?;
             *object.as_mut_state() = None;
-            object.set_property("context_id", instance_id as i64);
+            object.set_property("context_id", instance_id);
             Ok::<_, phper::Error>(object)
         });
 

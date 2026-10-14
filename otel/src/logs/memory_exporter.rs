@@ -39,7 +39,7 @@ pub fn make_logs_memory_exporter_class() -> ClassEntity<()> {
         let mut result = ZArray::new();
         let exporter = MEMORY_EXPORTER.lock().unwrap();
         let logs = exporter.get_emitted_logs().unwrap_or_default();
-        for (_i, log) in logs.iter().enumerate() {
+        for log in logs.iter() {
             let mut arr = ZArray::new();
             // Log body
             arr.insert("body", format!("{:?}", log.record.body()));
@@ -97,8 +97,8 @@ pub fn make_logs_memory_exporter_class() -> ClassEntity<()> {
             // Instrumentation scope
             let mut scope = ZArray::new();
             scope.insert("name", log.instrumentation.name());
-            scope.insert("version", log.instrumentation.version().as_deref().unwrap_or(""));
-            scope.insert("schema_url", log.instrumentation.schema_url().as_deref().unwrap_or(""));
+            scope.insert("version", log.instrumentation.version().unwrap_or(""));
+            scope.insert("schema_url", log.instrumentation.schema_url().unwrap_or(""));
             // Scope attributes
             let mut scope_attributes = ZArray::new();
             for kv in log.instrumentation.attributes() {

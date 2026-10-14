@@ -32,7 +32,7 @@ pub type StorageClassEntity = ClassEntity<()>;
 // context created and stored as a class property.
 thread_local! {
     static CONTEXT_STORAGE: RefCell<HashMap<u64, Arc<Context>>> = RefCell::new(HashMap::new());
-    static GUARD_STACK: RefCell<Vec<(ContextGuard, u64)>> = RefCell::new(Vec::new());
+    static GUARD_STACK: RefCell<Vec<(ContextGuard, u64)>> = const { RefCell::new(Vec::new()) };
     static CONTEXT_GUARD_MAP: RefCell<HashMap<usize, ContextGuard>> = RefCell::new(HashMap::new()); //for observer use
 }
 static INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -146,13 +146,13 @@ pub fn detach_context(instance_id: Option<u64>) {
     if let Some(id) = instance_id {
         debug!("Detaching context instance {}", id);
         GUARD_STACK.with(|stack| {
-            stack.borrow_mut().pop().map(|(_guard, stack_id)| {
+            if let Some((_guard, stack_id)) = stack.borrow_mut().pop() {
                 if stack_id == id {
                     maybe_remove_context_instance(Some(stack_id));
                 } else {
                     debug!("Not detaching context instance {}, is not top-most", id);
                 }
-            });
+            }
         });
     }
 }

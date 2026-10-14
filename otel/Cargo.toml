@@ -16,15 +16,14 @@ crate-type = ["cdylib"]
 strip = "debuginfo"
 
 [dependencies]
-#phper = "0.17.0"
-phper = { git = "https://github.com/phper-framework/phper.git", rev = "84adb0bf37890162df8fe4488a7bd009413e3ee9" }
-opentelemetry = { version = "0.31.0", features = ["internal-logs"] }
-opentelemetry-http = "0.31.0"
-opentelemetry-stdout = "0.31.0"
-opentelemetry_sdk = { version = "0.31.0", features = ["testing"] }
-opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic"] }
-opentelemetry-semantic-conventions = "0.31.0"
-tokio = { version = "1.0", features = ["full"] }
+phper = "0.17.0"
+opentelemetry = { version = "0.33.1", features = ["internal-logs"] }
+opentelemetry-http = "0.33.1"
+opentelemetry-stdout = "0.33.1"
+opentelemetry_sdk = { version = "0.33.1", features = ["testing"] }
+opentelemetry-otlp = { version = "0.33.1", features = ["grpc-tonic", "tls-ring"] }
+opentelemetry-semantic-conventions = "0.33.1"
+tokio = { version = "1.53.3", features = ["full"] }
 once_cell = "1.20.3"
 anyhow = "1.0.95"
 chrono = "0.4.39"
@@ -36,7 +35,7 @@ lazy_static = "1.5.0"
 regex = "1.11.1"
 
 [build-dependencies]
-cargo_metadata = "0.23.0"
+cargo_metadata = "0.23.1"
 phper-sys = "0.15.3"
 
 [dev-dependencies]

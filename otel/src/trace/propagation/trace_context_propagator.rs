@@ -80,12 +80,10 @@ pub fn make_trace_context_propagator_class(
 
             let mut map = std::collections::HashMap::<String, String>::new();
             for (k, v) in carrier.iter() {
-                if let phper::arrays::IterKey::ZStr(k) = k {
-                    if let Some(zstr) = v.as_z_str() {
-                        if let Ok(val) = zstr.to_str() {
-                            map.insert(k.to_str()?.to_string(), val.to_string());
-                        }
-                    }
+                if let phper::arrays::IterKey::ZStr(k) = k
+                    && let Some(zstr) = v.as_z_str()
+                    && let Ok(val) = zstr.to_str() {
+                    map.insert(k.to_str()?.to_string(), val.to_string());
                 }
             }
 

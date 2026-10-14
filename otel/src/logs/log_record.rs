@@ -51,33 +51,29 @@ fn zval_to_value(zval: &phper::values::ZVal) -> Option<opentelemetry::Value> {
         let mut value_type = None;
 
         for (_, v) in arr.iter() {
-            if let Ok(b) = v.expect_bool() {
-                if value_type.is_none() || value_type == Some("bool") {
-                    bools.push(b);
-                    value_type = Some("bool");
-                    continue;
-                }
+            if let Ok(b) = v.expect_bool()
+                && (value_type.is_none() || value_type == Some("bool")) {
+                bools.push(b);
+                value_type = Some("bool");
+                continue;
             }
-            if let Ok(i) = v.expect_long() {
-                if value_type.is_none() || value_type == Some("i64") {
-                    i64s.push(i);
-                    value_type = Some("i64");
-                    continue;
-                }
+            if let Ok(i) = v.expect_long()
+                && (value_type.is_none() || value_type == Some("i64")) {
+                i64s.push(i);
+                value_type = Some("i64");
+                continue;
             }
-            if let Ok(f) = v.expect_double() {
-                if value_type.is_none() || value_type == Some("f64") {
-                    f64s.push(f);
-                    value_type = Some("f64");
-                    continue;
-                }
+            if let Ok(f) = v.expect_double()
+                && (value_type.is_none() || value_type == Some("f64")) {
+                f64s.push(f);
+                value_type = Some("f64");
+                continue;
             }
-            if let Ok(s) = v.expect_z_str() {
-                if value_type.is_none() || value_type == Some("string") {
-                    strings.push(s.to_str().unwrap_or("").to_owned().into());
-                    value_type = Some("string");
-                    continue;
-                }
+            if let Ok(s) = v.expect_z_str()
+                && (value_type.is_none() || value_type == Some("string")) {
+                strings.push(s.to_str().unwrap_or("").to_owned().into());
+                value_type = Some("string");
+                continue;
             }
             // If we get here, it's a mixed or unsupported type
             tracing::warn!("Unsupported or mixed array element type in attribute array, skipping attribute: {:?}", v);
@@ -119,7 +115,7 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
     class
         .add_method("__construct", Visibility::Public, |this, arguments| {
             //if argument 1 (body) is provided, set it
-            if let Some(body_zval) = arguments.get(0) {
+            if let Some(body_zval) = arguments.first() {
                 let body_str = body_zval.expect_z_str()?;
                 if !body_str.is_empty() {
                     // Convert to owned String immediately to avoid lifetime issues

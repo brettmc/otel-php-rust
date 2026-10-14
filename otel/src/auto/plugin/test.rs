@@ -40,6 +40,12 @@ impl TestPlugin {
     }
 }
 
+impl Default for TestPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Plugin for TestPlugin {
     fn get_handlers(&self) -> &HandlerSlice {
         &self.handlers
@@ -82,7 +88,7 @@ impl DemoHandler {
         let exec_data_ref = unsafe { &*exec_data };
         let span_name = get_fqn(exec_data_ref).unwrap_or_default();
 
-        utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
 
     unsafe extern "C" fn post_callback(
@@ -152,11 +158,10 @@ impl Handler for DemoFunctionHandler {
 impl DemoFunctionHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
-        let mut attributes = vec![];
-        attributes.push(KeyValue::new("my-attribute", "my-value".to_string()));
+        let attributes = vec![KeyValue::new("my-attribute", "my-value".to_string())];
         let span_name = "demo-function";
 
-        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal);
+        unsafe { utils::start_and_activate_span(tracer, span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
 
     unsafe extern "C" fn post_callback(
