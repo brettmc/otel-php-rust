@@ -116,7 +116,7 @@ impl Psr18SendRequestHandler {
             }
         }
 
-        start_and_activate_span(tracer, &name, attributes, exec_data, SpanKind::Client);
+        unsafe { start_and_activate_span(tracer, &name, attributes, exec_data, SpanKind::Client); }
 
         //now inject the trace context into the request headers, using the span we just started
         let mut carrier = HashMap::new();

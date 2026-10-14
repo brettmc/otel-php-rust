@@ -126,7 +126,7 @@ impl LaminasApplicationRunHandler {
 
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas");
         let span_name = "Application::run".to_string();
-        utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -298,13 +298,15 @@ fn extract_laminas_db_namespace(arr: &phper::arrays::ZArr) -> String {
 
 impl LaminasDbConnectHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        utils::start_and_activate_span(
-            tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db"),
-            "connect",
-            vec![],
-            exec_data,
-            opentelemetry::trace::SpanKind::Client
-        );
+        unsafe {
+            utils::start_and_activate_span(
+                tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db"),
+                "connect",
+                vec![],
+                exec_data,
+                opentelemetry::trace::SpanKind::Client
+            );
+        }
         let mut attributes = vec![];
 
         // get connection params
@@ -372,13 +374,15 @@ impl Handler for LaminasStatementPrepareHandler {
 
 impl LaminasStatementPrepareHandler {
     unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
-        utils::start_and_activate_span(
-            tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db"),
-            "prepare",
-            vec![],
-            exec_data,
-            opentelemetry::trace::SpanKind::Client
-        );
+        unsafe {
+            utils::start_and_activate_span(
+                tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db"),
+                "prepare",
+                vec![],
+                exec_data,
+                opentelemetry::trace::SpanKind::Client
+            );
+        }
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -489,7 +493,7 @@ impl LaminasStatementExecuteHandler {
         tracing::debug!("Auto::Laminas::pre (Statement::execute) - pre_callback called");
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db");
         let span_name = "Statement::execute".to_string();
-        utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, SpanKind::Client);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, SpanKind::Client); }
     }
 
     unsafe extern "C" fn post_callback(
@@ -557,7 +561,7 @@ impl LaminasConnectionExecuteHandler {
         let span_name = utils::extract_span_name_from_sql(sql_str)
             .unwrap_or_else(|| "execute".to_string());
 
-        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
     }
 
     unsafe extern "C" fn post_callback(

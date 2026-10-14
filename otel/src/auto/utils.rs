@@ -65,7 +65,11 @@ pub fn record_exception(context: &opentelemetry::Context, exception: &mut ZObj) 
     context.span().set_status(opentelemetry::trace::Status::error(message));
 }
 
-pub fn start_and_activate_span(
+/// # Safety
+///
+/// `exec_data` must be a valid, non-null pointer to an `ExecuteData` that stays
+/// live for the duration of the call.
+pub unsafe fn start_and_activate_span(
     tracer: SdkTracer,
     span_name: &str,
     attributes: Vec<KeyValue>,

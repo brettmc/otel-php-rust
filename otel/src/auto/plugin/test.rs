@@ -82,7 +82,7 @@ impl DemoHandler {
         let exec_data_ref = unsafe { &*exec_data };
         let span_name = get_fqn(exec_data_ref).unwrap_or_default();
 
-        utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
 
     unsafe extern "C" fn post_callback(
@@ -156,7 +156,7 @@ impl DemoFunctionHandler {
         attributes.push(KeyValue::new("my-attribute", "my-value".to_string()));
         let span_name = "demo-function";
 
-        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
 
     unsafe extern "C" fn post_callback(

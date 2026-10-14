@@ -305,7 +305,7 @@ impl Zf1AdapterConnectHandler {
             }
             attributes.extend_from_slice(&execute_attributes);
 
-            utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+            unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
 
             let connection_id = get_object_id(this_obj);
             CONNECTION_ATTRS.lock().unwrap().insert(connection_id, ConnectionInfo {
@@ -373,7 +373,7 @@ impl Zf1AdapterPrepareHandler {
             tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
         }
 
-        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
     }
     unsafe extern "C" fn post_callback(
         exec_data: *mut ExecuteData,
@@ -471,7 +471,7 @@ impl Zf1StatementExecuteHandler {
             }
         }
 
-        utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client);
+        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
         if link.is_some() {
             opentelemetry::Context::current()
                 .span()
