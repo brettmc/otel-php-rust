@@ -1,7 +1,8 @@
 .idea
-# shared tasks are committed (otel/.vscode/tasks.json); personal editor state is not
+# shared tasks and rust-analyzer config are committed; personal editor state is not
 **/.vscode/*
 !**/.vscode/tasks.json
+!**/.vscode/settings.json
 .cargo
 vendor/
 otel/demo/

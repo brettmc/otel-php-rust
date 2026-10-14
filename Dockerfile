@@ -3,7 +3,9 @@ FROM debian:bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-WORKDIR /usr/src/myapp
+# the repository is mounted at /workspace and the extension lives one level
+# down; this matches the dev containers in .devcontainer/
+WORKDIR /workspace/otel
 
 RUN groupadd -g 1000 php-rust \
   && useradd -g 1000 --create-home php-rust
@@ -37,7 +39,7 @@ RUN apt-get update \
     php${PHP_VERSION}-sqlite3 \
     sqlite3 \
   && apt-get install -y php${PHP_VERSION}-dev \
-  && ln -s /usr/src/myapp/modules/otel.so $(php-config --extension-dir)/otel.so
+  && ln -s /workspace/otel/modules/otel.so $(php-config --extension-dir)/otel.so
 
 RUN cp $(php-config --extension-dir)/build/run-tests.php /home/php-rust/
 

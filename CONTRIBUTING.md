@@ -74,6 +74,6 @@ I eventually found the cause by running the cli-server through `gdb` and eventua
 
 The included `Dockerfile` contains `gdb` and PHP debug symbols, so you can run something like this:
 
-`gdb --args php -d extension=otel -d otel.log.level=debug -S 0.0.0.0:8081 -t /usr/src/myapp/demo/zf1/public`
+`gdb --args php -d extension=otel -d otel.log.level=debug -S 0.0.0.0:8081 -t /workspace/otel/demo/zf1/public`
 
 Then, `run` as usual until the _bad thing_ happens, and type `bt` to get a backtrace. Good luck!

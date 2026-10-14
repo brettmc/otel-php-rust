@@ -19,7 +19,12 @@ In VS Code: **Dev Containers: Reopen in Container**, then pick the PHP version
 you want. To switch versions, run the command again and pick another — see
 [Switching versions](#switching-versions).
 
-The workspace opens at `/workspace/otel`, so the `make` targets in
+The workspace opens at `/workspace`, the repository root, so the committed
+`.vscode/`, `.github/`, the top-level `Makefile` and `CONTRIBUTING.md` are all
+visible and editable, and git sees its repository at the workspace root rather
+than above it.
+
+Terminals and tasks still start in `/workspace/otel`, so the `make` targets in
 `otel/Makefile` work directly:
 
 ```shell
@@ -100,14 +105,15 @@ template people copy to `.env`.
 
 ## Tasks
 
-[../otel/.vscode/tasks.json](../otel/.vscode/tasks.json) is committed, so the
-tasks are available as soon as the dev container opens — no copy step. It lives
-under `otel/` because that is the `workspaceFolder`, which is where VS Code
-looks for `.vscode/tasks.json`.
+[../.vscode/tasks.json](../.vscode/tasks.json) is committed, so the tasks are
+available as soon as the dev container opens — no copy step. It sits at the
+repository root because that is the `workspaceFolder`, which is where VS Code
+looks for `.vscode/tasks.json`. Every task sets `cwd` to
+`${workspaceFolder}/otel`, since each one runs a target from `otel/Makefile`.
 
-`.gitignore` ignores `**/.vscode/*` but un-ignores `tasks.json`, so these shared
-tasks are versioned while personal `settings.json` / `launch.json` stay out of
-the repository.
+`.gitignore` ignores `**/.vscode/*` but un-ignores `tasks.json` and
+`settings.json`, so the shared tasks and rust-analyzer configuration are
+versioned while personal `launch.json` and the rest stay out of the repository.
 
 Run them with **Tasks: Run Task**, or **Run Test Task** / **Run Build Task**
 for the defaults (`make test` and `make build-test`).
@@ -207,12 +213,11 @@ docker volume rm otel-php-rust-target-php84
 
 ## Git
 
-The dev containers set `"git.openRepositoryInParentFolders": "always"`, because
-the workspace opens at `/workspace/otel` while the repository root is one level
-up at `/workspace`. By default VS Code only offers to open a repository found in
-a *parent* of the folder you opened, behind a prompt — so without this setting
-the Source Control view starts empty and you get no diffs or gutter
-annotations. The setting is scoped to these dev containers only.
+The workspace opens at the repository root, so the Source Control view works
+with no extra configuration. (It previously opened at `/workspace/otel`, one
+level *below* the repository root, which needed
+`"git.openRepositoryInParentFolders": "always"` or Source Control started
+empty — that setting is gone.)
 
 VS Code forwards your SSH agent into the container, so pushing to a
 `git@github.com:` remote works without copying any private key in. The first
@@ -378,12 +383,19 @@ entitlement check for *every* build in that environment.
 
 ## Relationship to `make bash`
 
-These are additive: the repository's top-level `Dockerfile`, `docker-compose.yaml`
-and `make bash` workflow are unchanged and still work. The dev containers use
-their own `Dockerfile` here, based on `debian:bookworm`, whose
+These are additive: the repository's top-level `Dockerfile`,
+`docker-compose.yaml` and `make bash` workflow still work. The dev containers
+use their own `Dockerfile` here, based on `debian:bookworm`, whose
 [sury](https://packages.sury.org/php/) repository carries every PHP version
 from 7.4 to 8.5 — the top-level image is `debian:bullseye` and is not changed
 by any of this.
+
+The two now agree on paths: `make bash` also mounts the whole repository at
+`/workspace` and starts in `/workspace/otel`, so a path from one works in the
+other. It used to mount only `otel/`, at `/usr/src/myapp`. If you have an
+existing `php-rust:<version>` image from before that change, rebuild it with
+`make build-image` — the `otel.so` symlink is baked into the image and the old
+one points at a path that no longer exists.
 
 ## PHP 8.5
 

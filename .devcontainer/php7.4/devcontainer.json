@@ -10,9 +10,18 @@
     "collector"
   ],
   "initializeCommand": ".devcontainer/build-image.sh 7.4",
-  "workspaceFolder": "/workspace/otel",
+  // the whole repository, not just otel/. The Cargo workspace is one level
+  // down, but opening the root is what makes the committed .vscode/,
+  // .github/, the top-level Makefile and CONTRIBUTING.md visible and
+  // editable, and it puts the git repository at the workspace root rather
+  // than above it. Shells and tasks still start in otel/ -- see
+  // terminal.integrated.cwd below and .vscode/tasks.json.
+  "workspaceFolder": "/workspace",
   "remoteUser": "php-rust",
-  "postStartCommand": "/workspace/.devcontainer/setup-signing-key.sh",
+  // an absolute path rather than a relative one: lifecycle commands run
+  // from workspaceFolder, but that is only a "should" in the spec and the
+  // reference implementation falls back to the home folder
+  "postStartCommand": "${containerWorkspaceFolder}/.devcontainer/setup-signing-key.sh",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -23,30 +32,18 @@
         "bmewburn.vscode-intelephense-client",
         "ms-azuretools.vscode-docker"
       ],
+      // Only container-specific settings belong here. Everything portable
+      // (rust-analyzer, .phpt handling, Problems sorting) is in the
+      // repository's own .vscode/settings.json, which is committed and now
+      // read by VS Code because the workspace opens at the repository root.
       "settings": {
-        "rust-analyzer.cargo.features": [
-          "test"
-        ],
-        "rust-analyzer.check.command": "clippy",
-        // clippy reports far more warnings than errors here, and the Problems
-        // panel sorts by file position by default, which buries the errors
-        // among them. Sort by severity so deny-level lints come first.
-        "problems.sortOrder": "severity",
-        "rust-analyzer.linkedProjects": [
-          "/workspace/otel/Cargo.toml"
-        ],
+        // VS Code always spawns the shell with an explicit cwd -- the
+        // compose service's working_dir is never consulted -- so without
+        // this every terminal would open at /workspace, one level above the
+        // Makefile and Cargo.toml.
+        "terminal.integrated.cwd": "${containerWorkspaceFolder}/otel",
         "terminal.integrated.defaultProfile.linux": "bash",
-        // the repository root is /workspace but this folder is /workspace/otel,
-        // so without this the git extension only offers to open the parent repo
-        // behind a prompt, and shows no source control until you accept it
-        "git.openRepositoryInParentFolders": "always",
-        "php.validate.executablePath": "/usr/bin/php",
-        "files.associations": {
-          "*.phpt": "php"
-        },
-        "intelephense.files.exclude": [
-          "**/tests/**/*.phpt"
-        ]
+        "php.validate.executablePath": "/usr/bin/php"
       }
     }
   }
