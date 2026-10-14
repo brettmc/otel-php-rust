@@ -1,0 +1,62 @@
+# Shared service definitions for the per-PHP-version dev containers.
+#
+# Each .devcontainer/php<version>/compose.yaml extends this file and fills in
+# the bits that differ: the compose project name, the image tag, and the
+# per-version cargo target volume.
+#
+# Relative paths below resolve against the compose project directory, which is
+# this file's directory (.devcontainer) because this is the first -f file.
+#
+# The `collector` service is included so that the hostname `collector`
+# resolves inside the dev container, which the tests in otel/tests/otlp
+# depend on (they hardcode http://collector:4317 and :4318).
+services:
+  php:
+    # The image is built on the host by build-image.sh, which each
+    # devcontainer.json runs as its initializeCommand; the per-version compose
+    # file names the tag. These services deliberately have no `build:` key --
+    # see the comment at the top of build-image.sh for why.
+    volumes:
+      # the whole repository, so the Cargo workspace and tests are editable
+      - ..:/workspace:cached
+      # cargo download caches are version-independent, so they are shared
+      # across every dev container
+      - cargo-registry:/home/php-rust/.cargo/registry
+      - cargo-git:/home/php-rust/.cargo/git
+      # scratch space for personal tooling that would otherwise lose its
+      # config on every rebuild; point such a tool here from your own .env.
+      # Nothing in this repository writes to it -- see .devcontainer/README.md
+      - tool-config:/home/php-rust/.config/dev-tools
+    env_file:
+      # Your own environment, not committed: anything in the repository's .env
+      # is passed into the container, which is where personal tools that read
+      # credentials or settings from the environment get configured.
+      # The container still starts when .env is absent.
+      - path: ../.env
+        required: false
+    environment:
+      # set below env_file, so these win over anything .env defines
+      TEST_PHP_EXECUTABLE: /usr/bin/php
+      CARGO_HOME: /home/php-rust/.cargo
+    user: php-rust
+    working_dir: /workspace/otel
+    # keep the container alive; the dev container attaches to it
+    command: sleep infinity
+    depends_on:
+      - collector
+
+  collector:
+    image: otel/opentelemetry-collector-contrib
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ../files/collector/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+
+volumes:
+  # explicit names so these are shared across the per-version compose
+  # projects instead of being prefixed with each project's name
+  cargo-registry:
+    name: otel-php-rust-cargo-registry
+  cargo-git:
+    name: otel-php-rust-cargo-git
+  tool-config:
+    name: otel-php-rust-tool-config
