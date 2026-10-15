@@ -32,6 +32,41 @@ pub struct LogRecordState {
 
 pub type LogRecordClass = StateClass<LogRecordState>;
 
+/// Map a severity number from the log data model onto its `Severity`.
+///
+/// The numbers are the spec's own 1-24 scale, so they are a wire format rather than an
+/// internal detail. A number outside that range is a userland mistake we cannot represent;
+/// `Info` keeps the record rather than dropping it.
+pub(crate) fn map_severity_number(severity: u8) -> Severity {
+    match severity {
+        1 => Severity::Trace,
+        2 => Severity::Trace2,
+        3 => Severity::Trace3,
+        4 => Severity::Trace4,
+        5 => Severity::Debug,
+        6 => Severity::Debug2,
+        7 => Severity::Debug3,
+        8 => Severity::Debug4,
+        9 => Severity::Info,
+        10 => Severity::Info2,
+        11 => Severity::Info3,
+        12 => Severity::Info4,
+        13 => Severity::Warn,
+        14 => Severity::Warn2,
+        15 => Severity::Warn3,
+        16 => Severity::Warn4,
+        17 => Severity::Error,
+        18 => Severity::Error2,
+        19 => Severity::Error3,
+        20 => Severity::Error4,
+        21 => Severity::Fatal,
+        22 => Severity::Fatal2,
+        23 => Severity::Fatal3,
+        24 => Severity::Fatal4,
+        _ => Severity::Info,
+    }
+}
+
 fn zval_to_value(zval: &phper::values::ZVal) -> Option<opentelemetry::Value> {
     use opentelemetry::{Array, Value};
     if let Ok(s) = zval.expect_z_str() {
@@ -153,34 +188,7 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
     class
         .add_method("setSeverityNumber", Visibility::Public, |this, arguments| {
             let severity = arguments[0].expect_long()? as u8;
-            let sev = match severity {
-                1 => Severity::Trace,
-                2 => Severity::Trace2,
-                3 => Severity::Trace3,
-                4 => Severity::Trace4,
-                5 => Severity::Debug,
-                6 => Severity::Debug2,
-                7 => Severity::Debug3,
-                8 => Severity::Debug4,
-                9 => Severity::Info,
-                10 => Severity::Info2,
-                11 => Severity::Info3,
-                12 => Severity::Info4,
-                13 => Severity::Warn,
-                14 => Severity::Warn2,
-                15 => Severity::Warn3,
-                16 => Severity::Warn4,
-                17 => Severity::Error,
-                18 => Severity::Error2,
-                19 => Severity::Error3,
-                20 => Severity::Error4,
-                21 => Severity::Fatal,
-                22 => Severity::Fatal2,
-                23 => Severity::Fatal3,
-                24 => Severity::Fatal4,
-                _ => Severity::Info,
-            };
-            this.as_mut_state().severity = Some(sev);
+            this.as_mut_state().severity = Some(map_severity_number(severity));
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
         .argument(phper::functions::Argument::new("severityNumber").with_type_hint(ArgumentTypeHint::Int));
@@ -253,4 +261,40 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
         .argument(phper::functions::Argument::new("eventName"));
 
     class
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_spec_severity_number_maps_to_its_own_severity() {
+        // The mapping has to be injective over 1-24: two numbers collapsing onto one
+        // `Severity` would silently relabel a record's severity.
+        let mapped: Vec<Severity> = (1..=24).map(map_severity_number).collect();
+        for (i, severity) in mapped.iter().enumerate() {
+            assert_eq!(
+                *severity as u8,
+                (i + 1) as u8,
+                "severity number {} mapped to {:?}",
+                i + 1,
+                severity
+            );
+        }
+    }
+
+    #[test]
+    fn the_range_boundaries_map_to_the_extremes() {
+        assert_eq!(map_severity_number(1), Severity::Trace);
+        assert_eq!(map_severity_number(24), Severity::Fatal4);
+    }
+
+    #[test]
+    fn numbers_outside_the_spec_range_fall_back_to_info() {
+        // 0 and anything above 24 are not severities in the data model; the record is kept
+        // at Info rather than dropped.
+        assert_eq!(map_severity_number(0), Severity::Info);
+        assert_eq!(map_severity_number(25), Severity::Info);
+        assert_eq!(map_severity_number(u8::MAX), Severity::Info);
+    }
 }

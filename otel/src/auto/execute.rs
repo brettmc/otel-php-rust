@@ -8,10 +8,9 @@ use crate::{
         execute_data::{
             get_global_exception,
         },
-        plugin_manager::{
-            get_global as get_plugin_manager,
-            PluginManager,
-        },
+        guard,
+        plugin::FunctionObserver,
+        plugin_manager::get_global as get_plugin_manager,
     }
 };
 use std::{
@@ -48,7 +47,7 @@ fn handle_execution<F, G>(
 )
 where
     F: Fn(Option<&mut ExecuteData>, Option<&mut ZVal>),
-    G: Fn(&PluginManager, &mut ExecuteData, &mut ZVal),
+    G: Fn(&FunctionObserver, &mut ExecuteData, &mut ZVal),
 {
     let exec_data = match exec_data {
         Some(data) => data,
@@ -58,31 +57,48 @@ where
         }
     };
 
-    let plugin_manager = get_plugin_manager()
-        .expect("PluginManager not initialized")
-        .read()
-        .unwrap();
-    let observer = plugin_manager.get_function_observer(exec_data);
+    // Resolving the observer and running the pre hooks are guarded together: this runs
+    // inside an `extern "C"` call from the Zend VM, where unwinding is undefined behaviour
+    // and there is no PHP frame to throw into. Whatever happens here, the call below must
+    // still reach the engine, so instrumentation failures degrade to a plain call.
+    let observer = guard("execute pre hooks", || {
+        let Some(plugin_manager) = get_plugin_manager() else {
+            tracing::error!("Execute::PluginManager not initialized, skipping instrumentation");
+            return None;
+        };
+        // A poisoned lock means a previous reader panicked; the manager is only mutated
+        // during MINIT, so its contents are still sound to read.
+        let plugin_manager = match plugin_manager.read() {
+            Ok(manager) => manager,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let observer = plugin_manager.get_function_observer(exec_data);
 
-    if let Some(ref obs) = observer {
-        for hook in obs.pre_hooks() {
-            hook(exec_data);
+        if let Some(ref obs) = observer {
+            for hook in obs.pre_hooks() {
+                hook(exec_data);
+            }
         }
-    }
+        observer
+    })
+    .flatten();
 
-    // Destructure return_value before moving it
-    let retval: &mut ZVal = if let Some(rv) = return_value {
-        rv
-    } else {
-        let fallback = ZVal::from(());
-        // Use Box to extend the lifetime so retval can be returned
-        Box::leak(Box::new(fallback))
+    // Not every call has a return value slot, but the post hooks take a `&mut ZVal`.
+    // The fallback is declared here (rather than inside the `else`) so that it outlives
+    // the borrow below without having to leak it.
+    let mut fallback = ZVal::from(());
+    let retval: &mut ZVal = match return_value {
+        Some(rv) => rv,
+        None => &mut fallback,
     };
 
     upstream(Some(exec_data), Some(retval));
 
-    if let Some(ref _observer) = observer {
-        run_post_hooks(&plugin_manager, exec_data, retval);
+    // Pass the observer we already resolved, rather than looking it up a second time.
+    if let Some(ref observer) = observer {
+        guard("execute post hooks", || {
+            run_post_hooks(observer, exec_data, retval);
+        });
     }
 }
 
@@ -92,18 +108,16 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         exec_data,
         None,
         |ed, _| upstream_execute_ex(ed),
-        |plugin_manager, exec_data, _retval| {
-            if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
-                //get return value via a pointer to avoid double-borrowing exec_data
-                let retval = unsafe {
-                    exec_data.get_return_value_mut_ptr()
-                        .as_mut()
-                        .unwrap_or_else(|| Box::leak(Box::new(ZVal::from(()))))
-                };
+        |observer, exec_data, fallback_retval| {
+            //get return value via a pointer to avoid double-borrowing exec_data
+            let retval = unsafe {
+                exec_data.get_return_value_mut_ptr()
+                    .as_mut()
+                    .unwrap_or(fallback_retval)
+            };
 
-                for hook in observer.post_hooks() {
-                    hook(exec_data, retval, get_global_exception());
-                }
+            for hook in observer.post_hooks() {
+                hook(exec_data, retval, get_global_exception());
             }
         },
     );
@@ -120,11 +134,9 @@ unsafe extern "C" fn execute_internal(
         exec_data,
         ret_val,
         |ed, rv| upstream_execute_internal(ed, rv),
-        |plugin_manager, exec_data, retval| {
-            if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
-                for hook in observer.post_hooks() {
-                    hook(exec_data, retval, get_global_exception());
-                }
+        |observer, exec_data, retval| {
+            for hook in observer.post_hooks() {
+                hook(exec_data, retval, get_global_exception());
             }
         },
     );

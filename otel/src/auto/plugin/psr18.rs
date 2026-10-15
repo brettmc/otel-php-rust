@@ -54,7 +54,7 @@ impl Plugin for Psr18Plugin {
         &self.handlers
     }
     fn get_name(&self) -> &str {
-        "psr-18"
+        "psr18"
     }
 }
 

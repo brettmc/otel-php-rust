@@ -1,6 +1,6 @@
 use crate::{
     auto::{
-        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, db},
         utils,
     },
     config::trace_attributes,
@@ -25,10 +25,10 @@ use opentelemetry::{
     },
 };
 use opentelemetry_semantic_conventions as SemConv;
-use lazy_static::lazy_static;
 use std::{
+    cell::RefCell,
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 use phper::{
     alloc::ToRefOwned,
@@ -51,15 +51,20 @@ struct StatementInfo {
     span_context: SpanContext,
 }
 
-// Storage for DB-related attributes
-lazy_static! {
-    static ref CONNECTION_ATTRS: Mutex<HashMap<usize, ConnectionInfo>> = Mutex::new(HashMap::new());
-    static ref STATEMENT_ATTRS: Mutex<HashMap<usize, StatementInfo>> = Mutex::new(HashMap::new());
+// Storage for DB-related attributes, collected on one request's PHP objects, so
+// thread-local: the objects they describe belong to the thread handling the request, and a
+// process-wide Mutex would both serialize unrelated requests and let a stale entry be read
+// by another thread. Cleared in `request_shutdown`.
+thread_local! {
+    static CONNECTION_ATTRS: RefCell<HashMap<u32, ConnectionInfo>> = RefCell::new(HashMap::new());
+    static STATEMENT_ATTRS: RefCell<HashMap<u32, StatementInfo>> = RefCell::new(HashMap::new());
 }
 
-// Helper to get object id (pointer address)
-fn get_object_id(obj: &ZObj) -> usize {
-    obj as *const _ as usize
+/// Identify a PHP object by its engine handle rather than its address: handles are what the
+/// engine itself uses to tell objects apart, whereas a freed object's address can be reused
+/// by an unrelated object within the same request.
+fn get_object_id(obj: &ZObj) -> u32 {
+    obj.handle()
 }
 
 pub struct LaminasPlugin {
@@ -96,8 +101,8 @@ impl Plugin for LaminasPlugin {
         "laminas"
     }
     fn request_shutdown(&self) {
-        CONNECTION_ATTRS.lock().unwrap().clear();
-        STATEMENT_ATTRS.lock().unwrap().clear();
+        CONNECTION_ATTRS.with(|map| map.borrow_mut().clear());
+        STATEMENT_ATTRS.with(|map| map.borrow_mut().clear());
     }
 }
 
@@ -332,10 +337,10 @@ impl LaminasDbConnectHandler {
                 opentelemetry::Context::current().span().set_attributes(attributes.clone());
             }
             let id = get_object_id(this_obj);
-            CONNECTION_ATTRS.lock().unwrap().insert(id, ConnectionInfo{
+            CONNECTION_ATTRS.with(|map| map.borrow_mut().insert(id, ConnectionInfo{
                 attributes: attributes.clone(),
                 span_context: opentelemetry::Context::current().span().span_context().clone(),
-            });
+            }));
             tracing::debug!("Auto::Laminas::pre (connect) - storing connection attributes: {:?}, id={}", attributes, id);
         }
     }
@@ -438,26 +443,26 @@ impl LaminasStatementPrepareHandler {
                 && let Some(connection_obj) = connection_zval.as_z_obj() {
                 let connection_id = get_object_id(connection_obj);
                 tracing::debug!("Auto::Laminas::post (Statement::prepare) - found driver connection id={}", connection_id);
-                let connection_attrs_guard = CONNECTION_ATTRS.lock().unwrap();
-                let connection_info = connection_attrs_guard.get(&connection_id);
-                if let Some(connection_info) = connection_info {
-                    attributes.extend_from_slice(&connection_info.attributes);
-                    prepare_attributes.extend_from_slice(&connection_info.attributes);
+                let connection_info = CONNECTION_ATTRS.with(|map| {
+                    map.borrow()
+                        .get(&connection_id)
+                        .map(|info| (info.attributes.clone(), info.span_context.clone()))
+                });
+                if let Some((connection_attributes, span_context)) = connection_info {
+                    attributes.extend_from_slice(&connection_attributes);
+                    prepare_attributes.extend_from_slice(&connection_attributes);
                     //add span context as a link to current span
-                    opentelemetry::Context::current().span().add_link(
-                        connection_info.span_context.clone(),
-                        vec![]
-                    );
+                    opentelemetry::Context::current().span().add_link(span_context, vec![]);
                 }
             }
 
             let id = get_object_id(this_obj);
             tracing::debug!("Auto::Laminas::post (Statement::prepare) - storing statement attributes for statement id: {}", id);
-            STATEMENT_ATTRS.lock().unwrap().insert(id, StatementInfo{
+            STATEMENT_ATTRS.with(|map| map.borrow_mut().insert(id, StatementInfo{
                 attributes,
                 span_name: execute_span_name,
                 span_context: opentelemetry::Context::current().span().span_context().clone(),
-            });
+            }));
         }
         let ctx = opentelemetry::Context::current();
         let span = ctx.span();
@@ -507,19 +512,20 @@ impl LaminasStatementExecuteHandler {
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
             let statement_id = get_object_id(this_obj);
             tracing::debug!("Auto::Laminas::pre (Statement::execute) - found this object: id={}", statement_id);
-            if let Some(info) = STATEMENT_ATTRS.lock().unwrap().get(&statement_id) {
-                tracing::debug!("Auto::Laminas::pre (Statement::execute) - found statement attributes: {:?}", info.attributes);
+            let statement_info = STATEMENT_ATTRS.with(|map| {
+                map.borrow().get(&statement_id).map(|info| {
+                    (info.attributes.clone(), info.span_name.clone(), info.span_context.clone())
+                })
+            });
+            if let Some((info_attributes, span_name, info_span_context)) = statement_info {
+                tracing::debug!("Auto::Laminas::pre (Statement::execute) - found statement attributes: {:?}", info_attributes);
                 let mut attributes = vec![];
-                attributes.extend_from_slice(&info.attributes);
-                let span_name = info.span_name.clone();
+                attributes.extend_from_slice(&info_attributes);
                 let ctx = opentelemetry::Context::current();
                 let span = ctx.span();
                 span.set_attributes(attributes);
                 span.update_name(span_name);
-                span.add_link(
-                    info.span_context.clone(),
-                    vec![]
-                );
+                span.add_link(info_span_context, vec![]);
             }
         }
     }
@@ -575,41 +581,18 @@ impl LaminasConnectionExecuteHandler {
     }
 }
 
-fn map_laminas_driver_to_semconv<'a>(driver: &'a str, connection_parameters: &'a ZArr) -> &'a str {
+/// Map a Laminas DB driver name to `db.system.name`, deferring to the shared mapping in
+/// [`crate::auto::plugin::db`] so Laminas and ZF1 cannot report the same database under
+/// different names. A bare `pdo` driver carries the real DBMS in its DSN.
+fn map_laminas_driver_to_semconv(driver: &str, connection_parameters: &ZArr) -> &'static str {
     tracing::debug!("Mapping Laminas DB driver '{}' to semantic convention", driver);
-    match driver.to_lowercase().as_str() {
-        "mysqli" | "pdo_mysql" => "mysql",
-        "pgsql" | "pdo_pgsql" => "postgresql",
-        "sqlite" | "pdo_sqlite" => "sqlite",
-        "oci8" | "pdo_oci" => "oracle",
-        "sqlsrv" | "pdo_sqlsrv" | "pdo_dblib" => "mssql",
-        "ibm_db2" => "db2",
-        "pdo_firebird" => "firebird",
-        "pdo_odbc" => "odbc",
-        "pdo" => {
-            if let Some(dsn_zv) = connection_parameters.get("dsn") {
-                if let Some(dsn) = dsn_zv.as_z_str().and_then(|s| s.to_str().ok()) {
-                    if let Some(pos) = dsn.find(':') {
-                        match dsn[..pos].to_lowercase().as_str() {
-                            "mysql" => "mysql",
-                            "pgsql" => "postgresql",
-                            "sqlite" => "sqlite",
-                            "oci" | "oracle" => "oracle",
-                            "sqlsrv" => "mssql",
-                            "ibm" | "db2" => "db2",
-                            "firebird" => "firebird",
-                            _ => "other_sql",
-                        }
-                    } else {
-                        "other_sql"
-                    }
-                } else {
-                    "other_sql"
-                }
-            } else {
-                "other_sql"
-            }
-        },
-        _ => "other_sql",
+    if driver.eq_ignore_ascii_case("pdo") {
+        return connection_parameters
+            .get("dsn")
+            .and_then(|zv| zv.as_z_str())
+            .and_then(|s| s.to_str().ok())
+            .map(db::map_pdo_dsn)
+            .unwrap_or(db::OTHER_SQL);
     }
+    db::map_driver_name(driver)
 }

@@ -83,7 +83,11 @@ pub fn make_logger_class(
     class
         .add_method("emit", Visibility::Public, |this, arguments| {
             tracing::debug!("Logger::emit called");
-            let logger: &SdkLogger = this.as_state().as_ref().unwrap();
+            // Populated only by `LoggerProvider::getLogger()`; anything else is a userland
+            // mistake to report, not a reason to panic across the FFI boundary.
+            let logger: &SdkLogger = this.as_state().as_ref().ok_or_else(|| {
+                phper::Error::boxed("Logger was not created by LoggerProvider::getLogger()")
+            })?;
 
             let record_zval = &arguments[0];
             let record_obj = record_zval.expect_z_obj();
@@ -138,4 +142,46 @@ pub fn make_logger_class(
         .return_type(ReturnType::new(ReturnTypeHint::Void));
 
     class
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::logs::log_record::map_severity_number;
+
+    #[test]
+    fn every_severity_name_is_recognised() {
+        // Driven off the number map so the two stay in step: every severity reachable via
+        // `setSeverityNumber` must also be nameable via `setSeverityText`.
+        for number in 1..=24u8 {
+            let name = map_severity_number(number).name();
+            assert_eq!(
+                map_severity_text(name),
+                Some(name),
+                "severity text {:?} was not recognised",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn the_range_boundaries_are_recognised() {
+        assert_eq!(map_severity_text("TRACE"), Some("TRACE"));
+        assert_eq!(map_severity_text("FATAL4"), Some("FATAL4"));
+    }
+
+    #[test]
+    fn unknown_severity_text_is_rejected() {
+        // `None` leaves severity_text unset on the record rather than inventing a value.
+        assert_eq!(map_severity_text("NOTICE"), None);
+        assert_eq!(map_severity_text(""), None);
+    }
+
+    #[test]
+    fn severity_text_matching_is_case_sensitive() {
+        // The data model spells these upper-case; accepting "info" here would make the
+        // extension more lenient than the spec, so pin the current behaviour.
+        assert_eq!(map_severity_text("info"), None);
+        assert_eq!(map_severity_text("Info"), None);
+    }
 }

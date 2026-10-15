@@ -3,6 +3,7 @@ use phper::{
 };
 use std::{
     convert::Infallible,
+    sync::LazyLock,
 };
 use opentelemetry::trace::{
     SpanContext,
@@ -65,35 +66,47 @@ pub fn make_span_context_class() -> ClassEntity<Option<SpanContext>> {
         Ok::<_, phper::Error>(object)
     });
 
+    // An unpopulated state means we never had a span context to wrap (for example
+    // `getContext()` on a Span with neither an SdkSpan nor a stored context). Reporting
+    // the invalid context is what the spec says such a context looks like, and avoids
+    // panicking across the FFI boundary into PHP.
     class.add_method("isValid", Visibility::Public, |this, _| {
-        let state = this.as_state();
-        let is_valid = state.as_ref().expect("kaboom").is_valid();
+        let is_valid = span_context_or_invalid(this.as_state()).is_valid();
         Ok::<_, phper::Error>(is_valid)
     });
 
     class.add_method("getTraceId", Visibility::Public, |this, _| {
-        let state = this.as_state();
-        let trace_id = state.as_ref().expect("kaboom").trace_id().to_string();
+        let trace_id = span_context_or_invalid(this.as_state()).trace_id().to_string();
         Ok::<_, phper::Error>(trace_id)
     });
 
     class.add_method("getSpanId", Visibility::Public, |this, _| {
-        let state = this.as_state();
-        let span_id = state.as_ref().expect("kaboom").span_id().to_string();
+        let span_id = span_context_or_invalid(this.as_state()).span_id().to_string();
         Ok::<_, phper::Error>(span_id)
     });
 
     class.add_method("isRemote", Visibility::Public, |this, _| {
-        let state = this.as_state();
-        let is_remote = state.as_ref().expect("kaboom").is_remote();
+        let is_remote = span_context_or_invalid(this.as_state()).is_remote();
         Ok::<_, phper::Error>(is_remote)
     });
 
     class.add_method("isSampled", Visibility::Public, |this, _| {
-        let state = this.as_state();
-        let is_sampled = state.as_ref().expect("kaboom").is_sampled();
+        let is_sampled = span_context_or_invalid(this.as_state()).is_sampled();
         Ok::<_, phper::Error>(is_sampled)
     });
 
     class
+}
+
+/// Borrow the wrapped `SpanContext`, falling back to the invalid context if this object's
+/// state was never populated.
+fn span_context_or_invalid(state: &Option<SpanContext>) -> &SpanContext {
+    static INVALID: LazyLock<SpanContext> = LazyLock::new(SpanContext::empty_context);
+    match state {
+        Some(span_context) => span_context,
+        None => {
+            tracing::debug!("SpanContext::no state stored, reporting the invalid span context");
+            &INVALID
+        }
+    }
 }

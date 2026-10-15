@@ -3,10 +3,10 @@ use phper::ini::ini_get;
 use tracing::{Event, Subscriber, field::{Visit, Field}};
 use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     ffi::CStr,
     fmt::{self, Write},
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::{Write as _},
     process,
     sync::{LazyLock, Mutex, OnceLock},
@@ -14,16 +14,31 @@ use std::{
 };
 use chrono::Utc;
 
-static LOG_FILE_PATH: OnceLock<String> = OnceLock::new();
-static LOGGER_PIDS: LazyLock<Mutex<HashMap<u32, ()>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+/// Where log lines go. Resolved once from `otel.log_file`, so the configured file is opened
+/// once for the life of the process instead of once per line.
+enum LogSink {
+    Stdout,
+    Stderr,
+    /// Opened with `append`, so concurrent writes from forked workers sharing this
+    /// descriptor each seek to the end rather than overwriting one another.
+    File(Mutex<File>),
+    /// The configured file could not be opened. The reason was reported when we resolved
+    /// the sink; retrying the open for every subsequent line would just repeat it.
+    Unavailable,
+}
+
+static LOG_SINK: OnceLock<LogSink> = OnceLock::new();
+static LOGGER_PIDS: LazyLock<Mutex<HashSet<u32>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// Initialize logging subscriber if it's not already running for this PID (for SAPIs that
 /// spawn worker processes)
 pub fn init_once() {
     let pid = process::id();
-    let mut logger_pids = LOGGER_PIDS.lock().unwrap();
-    if logger_pids.contains_key(&pid) {
-        return;
+    {
+        let mut logger_pids = LOGGER_PIDS.lock().unwrap();
+        if !logger_pids.insert(pid) {
+            return;
+        }
     }
 
     let log_level = ini_get::<Option<&CStr>>(config::ini::OTEL_LOG_LEVEL)
@@ -40,42 +55,48 @@ pub fn init_once() {
     };
 
     let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
-    let result = tracing::subscriber::set_global_default(subscriber);
-    if result.is_ok() {
-        logger_pids.insert(pid, ());
-        tracing::debug!("Logging::initialized level={}", level_filter);
-    } else {
-        tracing::debug!("Logging::already initialized for pid={}", pid);
+    // Emitted outside the LOGGER_PIDS lock: the layer writes to the log sink, and holding an
+    // unrelated lock across that is a deadlock waiting to be introduced.
+    match tracing::subscriber::set_global_default(subscriber) {
+        Ok(()) => tracing::debug!("Logging::initialized level={}", level_filter),
+        Err(_) => tracing::debug!("Logging::already initialized for pid={}", pid),
+    }
+}
+
+fn resolve_log_sink() -> LogSink {
+    let log_file = ini_get::<Option<&CStr>>(config::ini::OTEL_LOG_FILE)
+        .and_then(|cstr| cstr.to_str().ok())
+        .unwrap_or("/dev/stderr");
+
+    match log_file {
+        "/dev/stdout" => LogSink::Stdout,
+        "/dev/stderr" => LogSink::Stderr,
+        path => match OpenOptions::new().create(true).append(true).open(path) {
+            Ok(file) => LogSink::File(Mutex::new(file)),
+            Err(err) => {
+                eprintln!("[ERROR] Failed to open log file '{}': {}", path, err);
+                LogSink::Unavailable
+            }
+        },
     }
 }
 
 fn log_message(message: &str) {
-    let log_file = LOG_FILE_PATH.get_or_init(|| {
-        ini_get::<Option<&CStr>>(config::ini::OTEL_LOG_FILE)
-            .and_then(|cstr| cstr.to_str().ok())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "/dev/stderr".to_string())
-    });
-
-    match log_file.as_str() {
-        "/dev/stdout" => {
-            println!("{}", message);
-        }
-        "/dev/stderr" => {
-            eprintln!("{}", message);
-        }
-        _ => {
-            match OpenOptions::new().create(true).append(true).open(log_file) {
-                Ok(mut file) => {
-                    if let Err(err) = writeln!(file, "{}", message) {
-                        eprintln!("[ERROR] Failed to write to log file '{}': {}", log_file, err);
-                    }
-                }
-                Err(err) => {
-                    eprintln!("[ERROR] Failed to open log file '{}': {}", log_file, err);
-                }
+    match LOG_SINK.get_or_init(resolve_log_sink) {
+        LogSink::Stdout => println!("{}", message),
+        LogSink::Stderr => eprintln!("{}", message),
+        LogSink::File(file) => {
+            // A poisoned lock means a previous writer panicked mid-write; the handle is
+            // still usable for appending, so keep logging rather than panicking in turn.
+            let mut file = match file.lock() {
+                Ok(file) => file,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            if let Err(err) = writeln!(file, "{}", message) {
+                eprintln!("[ERROR] Failed to write to log file: {}", err);
             }
         }
+        LogSink::Unavailable => {}
     }
 }
 

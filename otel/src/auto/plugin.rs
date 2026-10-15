@@ -5,6 +5,7 @@ use phper::{
 };
 
 // Submodules
+pub mod db;
 pub mod laminas;
 pub mod psr18;
 #[cfg(feature = "test")]

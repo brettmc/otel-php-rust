@@ -30,5 +30,5 @@ Resource
 %A
 Span #0
 %A
-[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::trace::tracer_provider: event src/trace/tracer_provider.rs:%d message=OpenTelemetry tracer provider flush success
+[%s] [DEBUG] [pid=%d] [ThreadId(%d)] otel::provider: event src/provider.rs:%d message=OpenTelemetry tracer provider flush success
 %A

@@ -44,6 +44,13 @@ const SPAN_BUILDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\SpanBuilder";
 
 pub type SpanBuilderClass = StateClass<SpanBuilderState>;
 
+/// The state of a SpanBuilder is only populated by `Tracer::spanBuilder()`. An instance
+/// obtained any other way (`newInstanceWithoutConstructor()`) has none, which is a userland
+/// mistake to report rather than a reason to panic across the FFI boundary.
+fn uninitialized() -> phper::Error {
+    phper::Error::boxed("SpanBuilder was not created by Tracer::spanBuilder()")
+}
+
 pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilderState> {
     let mut class = ClassEntity::<SpanBuilderState>::new_with_state_constructor(
         SPAN_BUILDER_CLASS_NAME,
@@ -60,7 +67,7 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilder
 
     class.add_method("setAttribute", Visibility::Public, |this, arguments| {
         let state = this.as_mut_state();
-        let span_builder = state.span_builder.as_ref().expect("SpanBuilder not set");
+        let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
         let name = arguments[0].expect_z_str()?.to_str()?.to_string();
         let value = arguments[1].expect_z_str()?.to_str()?.to_string();
         let mut attributes = span_builder.attributes.clone().unwrap_or_default();
@@ -90,7 +97,7 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilder
     class
         .add_method("setSpanKind", Visibility::Public, |this, arguments| {
             let state = this.as_mut_state();
-            let span_builder = state.span_builder.as_ref().expect("SpanBuilder not set");
+            let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
             let span_kind_int = arguments[0].expect_long()?;
             let span_kind = match span_kind_int {
                 0 => SpanKind::Internal,
@@ -113,8 +120,8 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilder
     class
         .add_method("startSpan", Visibility::Public, move |this, _| {
             let state = this.as_state();
-            let span_builder = state.span_builder.as_ref().expect("SpanBuilder not set");
-            let tracer = state.tracer.as_ref().expect("Tracer not set");
+            let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
+            let tracer = state.tracer.as_ref().ok_or_else(uninitialized)?;
             let parent_context = if state.parent_context_id > 0 {
                 storage::get_context_instance(Some(state.parent_context_id))
                     .map(|ctx| {

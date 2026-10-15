@@ -54,6 +54,44 @@ pub fn zval_arr_to_key_value_vec(arr: ZArray) -> Vec<KeyValue> {
     result
 }
 
+/// Insert a `KeyValue` into a PHP array, converting the value to its PHP equivalent.
+///
+/// Scalars become the corresponding PHP scalar and arrays become a packed PHP array. A
+/// value of a kind not representable here is skipped rather than inserted as null, so a
+/// caller reading the array sees the key as absent.
+pub fn insert_attribute(arr: &mut ZArray, kv: &KeyValue) {
+    let key = kv.key.as_str();
+    match &kv.value {
+        Value::String(s) => arr.insert(key, s.as_str()),
+        Value::I64(i) => arr.insert(key, *i),
+        Value::F64(f) => arr.insert(key, *f),
+        Value::Bool(b) => arr.insert(key, *b),
+        Value::Array(values) => {
+            let mut arr_values = ZArray::new();
+            match values {
+                Array::Bool(vec) => for v in vec { arr_values.insert((), *v); },
+                Array::I64(vec) => for v in vec { arr_values.insert((), *v); },
+                Array::F64(vec) => for v in vec { arr_values.insert((), *v); },
+                Array::String(vec) => for v in vec { arr_values.insert((), v.as_str()); },
+                // `Array` is non-exhaustive upstream; skip kinds we cannot represent.
+                _ => return,
+            }
+            arr.insert(key, arr_values);
+        }
+        // `Value` is non-exhaustive upstream; skip kinds we cannot represent.
+        _ => {}
+    }
+}
+
+/// Convert a set of `KeyValue`s into a PHP array, skipping any unrepresentable values.
+pub fn attributes_to_zarray<'a>(attributes: impl IntoIterator<Item = &'a KeyValue>) -> ZArray {
+    let mut arr = ZArray::new();
+    for kv in attributes {
+        insert_attribute(&mut arr, kv);
+    }
+    arr
+}
+
 /// Get the name of the SAPI module.
 pub fn get_sapi_module_name() -> String {
     unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }

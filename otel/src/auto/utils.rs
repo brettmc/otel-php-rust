@@ -17,15 +17,25 @@ use phper::{
     objects::ZObj,
 };
 use regex::Regex;
+use std::sync::LazyLock;
+
+// Compiling a Regex is orders of magnitude more expensive than matching with one,
+// and these run on every instrumented database query, so compile them once.
+static SELECT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?si)^\s*(SELECT)\b.*?\bFROM\b(.*)"#).unwrap());
+static INSERT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?si)^\s*(INSERT)\s+INTO\s+([`"a-zA-Z0-9_\.]+)"#).unwrap());
+static UPDATE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?si)^\s*(UPDATE)\s+([`"a-zA-Z0-9_\.]+)"#).unwrap());
+static DELETE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?si)^\s*(DELETE)\s+FROM\s+([`"a-zA-Z0-9_\.]+)"#).unwrap());
+static TABLE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^[`"a-zA-Z0-9_\.]+"#).unwrap());
 
 pub fn extract_span_name_from_sql(sql: &str) -> Option<String> {
     let sql = sql.trim();
-    let select_re = Regex::new(r#"(?si)^\s*(SELECT)\b.*?\bFROM\b(.*)"#).unwrap();
-    let insert_re = Regex::new(r#"(?si)^\s*(INSERT)\s+INTO\s+([`"a-zA-Z0-9_\.]+)"#).unwrap();
-    let update_re = Regex::new(r#"(?si)^\s*(UPDATE)\s+([`"a-zA-Z0-9_\.]+)"#).unwrap();
-    let delete_re = Regex::new(r#"(?si)^\s*(DELETE)\s+FROM\s+([`"a-zA-Z0-9_\.]+)"#).unwrap();
 
-    if let Some(caps) = select_re.captures(sql) {
+    if let Some(caps) = SELECT_RE.captures(sql) {
         let after_from = caps.get(2).map(|m| m.as_str().trim_start());
         if let Some(after_from) = after_from {
             // If FROM is followed by a parenthesis, it's a subquery, not a table
@@ -33,22 +43,21 @@ pub fn extract_span_name_from_sql(sql: &str) -> Option<String> {
                 return Some("SELECT".to_string());
             }
             // Otherwise, match the table name
-            let table_re = Regex::new(r#"^[`"a-zA-Z0-9_\.]+"#).unwrap();
-            if let Some(table_caps) = table_re.captures(after_from) {
+            if let Some(table_caps) = TABLE_RE.captures(after_from) {
                 let table = table_caps.get(0).map(|m| m.as_str().replace(['"', '`'], ""));
                 return table.map(|t| format!("SELECT {}", t));
             }
         }
     }
-    if let Some(caps) = insert_re.captures(sql) {
+    if let Some(caps) = INSERT_RE.captures(sql) {
         let table = caps.get(2).map(|m| m.as_str().replace(['"', '`'], ""));
         return table.map(|t| format!("INSERT {}", t));
     }
-    if let Some(caps) = update_re.captures(sql) {
+    if let Some(caps) = UPDATE_RE.captures(sql) {
         let table = caps.get(2).map(|m| m.as_str().replace(['"', '`'], ""));
         return table.map(|t| format!("UPDATE {}", t));
     }
-    if let Some(caps) = delete_re.captures(sql) {
+    if let Some(caps) = DELETE_RE.captures(sql) {
         let table = caps.get(2).map(|m| m.as_str().replace(['"', '`'], ""));
         return table.map(|t| format!("DELETE {}", t));
     }

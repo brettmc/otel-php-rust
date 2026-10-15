@@ -43,9 +43,17 @@ pub fn current_context() -> Arc<Context> {
         .unwrap_or_else(|| Arc::new(Context::current()))
 }
 
+/// Look up a stored context by id, falling back to the current context.
+///
+/// A userland Context object can outlive its stored instance (for example if its scope was
+/// already detached), so a missing id is a recoverable condition rather than a panic: the
+/// current context is the same answer `None` gets.
 pub fn resolve_context(instance_id: Option<u64>) -> Arc<Context> {
     match instance_id {
-        Some(id) => get_context_instance(Some(id)).expect("context not found"),
+        Some(id) => get_context_instance(Some(id)).unwrap_or_else(|| {
+            debug!("Context instance {} not found, falling back to current context", id);
+            Arc::new(Context::current())
+        }),
         None => Arc::new(Context::current()),
     }
 }

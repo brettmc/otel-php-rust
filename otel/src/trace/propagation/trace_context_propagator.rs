@@ -37,8 +37,11 @@ pub fn make_trace_context_propagator_class(
             let context_id = get_instance_id(context_obj);
             tracing::debug!("inject() using context_id = {:?}", context_id);
 
-            let context = storage::get_context_instance(context_id);
-            let context_ref = context.as_ref().map(|arc| arc.as_ref()).expect("invalid context");
+            // `Context::getCurrent()` reports a context_id of 0, which resolves to `None`, so
+            // the overwhelmingly common call shape has no stored instance to look up. Fall
+            // back to the current context rather than treating that as an error.
+            let context = storage::resolve_context(context_id);
+            let context_ref = context.as_ref();
 
             // Carrier gymnastics (PHP array passed by ref)
             let carrier_ref = arguments[0].expect_mut_z_ref()?;

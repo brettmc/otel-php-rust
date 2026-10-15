@@ -8,28 +8,20 @@ use phper::{
 };
 use crate::{
     auto::{
+        guard,
         execute_data::{
             get_fqn,
             get_global_exception,
         },
-        plugin::{
-            FunctionObserver,
-        },
         plugin_manager::{
+            get_cached_observer,
             get_global as get_plugin_manager,
         },
     },
 };
-use std::{
-    collections::HashMap,
-    sync::{Arc, OnceLock, RwLock},
-};
-
-static FUNCTION_OBSERVERS: OnceLock<RwLock<HashMap<String, Arc<FunctionObserver>>>> = OnceLock::new();
 
 pub fn init() {
     tracing::debug!("Observer::init");
-    FUNCTION_OBSERVERS.get_or_init(|| RwLock::new(HashMap::new()));
     unsafe {
         sys::zend_observer_fcall_register(Some(observer_instrument));
     }
@@ -41,30 +33,42 @@ pub fn init() {
 /// Called by the Zend engine as an observer registration handler. `execute_data`
 /// must be a valid pointer to the frame being compiled, or null.
 pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
-    if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)}
-        && let Some(fqn) = get_fqn(exec_data) {
+    const UNOBSERVED: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
+        begin: None,
+        end: None,
+    };
+
+    let observed = guard("observer_instrument", || {
+        let Some(exec_data) = (unsafe { ExecuteData::try_from_mut_ptr(execute_data) }) else {
+            return false;
+        };
+        let Some(fqn) = get_fqn(exec_data) else {
+            return false;
+        };
         tracing::trace!("observer::observer_instrument checking: {}", &fqn);
-        let plugin_manager = get_plugin_manager()
-            .expect("PluginManager not initialized")
-            .read()
-            .unwrap();
-        if let Some(observer) = plugin_manager.get_function_observer(exec_data) {
-            let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-            let mut lock = observers.write().unwrap();
-            lock.insert(fqn, observer);
 
-            static mut HANDLERS: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
-                begin: Some(pre_observe_c_function),
-                end: Some(post_observe_c_function),
-            };
+        let Some(plugin_manager) = get_plugin_manager() else {
+            tracing::error!("Observer::PluginManager not initialized, skipping instrumentation");
+            return false;
+        };
+        // A poisoned lock means a previous reader panicked; the manager is only mutated
+        // during MINIT, so its contents are still sound to read.
+        let plugin_manager = match plugin_manager.read() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
-            return unsafe { HANDLERS };
-        }
+        // Populates the shared cache that the begin/end handlers below read from.
+        plugin_manager.get_function_observer(exec_data).is_some()
+    });
+
+    if observed != Some(true) {
+        return UNOBSERVED;
     }
 
     sys::zend_observer_fcall_handlers {
-        begin: None,
-        end: None,
+        begin: Some(pre_observe_c_function),
+        end: Some(post_observe_c_function),
     }
 }
 
@@ -74,18 +78,22 @@ pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execut
 /// pointer to the frame being entered, or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_execute_data) {
-    if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)}
-        && let Some(fqn) = get_fqn(exec_data) {
-        let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-        let lock = observers.read().unwrap();
-        if let Some(observer) = lock.get(&fqn)
-            && observer.has_hooks() {
-                for hook in observer.pre_hooks() {
-                    tracing::trace!("running pre hook: {}", fqn);
-                    hook(&mut *exec_data);
-                }
-            }
-    }
+    guard("pre_observe", || {
+        let Some(exec_data) = (unsafe { ExecuteData::try_from_mut_ptr(execute_data) }) else {
+            return;
+        };
+        let Some(fqn) = get_fqn(exec_data) else {
+            return;
+        };
+        // Only functions with hooks are ever cached, so no `has_hooks()` re-check is needed.
+        let Some(observer) = get_cached_observer(&fqn) else {
+            return;
+        };
+        for hook in observer.pre_hooks() {
+            tracing::trace!("running pre hook: {}", fqn);
+            hook(exec_data);
+        }
+    });
 }
 
 /// # Safety
@@ -95,20 +103,28 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
 /// value, or be null if the function returned nothing.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, retval: *mut sys::zval) {
-    if let Some(exec_data) = unsafe{ExecuteData::try_from_mut_ptr(execute_data)}
-        && let Some(fqn) = get_fqn(exec_data) {
-        let observers = FUNCTION_OBSERVERS.get().expect("Function observer not initialized");
-        let lock = observers.read().unwrap();
-        if let Some(observer) = lock.get(&fqn) {
-            let retval = if retval.is_null() {
-                &mut ZVal::from(())
-            } else {
-                unsafe { (retval as *mut ZVal).as_mut().unwrap() }
-            };
-            for hook in observer.post_hooks() {
-                tracing::trace!("running post hook: {}", fqn);
-                hook(&mut *exec_data, retval, get_global_exception());
-            }
+    guard("post_observe", || {
+        let Some(exec_data) = (unsafe { ExecuteData::try_from_mut_ptr(execute_data) }) else {
+            return;
+        };
+        let Some(fqn) = get_fqn(exec_data) else {
+            return;
+        };
+        let Some(observer) = get_cached_observer(&fqn) else {
+            return;
+        };
+
+        // Not every observed call has a return value slot, but the hooks take a `&mut ZVal`.
+        // The fallback is bound here so that it outlives the borrow handed to the hooks.
+        let mut fallback = ZVal::from(());
+        let retval: &mut ZVal = match unsafe { (retval as *mut ZVal).as_mut() } {
+            Some(retval) => retval,
+            None => &mut fallback,
+        };
+
+        for hook in observer.post_hooks() {
+            tracing::trace!("running post hook: {}", fqn);
+            hook(exec_data, retval, get_global_exception());
         }
-    }
+    });
 }
