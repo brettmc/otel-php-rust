@@ -1,17 +1,15 @@
-name: Build PHP Extension
+name: Build and test
 
 on:
   push:
-    branches: [main, gh-action]
+    branches: [main]
   pull_request:
 
 jobs:
-  test:
+  # Dependency scanning is independent of the PHP version, so it runs once rather than
+  # being duplicated across the test matrix.
+  audit:
     runs-on: ubuntu-latest
-    continue-on-error: true
-    strategy:
-      matrix:
-        php-version: ['7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4']
     steps:
       - uses: actions/checkout@v4
 
@@ -19,6 +17,33 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          cache: false
+
+      # scans Cargo.lock against the RustSec advisory database. This can go red without
+      # any change on our side, when a new advisory lands against a dependency.
+      - name: Security audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: otel
+
+  test:
+    runs-on: ubuntu-latest
+    # NOTE: this is job-level, so it does not make individual steps non-fatal -- it only
+    # stops a failing matrix entry from failing the whole workflow run. A failing step
+    # still fails its job, which is what makes the clippy steps below a real gate.
+    continue-on-error: true
+    strategy:
+      matrix:
+        php-version: ['7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
           cache: false
 
       - name: Set up PHP
@@ -50,6 +75,15 @@ jobs:
         working-directory: otel
         if: matrix.php-version != '7.0' && matrix.php-version != '7.1'
         run: (cd tests/auto/psr18 && composer update --no-dev)
+
+      # Clippy runs per PHP version on purpose. build.rs sets otel_observer_supported on
+      # PHP 8+ and otel_observer_not_supported on 7.x, and auto/mod.rs compiles only one
+      # of auto/observer.rs (8+) or auto/execute.rs (7.x) -- so a single-version run is
+      # blind to the other file entirely. It also reuses the Build step's target/, which
+      # makes it a few seconds rather than a fresh compile.
+      - name: Clippy
+        working-directory: otel
+        run: cargo clippy --all-targets --features test -- -D warnings
 
       - name: Run cargo tests
         working-directory: otel
