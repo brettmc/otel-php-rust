@@ -1,5 +1,15 @@
 --TEST--
 Every declared parameter and return type names a class or interface that exists
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80000) {
+    // phper-sys only encodes class-valued type hints into zend_internal_arg_info on
+    // PHP 8.0+; on PHP 7 both ZEND_ARG_OBJ_INFO and ZEND_BEGIN_ARG_WITH_RETURN_OBJ_INFO_EX
+    // are compiled out, so reflection reports no class types at all and the
+    // "a zero count would make this test pass by checking nothing" guard below trips.
+    die("skip class type hints are not registered before PHP 8.0");
+}
+?>
 --EXTENSIONS--
 otel
 --INI--

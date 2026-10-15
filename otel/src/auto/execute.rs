@@ -154,7 +154,7 @@ unsafe extern "C" fn execute_internal(
     handle_execution(
         exec_data,
         ret_val,
-        |ed, rv| upstream_execute_internal(ed, rv),
+        upstream_execute_internal,
         |observer, exec_data, retval| {
             for hook in observer.post_hooks() {
                 hook(exec_data, retval, get_global_exception());

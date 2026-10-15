@@ -1,5 +1,14 @@
 --TEST--
 LocalRootSpan::current() declares a return type that exists
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80000) {
+    // phper-sys compiles ZEND_BEGIN_ARG_WITH_RETURN_OBJ_INFO_EX out below PHP 8.0, so
+    // current() is registered with no return type and reflection reports "". The typo
+    // this test guards against can therefore only be detected on 8.0+.
+    die("skip class return types are not registered before PHP 8.0");
+}
+?>
 --EXTENSIONS--
 otel
 --INI--
