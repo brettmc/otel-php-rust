@@ -509,8 +509,13 @@ fn close_root_span() {
 /// Ensure $_SERVER is initialized, which may not be true if auto_globals_jit is enabled.
 fn jit_initialization() {
     unsafe {
-        let jit_initialization: u8 = pg!(auto_globals_jit);
-        if jit_initialization != 0 {
+        // `auto_globals_jit` is `zend_bool` (a `u8`) on PHP 7.x but a real `bool` on PHP 8+,
+        // so neither a `u8` annotation nor a `bool` one compiles everywhere, and converting
+        // between them is a useless conversion (which clippy denies) on whichever version
+        // already has the target type. Comparing against `Default::default()` infers the
+        // field's own type, so it is both correct and lint-clean on every version.
+        let jit_initialization = pg!(auto_globals_jit);
+        if jit_initialization != Default::default() {
             tracing::debug!("JIT auto_globals_jit enabled, initializing $_SERVER");
             let mut server = "_SERVER".to_string();
             sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
