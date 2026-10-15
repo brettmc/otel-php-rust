@@ -3,6 +3,8 @@
 **/.vscode/*
 !**/.vscode/tasks.json
 !**/.vscode/settings.json
+**/.claude/*
+
 .cargo
 vendor/
 otel/demo/
