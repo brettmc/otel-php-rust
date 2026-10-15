@@ -27,6 +27,51 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: otel
 
+  # Cargo.lock is committed, which pins us to one dependency graph and hides upstream
+  # breakage until someone runs `cargo update`. This job is the counterweight recommended
+  # by https://doc.rust-lang.org/cargo/guide/continuous-integration.html#verifying-latest-dependencies
+  # -- it resolves the newest versions allowed by Cargo.toml and checks they still work,
+  # which is what anyone running `cargo add`/`cargo install` would get.
+  #
+  # continue-on-error is job-level and deliberate: a dependency published an hour ago
+  # should not block an unrelated PR. Expect to read this one's result rather than rely
+  # on it going red. Only Rust-level checks run here; the phpt suites stay in `test`.
+  latest-deps:
+    name: Latest dependencies
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      # stops the resolver from holding dependencies back over rust-version metadata
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: allow
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
+
+      # cargo build needs php-config, even though no extension is installed here
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      # ignores the committed lockfile and takes the newest semver-compatible versions
+      - name: Update to latest dependencies
+        working-directory: otel
+        run: cargo update --verbose
+
+      - name: Build
+        working-directory: otel
+        run: cargo build --features test --verbose
+
+      - name: Run cargo tests
+        working-directory: otel
+        run: cargo test --features test --verbose
+
   test:
     runs-on: ubuntu-latest
     # NOTE: this is job-level, so it does not make individual steps non-fatal -- it only
