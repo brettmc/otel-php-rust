@@ -19,7 +19,10 @@ use opentelemetry::{
 };
 use opentelemetry_sdk::trace::SdkTracer;
 use crate::{
-    context::storage,
+    context::{
+        context_interface::CONTEXT_INTERFACE_NAME,
+        storage,
+    },
     trace::{
         span::SpanClass,
     }
@@ -91,7 +94,7 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilder
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
         .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(r"OpenTelemetry\Context\ContextInterface"),
+            String::from(CONTEXT_INTERFACE_NAME),
         )));
 
     class

@@ -4,9 +4,8 @@ use phper::{
 use phper::functions::ReturnType;
 use phper::types::ReturnTypeHint;
 use phper::arrays::ZArray;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::convert::Infallible;
-use once_cell::sync::Lazy;
 use opentelemetry_sdk::trace::InMemorySpanExporter;
 use crate::util;
 
@@ -15,7 +14,7 @@ pub type MemoryExporterClass = StateClass<()>;
 const MEMORY_EXPORTER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\SpanExporter\Memory";
 
 // Static instance of the exporter
-pub static MEMORY_EXPORTER: Lazy<Mutex<InMemorySpanExporter>> = Lazy::new(|| {
+pub static MEMORY_EXPORTER: LazyLock<Mutex<InMemorySpanExporter>> = LazyLock::new(|| {
     Mutex::new(InMemorySpanExporter::default())
 });
 

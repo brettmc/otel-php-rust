@@ -1,4 +1,19 @@
-// Handle auto-instrumentation via the observer API (PHP 8+)
+//! Auto-instrumentation via the Zend observer API (PHP 8+).
+//!
+//! This is one of two mutually exclusive backends, selected by `build.rs`: this module is
+//! compiled under `otel_observer_supported`, and `auto::execute` takes its place on PHP 7.x
+//! under `otel_observer_not_supported`. Only one is ever built, so changes to the other are
+//! not type-checked by a normal build here — see that module's docs for how to check it.
+//!
+//! The engine asks once per function, at compile time, whether that function should be
+//! observed ([`observer_instrument`]), then calls the handlers it was given on every entry
+//! and exit. That split is why instrumentation decisions are cached: `observer_instrument`
+//! populates the plugin manager's cache as a side effect of answering, and the begin/end
+//! handlers only read it, keeping the per-call path to a lookup by FQN.
+//!
+//! Every entry point is `extern "C"` and called by the engine, so all three wrap their work
+//! in [`crate::auto::guard`]: unwinding across an FFI boundary is undefined behaviour, and
+//! there is no PHP frame here to throw into.
 use phper::{
     sys,
     values::{

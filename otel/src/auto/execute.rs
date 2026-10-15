@@ -1,4 +1,25 @@
-// Handle auto-instrumentation via zend_execute_ex wrapping (PHP 7)
+//! Auto-instrumentation by wrapping `zend_execute_ex`/`zend_execute_internal` (PHP 7.x).
+//!
+//! This is one of two mutually exclusive backends, selected by `build.rs`: this module is
+//! compiled under `otel_observer_not_supported`, and `auto::observer` takes its place on
+//! PHP 8+ under `otel_observer_supported`, where the observer API makes this unnecessary.
+//! Because PHP 8 containers never build this file, a normal `cargo check` does not
+//! type-check it. To check it:
+//!
+//! ```sh
+//! RUSTFLAGS="--cfg otel_observer_not_supported" cargo check --features test
+//! ```
+//!
+//! [`init`] saves the engine's own handlers and installs ours in their place, so every call
+//! to a userland function (`execute_ex`) or an internal one (`execute_internal`) passes
+//! through here — unlike the observer API, there is no per-function opt-in, so the hot path
+//! is every call in the process and hook lookup happens inline.
+//!
+//! Both entry points funnel into [`handle_execution`], whose one hard requirement is that
+//! the upstream handler is always reached: these are `extern "C"` frames called by the Zend
+//! VM, so unwinding is undefined behaviour and swallowing the call would stop the program
+//! executing. Instrumentation work is therefore wrapped in [`crate::auto::guard`] and a
+//! failure degrades to a plain, uninstrumented call.
 use phper::{
     sys,
     values::{ExecuteData,ZVal},

@@ -1,7 +1,7 @@
 use crate::{
     auto::{
         execute_data::get_fqn,
-        plugin::{FunctionObserver, Plugin},
+        plugin::{FunctionObserver, Plugin, Target},
         plugin::{
             laminas::LaminasPlugin,
             psr18::Psr18Plugin,
@@ -16,14 +16,13 @@ use phper::{
     ini::ini_get,
     values::ExecuteData,
 };
-use once_cell::sync::OnceCell;
 use std::{
     ffi::CStr,
     collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
+    sync::{Arc, OnceLock, RwLock},
 };
 
-static PLUGIN_MANAGER: OnceCell<RwLock<PluginManager>> = OnceCell::new();
+static PLUGIN_MANAGER: OnceLock<RwLock<PluginManager>> = OnceLock::new();
 
 /// Memoizes the result of matching a function against every plugin's handlers, which is a
 /// comparatively expensive scan involving `is_instance_of` checks.
@@ -34,7 +33,7 @@ static PLUGIN_MANAGER: OnceCell<RwLock<PluginManager>> = OnceCell::new();
 /// Keyed on the fully-qualified name rather than the `zend_function *`, deliberately: a
 /// closure or `eval`'d function is freed mid-request and its address can be reused by an
 /// unrelated function, which would make a pointer-keyed entry return the wrong hooks.
-static FUNCTION_OBSERVER_CACHE: OnceCell<RwLock<HashMap<String, Arc<FunctionObserver>>>> = OnceCell::new();
+static FUNCTION_OBSERVER_CACHE: OnceLock<RwLock<HashMap<String, Arc<FunctionObserver>>>> = OnceLock::new();
 
 pub fn init_observer_cache() {
     FUNCTION_OBSERVER_CACHE.set(RwLock::new(HashMap::new())).ok();
@@ -127,7 +126,7 @@ impl PluginManager {
         let mut observer = FunctionObserver::new();
         for plugin in &self.plugins {
             for handler in plugin.get_handlers() {
-                if should_trace(execute_data.func(), &handler.get_targets(), plugin.get_name()) {
+                if should_trace(execute_data.func(), handler.get_targets(), plugin.get_name()) {
                     let callbacks = handler.get_callbacks();
                     if let Some(pre) = callbacks.pre_observe {
                         observer.add_pre_hook(Box::new(move |execute_data| {
@@ -185,7 +184,13 @@ fn parse_disabled_plugins(value: &str) -> HashSet<String> {
         .collect()
 }
 
-fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], _plugin_name: &str) -> bool {
+/// Whether `func` is one of `targets`.
+///
+/// Matching happens in two passes because the cheap one usually wins: an exact name
+/// comparison first, then — only for methods — a check of whether the observed class
+/// implements or extends a target class. The second pass has to look each target class up in
+/// the class table, so it is worth avoiding when the name already matched.
+fn should_trace(func: &ZFunc, targets: &[Target], _plugin_name: &str) -> bool {
     let name_zstr = func.get_function_or_method_name();
     let function_name = match name_zstr.to_str() {
         Ok(name) => name,
@@ -196,18 +201,20 @@ fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], 
     let class_part = parts.next();
     let method_part = parts.next();
 
-    let observed_name_pair = if let Some(method) = method_part {
-        (class_part, method)
-    } else {
-        (None, function_name)
+    let (observed_class, observed_function) = match method_part {
+        Some(method) => (class_part, method),
+        None => (None, function_name),
     };
 
-    if targets.iter().any(|target| target.0 == observed_name_pair.0 && target.1 == observed_name_pair.1) {
+    if targets
+        .iter()
+        .any(|target| target.class == observed_class && target.function == observed_function)
+    {
         return true;
     }
 
-    if observed_name_pair.0.is_none() {
-        //tracing::trace!("[plugin={}] not checking interfaces, {} is not a class::method", plugin_name, function_name_str);
+    // A free function has no class to walk, so the name comparison above was the only test.
+    if observed_class.is_none() {
         return false;
     }
 
@@ -215,11 +222,12 @@ fn should_trace(func: &ZFunc, targets: &[(Option<&'static str>, &'static str)], 
         Some(class_entry) => class_entry,
         None => return false,
     };
-    for (target_class_name, target_method_name) in targets.iter() {
-        if let Some(interface_name) = target_class_name
-            && target_method_name == &observed_name_pair.1
-            && let Ok(iface_ce) = ClassEntry::from_globals(interface_name)
-            && ce.is_instance_of(iface_ce) {
+    for target in targets.iter() {
+        if let Some(target_class) = target.class
+            && target.function == observed_function
+            && let Ok(target_ce) = ClassEntry::from_globals(target_class)
+            && ce.is_instance_of(target_ce)
+        {
             return true;
         }
     }

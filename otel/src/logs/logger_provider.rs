@@ -7,7 +7,7 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     env,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 use opentelemetry::{
     logs::LoggerProvider,
@@ -23,10 +23,10 @@ use opentelemetry_sdk::{
     },
     Resource,
 };
-use once_cell::sync::Lazy;
 use crate::{
     logs::{
         logger::LoggerClass,
+        logger_interface::LOGGER_INTERFACE_NAME,
         memory_exporter::MEMORY_EXPORTER,
     },
     provider::{self, ProviderKey},
@@ -44,8 +44,8 @@ pub const LOGGER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\LoggerProv
 
 pub type LoggerProviderClass = StateClass<()>;
 
-static LOGGER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static NOOP_LOGGER_PROVIDER: Lazy<Arc<SdkLoggerProvider>> = Lazy::new(|| {
+static LOGGER_PROVIDERS: LazyLock<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static NOOP_LOGGER_PROVIDER: LazyLock<Arc<SdkLoggerProvider>> = LazyLock::new(|| {
     Arc::new(SdkLoggerProvider::builder()
         .with_resource(Resource::builder_empty().build())
         .build())
@@ -209,8 +209,8 @@ pub fn make_logger_provider_class(
         .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
         .argument(Argument::new("version").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
         .argument(Argument::new("schemaUrl").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
-        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]"))
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Logs\LoggerInterface"))));
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable).with_default_value("[]"))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(LOGGER_INTERFACE_NAME))));
 
     class.add_method("forceFlush", Visibility::Public, |_, _| {
         force_flush();

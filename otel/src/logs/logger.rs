@@ -6,9 +6,8 @@ use phper::{
 use std::{
     collections::HashSet,
     convert::Infallible,
-    sync::Mutex,
+    sync::{LazyLock, Mutex},
 };
-use once_cell::sync::Lazy;
 use opentelemetry::logs::{
     Logger,
     LogRecord,
@@ -19,7 +18,7 @@ use crate::logs::log_record::{LOG_RECORD_CLASS_NAME, LogRecordState};
 pub type LoggerClass = StateClass<Option<SdkLogger>>;
 
 const LOGGER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\Logger";
-static EVENT_NAMES: Lazy<Mutex<HashSet<&'static str>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static EVENT_NAMES: LazyLock<Mutex<HashSet<&'static str>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// Intern event names to avoid leaking memory since opentelemetry-rust requires &'static str
 /// This only reduces memory leaks by re-using event names, but does not eliminate them

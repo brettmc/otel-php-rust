@@ -7,9 +7,8 @@ use phper::{
 };
 use std::{
     convert::Infallible,
-    sync::Mutex,
+    sync::{LazyLock, Mutex},
 };
-use once_cell::sync::Lazy;
 use opentelemetry_sdk::logs::InMemoryLogExporter;
 
 pub type MemoryExporterClass = StateClass<()>;
@@ -17,7 +16,7 @@ pub type MemoryExporterClass = StateClass<()>;
 const MEMORY_EXPORTER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\MemoryLogsExporter";
 
 // Static instance of the exporter
-pub static MEMORY_EXPORTER: Lazy<Mutex<InMemoryLogExporter>> = Lazy::new(|| {
+pub static MEMORY_EXPORTER: LazyLock<Mutex<InMemoryLogExporter>> = LazyLock::new(|| {
     Mutex::new(InMemoryLogExporter::default())
 });
 

@@ -1,6 +1,6 @@
 use crate::{
     auto::{
-        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, db},
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, Target, db},
         utils,
     },
     config::trace_attributes,
@@ -109,10 +109,11 @@ impl Plugin for LaminasPlugin {
 pub struct LaminasApplicationRunHandler;
 
 impl Handler for LaminasApplicationRunHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Laminas\Mvc\Application"), "run"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Laminas\Mvc\Application", "run"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -127,7 +128,7 @@ impl Handler for LaminasApplicationRunHandler {
 }
 
 impl LaminasApplicationRunHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         if let Some(ctx) = get_local_root_span_context() {
             ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "laminas"));
         };
@@ -136,7 +137,7 @@ impl LaminasApplicationRunHandler {
         let span_name = "Application::run".to_string();
         unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
@@ -149,10 +150,11 @@ impl LaminasApplicationRunHandler {
 pub struct LaminasCompleteRequestHandler;
 
 impl Handler for LaminasCompleteRequestHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Laminas\Mvc\Application"), "completeRequest"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Laminas\Mvc\Application", "completeRequest"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -165,7 +167,7 @@ impl Handler for LaminasCompleteRequestHandler {
 }
 
 impl LaminasCompleteRequestHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         //get the first argument from exec_data, which is an MvcEvent
         let exec_data_ref = unsafe { &mut *exec_data };
         let mvc_event_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
@@ -209,10 +211,11 @@ impl LaminasCompleteRequestHandler {
 pub struct LaminasRouteHandler;
 
 impl Handler for LaminasRouteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Laminas\Mvc\MvcEvent"), "setRouteMatch"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Laminas\Mvc\MvcEvent", "setRouteMatch"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -225,7 +228,7 @@ impl Handler for LaminasRouteHandler {
 }
 
 impl LaminasRouteHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         tracing::debug!("Auto::Laminas::pre (MvcEvent::setRouteMatch)");
         let ctx = match get_local_root_span_context() {
             Some(ctx) => ctx,
@@ -273,10 +276,11 @@ impl LaminasRouteHandler {
 pub struct LaminasDbConnectHandler;
 
 impl Handler for LaminasDbConnectHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Laminas\Db\Adapter\Driver\AbstractConnection"), "connect"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Laminas\Db\Adapter\Driver\AbstractConnection", "connect"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -303,7 +307,7 @@ fn extract_laminas_db_namespace(arr: &phper::arrays::ZArr) -> String {
 }
 
 impl LaminasDbConnectHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         unsafe {
             utils::start_and_activate_span(
                 tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db"),
@@ -345,7 +349,7 @@ impl LaminasDbConnectHandler {
         }
     }
 
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
@@ -360,10 +364,11 @@ impl LaminasDbConnectHandler {
 pub struct LaminasStatementPrepareHandler;
 
 impl Handler for LaminasStatementPrepareHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Laminas\Db\Adapter\Driver\StatementInterface"), "prepare"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Laminas\Db\Adapter\Driver\StatementInterface", "prepare"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -378,7 +383,7 @@ impl Handler for LaminasStatementPrepareHandler {
 }
 
 impl LaminasStatementPrepareHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         unsafe {
             utils::start_and_activate_span(
                 tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db"),
@@ -389,7 +394,7 @@ impl LaminasStatementPrepareHandler {
             );
         }
     }
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
@@ -474,10 +479,11 @@ impl LaminasStatementPrepareHandler {
 pub struct LaminasStatementExecuteHandler;
 
 impl Handler for LaminasStatementExecuteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Laminas\Db\Adapter\Driver\StatementInterface"), "execute"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Laminas\Db\Adapter\Driver\StatementInterface", "execute"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -492,14 +498,14 @@ impl Handler for LaminasStatementExecuteHandler {
 }
 
 impl LaminasStatementExecuteHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         tracing::debug!("Auto::Laminas::pre (Statement::execute) - pre_callback called");
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db");
         let span_name = "Statement::execute".to_string();
         unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, SpanKind::Client); }
     }
 
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
@@ -534,10 +540,11 @@ impl LaminasStatementExecuteHandler {
 pub struct LaminasConnectionExecuteHandler;
 
 impl Handler for LaminasConnectionExecuteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Laminas\Db\Adapter\Driver\ConnectionInterface"), "execute"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Laminas\Db\Adapter\Driver\ConnectionInterface", "execute"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -552,7 +559,7 @@ impl Handler for LaminasConnectionExecuteHandler {
 }
 
 impl LaminasConnectionExecuteHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         tracing::debug!("Auto::Laminas::pre (Connection::execute) - pre_callback called");
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.laminas.db");
         let exec_data_ref = unsafe {&mut *exec_data};
@@ -568,7 +575,7 @@ impl LaminasConnectionExecuteHandler {
         unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
     }
 
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>

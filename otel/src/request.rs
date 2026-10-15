@@ -1,3 +1,29 @@
+//! Per-request lifecycle: the RINIT and RSHUTDOWN halves of a PHP request.
+//!
+//! [`on_request_init`] and [`on_request_shutdown`] are the only entry points the module
+//! wires up (see [`crate::module`]); everything else here exists to serve them. The two must
+//! stay symmetric — a request runs in a worker process that will serve the next one, so
+//! anything RINIT establishes (an active context, mutated environment, a root span) has to
+//! be unwound in RSHUTDOWN or it leaks across the request boundary into an unrelated trace.
+//!
+//! The work splits into four concerns:
+//!
+//! - **Disabling.** `otel.disabled`, `.env`, and the excluded-URL list decide whether this
+//!   request is traced at all. [`is_disabled`] is on the hot path — consulted once per
+//!   auto-instrumented function — so its answer is memoized per request.
+//! - **Environment.** A request may carry its own `.env`, which is applied over the process
+//!   environment and restored at RSHUTDOWN from `ENV_BACKUP`. The SDK reads configuration
+//!   from env vars, so this is how per-directory config reaches it at all.
+//! - **The root span.** For a web request, RINIT opens a span from the propagated remote
+//!   context, named for the HTTP method, and RSHUTDOWN finishes it with the response status.
+//!   Both are skipped under CLI unless `otel.cli.enabled` is set.
+//! - **`$_SERVER` reading.** Request attributes (method, uri, headers) and the incoming
+//!   traceparent all come from `$_SERVER`, which is why RINIT has to force-populate it when
+//!   `auto_globals_jit` would otherwise leave it empty.
+//!
+//! All request state lives in thread-locals rather than process statics, because a request
+//! belongs to a thread: under a threaded SAPI, sharing them would let one request's root
+//! span or env backup clobber another's.
 use anyhow::Context as _;
 use phper::{
     eg,

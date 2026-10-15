@@ -7,12 +7,18 @@ use phper::{
     types::ReturnTypeHint,
 };
 use crate::{
-    logs::logger_provider::LoggerProviderClass,
+    context::propagation::text_map_propagator_interface::TEXT_MAP_PROPAGATOR_INTERFACE_NAME,
+    logs::{
+        logger_provider::LoggerProviderClass,
+        logger_provider_interface::LOGGER_PROVIDER_INTERFACE_NAME,
+    },
     trace::{
         propagation::trace_context_propagator::TraceContextPropagatorClass,
         tracer_provider::TracerProviderClass,
+        tracer_provider_interface::TRACER_PROVIDER_INTERFACE_NAME,
     }
 };
+
 const GLOBALS_CLASS_NAME: &str = r"OpenTelemetry\API\Globals";
 
 pub fn make_globals_class(
@@ -27,20 +33,21 @@ pub fn make_globals_class(
             let object = tracer_provider_class.init_object()?;
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Trace\TracerProviderInterface"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(TRACER_PROVIDER_INTERFACE_NAME))));
 
     class
         .add_static_method("propagator", Visibility::Public, move |_| {
             let object = propagator_class.init_object()?;
             Ok::<_, phper::Error>(object)
-        }); //TODO return interface
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(TEXT_MAP_PROPAGATOR_INTERFACE_NAME))));
 
     class
         .add_static_method("loggerProvider", Visibility::Public, move |_| {
             let object = logger_provider_class.init_object()?;
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Logs\LoggerProvider"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(LOGGER_PROVIDER_INTERFACE_NAME))));
 
     class
 }

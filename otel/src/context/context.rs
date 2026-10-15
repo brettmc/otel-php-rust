@@ -1,5 +1,7 @@
 use crate::context::{
+    context_interface::CONTEXT_INTERFACE_NAME,
     scope::ScopeClassEntity,
+    scope_interface::SCOPE_INTERFACE_NAME,
     storage::{self, StorageClassEntity},
 };
 use phper::{
@@ -74,7 +76,7 @@ pub fn build_context_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
 
 
     //TODO: this doesn't usefully work, since the "key" is the type of the struct,
@@ -121,7 +123,7 @@ pub fn build_context_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SCOPE_INTERFACE_NAME))));
 
     class
         .add_static_method("storage", Visibility::Public, move |_| {

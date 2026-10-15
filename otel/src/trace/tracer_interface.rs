@@ -4,8 +4,10 @@ use phper::{
     types::{ArgumentTypeHint},
 };
 
+pub const TRACER_INTERFACE_NAME: &str = r"OpenTelemetry\API\Trace\TracerInterface";
+
 pub fn make_tracer_interface() -> InterfaceEntity {
-    let mut interface = InterfaceEntity::new(r"OpenTelemetry\API\Trace\TracerInterface");
+    let mut interface = InterfaceEntity::new(TRACER_INTERFACE_NAME);
     interface
         .add_method("spanBuilder")
         .argument(Argument::new("spanName").with_type_hint(ArgumentTypeHint::String))

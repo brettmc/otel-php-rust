@@ -1,7 +1,7 @@
 use crate::{
     auto::{
         execute_data,
-        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, db},
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, Target, db},
         utils,
     },
     config::trace_attributes,
@@ -104,10 +104,11 @@ impl Plugin for Zf1Plugin {
 pub struct Zf1RouteHandler;
 
 impl Handler for Zf1RouteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some("Zend_Controller_Router_Interface"), "route"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method("Zend_Controller_Router_Interface", "route"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -120,7 +121,7 @@ impl Handler for Zf1RouteHandler {
 }
 
 impl Zf1RouteHandler {
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         retval: &mut ZVal,
         _exception: Option<&mut ZObj>
@@ -193,10 +194,11 @@ impl Zf1RouteHandler {
 
 pub struct Zf1SendResponseHandler;
 impl Handler for Zf1SendResponseHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some("Zend_Controller_Response_Abstract"), "sendResponse"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method("Zend_Controller_Response_Abstract", "sendResponse"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -209,7 +211,7 @@ impl Handler for Zf1SendResponseHandler {
 }
 
 impl Zf1SendResponseHandler {
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
@@ -261,10 +263,11 @@ impl Zf1SendResponseHandler {
 pub struct Zf1AdapterConnectHandler;
 
 impl Handler for Zf1AdapterConnectHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some("Zend_Db_Adapter_Abstract"), "_connect"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method("Zend_Db_Adapter_Abstract", "_connect"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -279,7 +282,7 @@ impl Handler for Zf1AdapterConnectHandler {
 }
 
 impl Zf1AdapterConnectHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe {&mut *exec_data};
         let this_obj = exec_data_ref.get_this_mut().unwrap();
@@ -325,7 +328,7 @@ impl Zf1AdapterConnectHandler {
         tracing::debug!("Zf1AdapterConnectHandler: should_start_span: {}", should_start_span);
         execute_data::set_exec_data_flag(exec_data, should_start_span);
     }
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
@@ -346,10 +349,11 @@ impl Zf1AdapterConnectHandler {
 pub struct Zf1AdapterPrepareHandler;
 
 impl Handler for Zf1AdapterPrepareHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some("Zend_Db_Adapter_Abstract"), "prepare"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method("Zend_Db_Adapter_Abstract", "prepare"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -364,7 +368,7 @@ impl Handler for Zf1AdapterPrepareHandler {
 }
 
 impl Zf1AdapterPrepareHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe {&mut *exec_data};
         let mut span_name = "prepare".to_string();
@@ -384,7 +388,7 @@ impl Zf1AdapterPrepareHandler {
 
         unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
     }
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         retval: &mut ZVal,
         exception: Option<&mut ZObj>
@@ -449,10 +453,11 @@ impl Zf1AdapterPrepareHandler {
 pub struct Zf1StatementExecuteHandler;
 
 impl Handler for Zf1StatementExecuteHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some("Zend_Db_Statement_Interface"), "execute"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method("Zend_Db_Statement_Interface", "execute"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -467,7 +472,7 @@ impl Handler for Zf1StatementExecuteHandler {
 }
 
 impl Zf1StatementExecuteHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
         let exec_data_ref = unsafe { &mut *exec_data };
         let mut attributes = vec![];
@@ -496,7 +501,7 @@ impl Zf1StatementExecuteHandler {
                 .add_link(link, vec![]);
         }
     }
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>

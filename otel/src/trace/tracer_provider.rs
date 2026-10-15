@@ -7,7 +7,7 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     env,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 use opentelemetry::{
     InstrumentationScope,
@@ -26,15 +26,13 @@ use opentelemetry_sdk::{
     },
     Resource,
 };
-use once_cell::sync::{
-    Lazy,
-};
 use crate::{
     provider::{self, ProviderKey},
     request,
     trace::{
         memory_exporter::MEMORY_EXPORTER,
-        tracer::TracerClass
+        tracer::TracerClass,
+        tracer_interface::TRACER_INTERFACE_NAME,
     },
     runtime::init_tokio_runtime,
     util,
@@ -44,8 +42,8 @@ const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvide
 
 pub type TracerProviderClass = StateClass<()>;
 
-static TRACER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
+static TRACER_PROVIDERS: LazyLock<Mutex<HashMap<ProviderKey, Arc<SdkTracerProvider>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static NOOP_TRACER_PROVIDER: LazyLock<Arc<SdkTracerProvider>> = LazyLock::new(|| {
     Arc::new(SdkTracerProvider::builder()
         .with_resource(Resource::builder_empty().build())
         .with_sampler(AlwaysOff)
@@ -200,8 +198,8 @@ pub fn make_tracer_provider_class(
         .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
         .argument(Argument::new("version").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
         .argument(Argument::new("schemaUrl").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
-        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]"))
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Trace\TracerInterface"))));
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable).with_default_value("[]"))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(TRACER_INTERFACE_NAME))));
 
     class.add_method("forceFlush", Visibility::Public, |_, _| {
         force_flush();
