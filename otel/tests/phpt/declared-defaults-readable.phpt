@@ -1,5 +1,17 @@
 --TEST--
 Every declared default value can be read without crashing the process
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80000) {
+    // phper-sys only encodes default values into zend_internal_arg_info on PHP 8.0+; on 7.x
+    // php_wrapper.c falls back to ZEND_ARG_TYPE_INFO, which has no default-value field, so
+    // every default is dropped at registration. There is then no default-value AST for
+    // reflection to read -- and so nothing that could be malformed enough to segfault, and
+    // nothing for the "a zero count would make this test pass by checking nothing" guard
+    // below to count.
+    die("skip default values are not registered before PHP 8.0");
+}
+?>
 --EXTENSIONS--
 otel
 --INI--

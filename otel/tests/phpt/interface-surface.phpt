@@ -148,10 +148,16 @@ $returns = [
     // phper cannot express an intersection, so we declare the half that is true.
     ['OpenTelemetry\Context\Context', 'storage', 'OpenTelemetry\Context\ContextStorageInterface'],
 ];
-foreach ($returns as [$class, $method, $expectedReturn]) {
-    $actual = (string) (new ReflectionMethod($class, $method))->getReturnType();
-    if ($actual !== $expectedReturn) {
-        $errors[] = "$class::$method() returns '$actual', expected '$expectedReturn'";
+// Guarded rather than skipping the whole file: the arity and implements sweeps above are
+// version-independent and worth running everywhere. Only these three need PHP 8, because
+// phper-sys compiles ZEND_BEGIN_ARG_WITH_RETURN_OBJ_INFO_EX out on 7.x, so a class-valued
+// return type is never registered there and every one of them reflects as ''.
+if (PHP_VERSION_ID >= 80000) {
+    foreach ($returns as [$class, $method, $expectedReturn]) {
+        $actual = (string) (new ReflectionMethod($class, $method))->getReturnType();
+        if ($actual !== $expectedReturn) {
+            $errors[] = "$class::$method() returns '$actual', expected '$expectedReturn'";
+        }
     }
 }
 

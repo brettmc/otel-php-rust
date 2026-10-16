@@ -28,18 +28,25 @@ use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\ContextInterface;
 use OpenTelemetry\Context\ContextKeyInterface;
 use OpenTelemetry\Context\ContextStorageScopeInterface;
-use OpenTelemetry\Context\ImplicitContextKeyedInterface;
 use OpenTelemetry\Context\ScopeInterface;
 
+// The parameters below are deliberately untyped, which is what makes this file declarable on
+// PHP 7 as well as 8. phper-sys compiles ZEND_ARG_OBJ_INFO out before 8.0, so our interfaces
+// register their class-typed parameters as untyped there -- and PHP forbids an implementation
+// from *narrowing* a parameter the interface leaves untyped. Typing $key as
+// ContextKeyInterface is therefore a fatal declaration error on 7.x. Widening is always
+// allowed, so untyped satisfies both. Return types are unaffected: those are covariant.
+// `storeInContext()` keeps its hint because ContextInterface does not declare that method at
+// all -- upstream puts it on ImplicitContextKeyedInterface -- so nothing constrains it here.
 final class UserlandContext implements ContextInterface
 {
     public static function createKey(string $key): ContextKeyInterface { return Context::createKey($key); }
     public static function getCurrent(): ContextInterface { return Context::getCurrent(); }
     public function activate(): ScopeInterface { throw new LogicException('not needed'); }
     public function storeInContext(ContextInterface $context): ContextInterface { return $context; }
-    public function with(ContextKeyInterface $key, $value): ContextInterface { return $this; }
-    public function withContextValue(ImplicitContextKeyedInterface $value): ContextInterface { return $this; }
-    public function get(ContextKeyInterface $key) { return null; }
+    public function with($key, $value): ContextInterface { return $this; }
+    public function withContextValue($value): ContextInterface { return $this; }
+    public function get($key) { return null; }
 }
 
 final class UserlandSpanContext implements SpanContextInterface

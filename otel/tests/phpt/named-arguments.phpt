@@ -1,5 +1,16 @@
 --TEST--
 Optional arguments with a known default can be passed by name
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80000) {
+    // Named arguments are PHP 8.0 syntax, so the --FILE-- below is a parse error on 7.x
+    // rather than a failed assertion. There is nothing to assert there either: phper-sys
+    // only encodes default values into zend_internal_arg_info on 8.0+ (php_wrapper.c falls
+    // back to ZEND_ARG_TYPE_INFO, which has no default-value field), so no argument has a
+    // known default to skip past in the first place.
+    die("skip named arguments require PHP 8.0");
+}
+?>
 --EXTENSIONS--
 otel
 --INI--

@@ -30,8 +30,12 @@ var_dump($loggerProvider->forceFlush());
 // value with the declaration dropped.
 foreach ([TracerProvider::class, LoggerProvider::class] as $class) {
     foreach (['forceFlush', 'shutdown'] as $method) {
+        // getName(), not string interpolation: casting a ReflectionType to string is
+        // deprecated in PHP 7.4 and the notice would land in the middle of the expected
+        // output. `bool` is a builtin type hint, which phper-sys registers on 7.x as well
+        // as 8.x, so there is a real type to read on every version we support.
         $returnType = (new ReflectionMethod($class, $method))->getReturnType();
-        echo $class, '::', $method, '(): ', $returnType, "\n";
+        echo $class, '::', $method, '(): ', $returnType->getName(), "\n";
     }
 }
 

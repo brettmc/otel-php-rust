@@ -28,7 +28,9 @@ $swept = 0;
 $survived = [];
 
 foreach (get_declared_classes() as $class) {
-    if (!str_starts_with($class, 'OpenTelemetry\\')) {
+    // strpos rather than str_starts_with: this test runs on PHP 7, where that function
+    // does not exist. An abort is worth catching on every version we support.
+    if (strpos($class, 'OpenTelemetry\\') !== 0) {
         continue;
     }
     $rc = new ReflectionClass($class);
