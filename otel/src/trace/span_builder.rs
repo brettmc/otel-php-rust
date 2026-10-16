@@ -102,14 +102,20 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilder
             let state = this.as_mut_state();
             let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
             let span_kind_int = arguments[0].expect_long()?;
+            // These must match `SpanKind`'s constants, which match upstream's: KIND_CLIENT is
+            // 1 and KIND_SERVER is 2. They were previously transposed, so every client span
+            // was exported as a server span and vice versa.
             let span_kind = match span_kind_int {
                 0 => SpanKind::Internal,
-                1 => SpanKind::Server,
-                2 => SpanKind::Client,
+                1 => SpanKind::Client,
+                2 => SpanKind::Server,
                 3 => SpanKind::Producer,
                 4 => SpanKind::Consumer,
                 _ => {
-                    //log a warning
+                    tracing::warn!(
+                        "setSpanKind() given unknown span kind {}, defaulting to INTERNAL",
+                        span_kind_int
+                    );
                     SpanKind::Internal
                 },
             };

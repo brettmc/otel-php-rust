@@ -5,6 +5,7 @@ pub mod span;
 pub mod span_interface;
 pub mod span_builder;
 pub mod span_context;
+pub mod span_kind;
 pub mod status_code;
 pub mod tracer;
 pub mod tracer_interface;

@@ -22,6 +22,7 @@ use crate::{
         tracer_provider::make_tracer_provider_class,
         tracer_provider_interface::make_tracer_provider_interface,
         span_context::make_span_context_class,
+        span_kind::make_span_kind_interface,
         propagation::trace_context_propagator::make_trace_context_propagator_class,
     },
     globals::make_globals_class,
@@ -59,6 +60,7 @@ pub fn register_classes_and_interfaces(module: &mut Module) {
     let logger_interface = module.add_interface(make_logger_interface());
     let logger_provider_interface = module.add_interface(make_logger_provider_interface());
     let _status_code_interface = module.add_interface(make_status_code_interface());
+    let _span_kind_interface = module.add_interface(make_span_kind_interface());
 
     // The co-dependent trio: create all three, then wire them to each other (rule 3).
     let mut scope_class_entity = new_scope_class();

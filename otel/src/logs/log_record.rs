@@ -169,7 +169,12 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
             }
             Ok::<_, phper::Error>(())
         })
-        .argument(phper::functions::Argument::new("body").optional().with_default_value("").with_type_hint(phper::types::ArgumentTypeHint::String));
+        // `with_default_value` takes PHP *source*, which is compiled to a default-value AST.
+        // An empty string is not a PHP expression, so it compiled to a malformed AST that
+        // segfaulted the process the first time anything read the default — which reflection
+        // does, meaning `ReflectionClass` over the extension was enough to crash it.
+        // The empty string literal is spelled `''`.
+        .argument(phper::functions::Argument::new("body").optional().with_default_value("''").with_type_hint(phper::types::ArgumentTypeHint::String));
 
     class
         .add_method("setTimestamp", Visibility::Public, |this, arguments| {
