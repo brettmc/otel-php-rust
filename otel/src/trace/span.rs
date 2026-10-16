@@ -3,8 +3,9 @@ use phper::{
     alloc::ToRefOwned,
     classes::{ClassEntity, Interface, StateClass, Visibility},
     errors::ThrowObject,
-    functions::Argument,
+    functions::{Argument, ReturnType},
     objects::{ZObj, ZObject},
+    types::{ArgumentTypeHint, ReturnTypeHint},
 };
 use std::{
     borrow::Cow,
@@ -27,11 +28,12 @@ use crate::{
             get_instance_id,
             ContextClass,
         },
+        context_interface::CONTEXT_INTERFACE_NAME,
         scope::ScopeClass,
         storage,
     },
     trace::{
-        span_context::SpanContextClass,
+        span_context::{SpanContextClass, SPAN_CONTEXT_CLASS_NAME},
         local_root_span::store_local_root_span,
     },
     util,
@@ -86,15 +88,14 @@ pub fn make_span_class(
                 Ok(s) => s.to_string(),
                 Err(_) => return Ok(this.to_ref_owned()), // Ignore invalid UTF-8 input
             };
+            // `?string $description = null`, so the slot may be absent *or* hold an explicit
+            // null; neither is a string to unwrap.
             let description: Cow<'static, str> = arguments
                 .get(1)
-                .map(|d| d.expect_z_str())
-                .transpose()?
-                .map(|d| {
-                    match d.to_str() {
-                        Ok(s) => Cow::Owned(s.to_string()),
-                        Err(_) => Cow::Borrowed(""),
-                    }
+                .and_then(|d| d.as_z_str())
+                .map(|d| match d.to_str() {
+                    Ok(s) => Cow::Owned(s.to_string()),
+                    Err(_) => Cow::Borrowed(""),
                 })
                 .unwrap_or(Cow::Borrowed(""));
             let status_code = match status.as_str() {
@@ -113,8 +114,13 @@ pub fn make_span_class(
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("code"))
-        .argument(Argument::new("description").optional());
+        .argument(Argument::new("code").with_type_hint(ArgumentTypeHint::String))
+        .argument(
+            Argument::new("description")
+                .with_type_hint(ArgumentTypeHint::String)
+                .allow_null()
+                .with_default_value("null"),
+        );
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
@@ -130,7 +136,12 @@ pub fn make_span_class(
              }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::String))
+        // Upstream is `bool|int|float|string|array|null`. phper has no union type hint, so
+        // `mixed` stands in: it is wider than the union, and a parameter may be widened
+        // without breaking an implementer. See docs/phper-upstream-needs.md.
+        .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed));
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
@@ -147,7 +158,8 @@ pub fn make_span_class(
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable));
 
     class
         .add_method("updateName", Visibility::Public, |this, arguments| {
@@ -163,7 +175,8 @@ pub fn make_span_class(
                 ctx.span().update_name(name);
             }
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String));
 
     class
         .add_method("recordException", Visibility::Public, |this, arguments| {
@@ -177,7 +190,17 @@ pub fn make_span_class(
                 }
             }
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("exception").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from("Throwable"),
+        )))
+        // Declared to match upstream's arity, but not yet applied: the Rust SDK's
+        // `record_error` takes no attributes.
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        );
 
     class
         .add_method("addLink", Visibility::Public, |this, arguments| {
@@ -198,7 +221,19 @@ pub fn make_span_class(
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        // Upstream types this `SpanContextInterface`; there is no such interface yet, so the
+        // concrete class stands in. Narrowing a parameter is a breaking change, so this is
+        // widened to the interface when it lands.
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(SPAN_CONTEXT_CLASS_NAME),
+        )))
+        // Declared to match upstream's arity; link attributes are not applied yet.
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        );
 
     class
         .add_method("addEvent", Visibility::Public, |this, arguments| {
@@ -226,7 +261,20 @@ pub fn make_span_class(
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        )
+        // Declared to match upstream's arity; an explicit event timestamp is not applied yet.
+        .argument(
+            Argument::new("timestamp")
+                .with_type_hint(ArgumentTypeHint::Int)
+                .allow_null()
+                .with_default_value("null"),
+        );
 
     class
         .add_method("getContext", Visibility::Public, move |this, _| {
@@ -309,7 +357,13 @@ pub fn make_span_class(
             object.set_property("context_id", instance_id.unwrap_or(0) as i64);
 
             Ok::<_, phper::Error>(object)
-        }); //argument ContextInterface, return ContextInterface
+        })
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(CONTEXT_INTERFACE_NAME),
+        )))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            CONTEXT_INTERFACE_NAME,
+        ))));
 
     let span_class_clone = class.bound_class();
     class
@@ -320,7 +374,10 @@ pub fn make_span_class(
             *object.as_mut_state() = None;
             object.set_property("context_id", instance_id);
             Ok::<_, phper::Error>(object)
-        });
+        })
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(CONTEXT_INTERFACE_NAME),
+        )));
 
     class
 }

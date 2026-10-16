@@ -2,6 +2,7 @@ use phper::{
     alloc::ToRefOwned,
     classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::Argument,
+    types::ArgumentTypeHint,
 };
 use std::{
     convert::Infallible,
@@ -15,10 +16,11 @@ use opentelemetry_sdk::trace::Span as SdkSpan;
 use crate::{
     context::{
         context::ContextClass,
+        context_interface::CONTEXT_INTERFACE_NAME,
         scope::ScopeClass,
     },
     trace::{
-        span_context::SpanContextClass,
+        span_context::{SpanContextClass, SPAN_CONTEXT_CLASS_NAME},
     },
 };
 
@@ -47,42 +49,84 @@ pub fn make_non_recording_span_class(
             Ok(())
         });
 
+    // Every method below is a no-op, but the signatures must match `Span`'s: both implement
+    // `SpanInterface`, and userland holding one does not know which it has. An arity or type
+    // that differs between the two makes the same call legal against one and a TypeError
+    // against the other.
+
     class
         .add_method("setStatus", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("code"))
-        .argument(Argument::new("description").optional());
+        .argument(Argument::new("code").with_type_hint(ArgumentTypeHint::String))
+        .argument(
+            Argument::new("description")
+                .with_type_hint(ArgumentTypeHint::String)
+                .allow_null()
+                .with_default_value("null"),
+        );
 
     class
         .add_method("setAttribute", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::String))
+        .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed));
 
     class
         .add_method("setAttributes", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable));
 
     class
         .add_method("updateName", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String));
 
     class
         .add_method("recordException", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("exception").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from("Throwable"),
+        )))
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        );
 
     class
         .add_method("addLink", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(SPAN_CONTEXT_CLASS_NAME),
+        )))
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        );
 
     class
         .add_method("addEvent", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        )
+        .argument(
+            Argument::new("timestamp")
+                .with_type_hint(ArgumentTypeHint::Int)
+                .allow_null()
+                .with_default_value("null"),
+        );
 
     class
         .add_method("getContext", Visibility::Public, move |_this, _| {
@@ -104,17 +148,27 @@ pub fn make_non_recording_span_class(
             Ok::<_, phper::Error>(())
         });
 
+    // Both still return null rather than a Context/Span. The return types are deliberately
+    // left undeclared until the bodies are implemented: declaring one here would promise
+    // userland a type the handler does not return, and an internal function's return type is
+    // not enforced, so the promise would be silently broken rather than caught.
     class
         .add_method("storeInContext", Visibility::Public, move |_, _| {
             //TODO
             Ok::<_, phper::Error>(())
-        }); //argument ContextInterface, return ContextInterface
+        })
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(CONTEXT_INTERFACE_NAME),
+        )));
 
     class
         .add_static_method("fromContext", Visibility::Public, move |_| {
             //TODO
             Ok::<_, phper::Error>(())
-        });
+        })
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(CONTEXT_INTERFACE_NAME),
+        )));
 
     class
 }

@@ -28,7 +28,7 @@
 //! [`detach_context`].
 
 use crate::context::{
-    context::ContextClassEntity,
+    context::{get_instance_id, ContextClassEntity},
     context_interface::CONTEXT_INTERFACE_NAME,
     scope::ScopeClassEntity,
     scope_interface::SCOPE_INTERFACE_NAME,
@@ -297,8 +297,10 @@ pub fn build_storage_class(
     class
         .add_method("attach", Visibility::Public, move |_, arguments| {
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let instance_id = context_obj.get_property("context_id").as_long();
-            let opt_instance_id = instance_id.map(|id| id as u64);
+            // `get_instance_id` maps a context_id of 0 to None, which is what
+            // `Context::getCurrent()` reports. Reading the property directly turned that 0
+            // into `Some(0)`, an id that resolves to no stored context.
+            let opt_instance_id = get_instance_id(context_obj);
             attach_context(opt_instance_id).map_err(phper::Error::boxed)?;
 
             let mut object = scope_ce_attach.init_object()?;

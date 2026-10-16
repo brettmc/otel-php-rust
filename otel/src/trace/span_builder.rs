@@ -10,7 +10,6 @@ use std::{
 };
 use opentelemetry::{
     Context,
-    KeyValue,
     trace::{
         SpanBuilder,
         SpanKind,
@@ -20,12 +19,14 @@ use opentelemetry::{
 use opentelemetry_sdk::trace::SdkTracer;
 use crate::{
     context::{
+        context::get_instance_id,
         context_interface::CONTEXT_INTERFACE_NAME,
         storage,
     },
     trace::{
         span::SpanClass,
-    }
+    },
+    util,
 };
 
 pub struct SpanBuilderState {
@@ -71,31 +72,48 @@ pub fn make_span_builder_class(span_class: SpanClass) -> ClassEntity<SpanBuilder
     class.add_method("setAttribute", Visibility::Public, |this, arguments| {
         let state = this.as_mut_state();
         let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
-        let name = arguments[0].expect_z_str()?.to_str()?.to_string();
-        let value = arguments[1].expect_z_str()?.to_str()?.to_string();
-        let mut attributes = span_builder.attributes.clone().unwrap_or_default();
-        attributes.push(KeyValue::new(name, value));
-        let new_span_builder = span_builder.clone().with_attributes(attributes);
-        state.span_builder = Some(new_span_builder);
+        let key = arguments[0].expect_z_str()?.to_str()?.to_string();
+        // `$value` is `mixed` upstream, and forcing it through `expect_z_str` rejected the
+        // ints, floats, bools and arrays that `Span::setAttribute` already accepts. Share
+        // that conversion rather than keeping a second, narrower one here.
+        if let Some(kv) = util::zval_to_key_value(&key, &arguments[1]) {
+            let mut attributes = span_builder.attributes.clone().unwrap_or_default();
+            attributes.push(kv);
+            let new_span_builder = span_builder.clone().with_attributes(attributes);
+            state.span_builder = Some(new_span_builder);
+        }
 
         Ok::<_, phper::Error>(this.to_ref_owned())
     })
-    .argument(Argument::new("key"))
-    .argument(Argument::new("value").optional());
+    .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::String))
+    // Previously `.optional()` with no default, so `setAttribute('k')` passed Zend's arity
+    // check and then indexed a slot that did not exist -- a panic across the FFI boundary,
+    // which aborts the process (SIGABRT). Upstream has no default here either.
+    .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed));
 
     class
         .add_method("setParent", Visibility::Public, |this, arguments| {
-            let state = this.as_mut_state();
-
-            let context_obj = arguments[0].expect_mut_z_obj()?;
-            let context_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
-            state.parent_context_id = context_id as u64;
+            // `get_instance_id` maps a context_id of 0 to None, which is what
+            // `Context::getCurrent()` reports; reading the property directly turned that 0
+            // into a parent id that resolves to nothing.
+            let context_id = arguments[0]
+                .as_z_obj()
+                .and_then(get_instance_id)
+                .unwrap_or(0);
+            this.as_mut_state().parent_context_id = context_id;
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_INTERFACE_NAME),
-        )));
+        // Upstream is `ContextInterface|false|null`. phper has no union type hint, so this
+        // accepts null but rejects `false`; see docs/phper-upstream-needs.md. Note that a
+        // class-typed argument cannot carry a default value either, so this stays required.
+        .argument(
+            Argument::new("context")
+                .with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                    CONTEXT_INTERFACE_NAME,
+                )))
+                .allow_null(),
+        );
 
     class
         .add_method("setSpanKind", Visibility::Public, |this, arguments| {
