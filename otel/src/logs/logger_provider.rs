@@ -148,15 +148,16 @@ pub fn get_logger_provider() -> Arc<SdkLoggerProvider> {
         tracing::debug!("OpenTelemetry is disabled for this request, returning no-op logger provider");
         return NOOP_LOGGER_PROVIDER.clone();
     }
-    provider::get_provider(&LOGGER_PROVIDERS, "logger", &NOOP_LOGGER_PROVIDER)
+    provider::get_provider(&LOGGER_PROVIDERS, "Logger", &NOOP_LOGGER_PROVIDER)
 }
 
-pub fn force_flush() {
-    provider::force_flush_registry(&LOGGER_PROVIDERS, "logger", |p| p.force_flush());
+/// Flush the current request's provider, reporting whether it succeeded.
+pub fn force_flush() -> bool {
+    provider::force_flush_registry(&LOGGER_PROVIDERS, "Logger", |p| p.force_flush())
 }
 
-pub fn shutdown() {
-    provider::shutdown_registry(&LOGGER_PROVIDERS, "Logger", |p| p.shutdown());
+pub fn shutdown() -> bool {
+    provider::shutdown_registry(&LOGGER_PROVIDERS, "Logger", |p| p.shutdown())
 }
 
 pub fn make_logger_provider_class(
@@ -212,10 +213,19 @@ pub fn make_logger_provider_class(
         .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable).with_default_value("[]"))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(LOGGER_INTERFACE_NAME))));
 
-    class.add_method("forceFlush", Visibility::Public, |_, _| {
-        force_flush();
-        Ok::<_, Infallible>(())
-    });
+    // Declared on the class rather than on `API\Logs\LoggerProviderInterface`, for the reason
+    // given in `tracer_provider::make_tracer_provider_class`.
+    class
+        .add_method("forceFlush", Visibility::Public, |_, _| -> phper::Result<bool> {
+            Ok(force_flush())
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::Bool));
+
+    class
+        .add_method("shutdown", Visibility::Public, |_, _| -> phper::Result<bool> {
+            Ok(shutdown())
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::Bool));
 
     class
 }

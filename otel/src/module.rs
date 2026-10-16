@@ -48,8 +48,10 @@ pub fn on_module_shutdown() {
         return;
     }
     tracing::debug!("OpenTelemetry::MSHUTDOWN");
-    tracer_provider::shutdown();
-    logger_provider::shutdown();
+    // The success flag is for userland's `shutdown(): bool`; there is nobody left to report
+    // it to here, and a failure is already logged by `shutdown_registry`.
+    let _ = tracer_provider::shutdown();
+    let _ = logger_provider::shutdown();
 }
 
 pub fn is_disabled() -> bool {

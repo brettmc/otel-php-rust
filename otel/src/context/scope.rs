@@ -46,16 +46,22 @@ pub fn build_scope_class(
     });
 
     class
-        .add_method("detach", Visibility::Public, |this, _| -> phper::Result<()> {
+        // Declared `: int` but returned Rust `()`, and an internal function's return type is
+        // not enforced by PHP -- so every caller silently got NULL where the spec promises a
+        // zero-or-bitmask. The information was already being computed and thrown away:
+        // `detach_context` distinguished "not top-most" from "stack empty" in its debug logs
+        // and then collapsed both into a bool.
+        .add_method("detach", Visibility::Public, |this, _| -> phper::Result<i64> {
             let instance_id = get_instance_id(this);
+            let result = storage::detach_context(instance_id);
             // Only tear down the local root span if the scope really was detached. An
             // out-of-order detach is refused (see `storage::detach_context`), and clearing
             // the local root for a scope that is still active would drop its context while
             // userland can still reach it through the still-active inner scope.
-            if storage::detach_context(instance_id) {
+            if result.is_detached() {
                 local_root_span::maybe_remove_local_root_span(instance_id);
             }
-            Ok(())
+            Ok(result.to_php_flags())
         })
         .return_type(ReturnType::new(ReturnTypeHint::Int));
 

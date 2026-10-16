@@ -182,6 +182,56 @@ pub fn attach_context(instance_id: Option<u64>) -> Result<(), &'static str> {
     }
 }
 
+/// The outcome of a detach, in the terms the spec defines.
+///
+/// `detach()` returns zero for an expected call and a non-zero bitmask otherwise, so these
+/// map onto the `ScopeInterface` constants rather than onto a plain success/failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetachResult {
+    /// The scope was the active one and was detached.
+    Detached,
+    /// The scope is not on the guard stack at all — most often a second `detach()` on a
+    /// scope that was already detached.
+    AlreadyDetached,
+    /// The scope is on the stack but is not the active one, i.e. an out-of-order detach.
+    Mismatch,
+}
+
+impl DetachResult {
+    /// Whether the scope was actually detached, for callers continuing their teardown.
+    pub fn is_detached(self) -> bool {
+        self == DetachResult::Detached
+    }
+
+    /// The value `ScopeInterface::detach()` returns: zero, or a non-zero bitmask.
+    ///
+    /// The constants are `1 << (PHP_INT_SIZE << 3) - N`, i.e. relative to the top of PHP's
+    /// integer, so they are computed from `i64::BITS` rather than written out. Hardcoding
+    /// the 64-bit values would silently produce the wrong flags on a 32-bit build, where
+    /// PHP's own constants are different numbers.
+    ///
+    /// Two parts of upstream's bitmask are deliberately not reproduced:
+    ///
+    /// - `INACTIVE`, which upstream sets when the scope belongs to a *different execution
+    ///   context* than the current one — a fiber case. This extension does not track
+    ///   execution contexts at all (see the audit's §4.7), so there is no state from which
+    ///   to decide it, and claiming it for an out-of-order detach would mean something
+    ///   different from what upstream means by it.
+    /// - the *depth* upstream ORs into `MISMATCH`, saying how far down the stack the scope
+    ///   was. Upstream detaches it anyway, splicing it out of the middle; we refuse. A depth
+    ///   for a detach that did not happen would be misleading.
+    pub fn to_php_flags(self) -> i64 {
+        const DETACHED: i64 = 1i64 << (i64::BITS - 1);
+        const MISMATCH: i64 = 1i64 << (i64::BITS - 3);
+
+        match self {
+            DetachResult::Detached => 0,
+            DetachResult::AlreadyDetached => DETACHED,
+            DetachResult::Mismatch => MISMATCH,
+        }
+    }
+}
+
 /// Detach a scope, if it is the innermost one.
 ///
 /// Detaching out of order is a userland mistake (the spec calls it undefined behaviour), and
@@ -204,40 +254,52 @@ pub fn attach_context(instance_id: Option<u64>) -> Result<(), &'static str> {
 /// left to `Span::end()`, `Context::__destruct`, or the RSHUTDOWN sweep. A context with no
 /// span has nothing left to do once detached, so it is released here rather than lingering
 /// for the rest of the request.
-/// Returns whether the scope was actually detached, so callers can skip the rest of their
-/// teardown when the request was refused.
-pub fn detach_context(instance_id: Option<u64>) -> bool {
+/// Returns which of the spec's conditions applied, so callers can both skip the rest of
+/// their teardown when the request was refused and report the reason to userland.
+pub fn detach_context(instance_id: Option<u64>) -> DetachResult {
     if let Some(id) = instance_id {
         debug!("Detaching context instance {}", id);
-        let detached = GUARD_STACK.with(|stack| {
+        let outcome = GUARD_STACK.with(|stack| {
             let mut stack = stack.borrow_mut();
             // Inspect the top before popping: popping first and checking afterwards would
             // already have dropped the guard, deactivating a scope nobody asked to detach.
             match stack.last() {
-                Some((_, stack_id)) if *stack_id == id => stack.pop().map(|(_, id)| id),
+                Some((_, stack_id)) if *stack_id == id => {
+                    stack.pop();
+                    DetachResult::Detached
+                }
                 Some((_, stack_id)) => {
                     debug!(
                         "Not detaching context instance {}, is not top-most (top is {})",
                         id, stack_id
                     );
-                    None
+                    // Distinguish "this scope is somewhere further down the stack" from
+                    // "this scope is not on the stack at all": the first is an out-of-order
+                    // detach, the second a scope that was already detached. Userland gets
+                    // MISMATCH for one and DETACHED for the other, which is the whole point
+                    // of the return value.
+                    if stack.iter().any(|(_, stack_id)| *stack_id == id) {
+                        DetachResult::Mismatch
+                    } else {
+                        DetachResult::AlreadyDetached
+                    }
                 }
                 None => {
                     debug!("Not detaching context instance {}, guard stack is empty", id);
-                    None
+                    DetachResult::AlreadyDetached
                 }
             }
         });
         // Outside the GUARD_STACK borrow: this touches CONTEXT_STORAGE, and the dropped
         // guard above may run arbitrary Drop code.
-        if let Some(id) = detached
-            && !detached_context_holds_span(id)
-        {
+        if outcome == DetachResult::Detached && !detached_context_holds_span(id) {
             maybe_remove_context_instance(Some(id));
         }
-        detached.is_some()
+        outcome
     } else {
-        false
+        // No id means nothing was ever stored for this scope, so there is nothing active to
+        // detach. Upstream reports that as DETACHED rather than as success.
+        DetachResult::AlreadyDetached
     }
 }
 
@@ -359,4 +421,59 @@ pub fn clear_context_storage() {
     CONTEXT_STORAGE.with(|storage| storage.borrow_mut().clear());
     GUARD_STACK.with(|stack| stack.borrow_mut().clear());
     CONTEXT_GUARD_MAP.with(|map| map.borrow_mut().clear());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_successful_detach_is_the_only_zero() {
+        // The spec's contract is "zero indicating an expected call, or a non-zero value
+        // indicating that the call was unexpected", so zero has to mean exactly one thing.
+        assert_eq!(DetachResult::Detached.to_php_flags(), 0);
+        assert_ne!(DetachResult::AlreadyDetached.to_php_flags(), 0);
+        assert_ne!(DetachResult::Mismatch.to_php_flags(), 0);
+    }
+
+    #[test]
+    fn the_flags_match_upstreams_constants_on_a_64_bit_build() {
+        // Upstream computes these as `1 << (PHP_INT_SIZE << 3) - N`. Pinning the arithmetic
+        // against the literal values catches an off-by-one in the shift, which would
+        // otherwise only show up as userland comparing against the wrong constant.
+        assert_eq!(
+            DetachResult::AlreadyDetached.to_php_flags(),
+            -9223372036854775808i64,
+            "DETACHED"
+        );
+        assert_eq!(
+            DetachResult::Mismatch.to_php_flags(),
+            2305843009213693952i64,
+            "MISMATCH"
+        );
+    }
+
+    #[test]
+    fn the_flags_are_distinguishable_by_bitmask() {
+        // Userland tests these with `$flags & ScopeInterface::DETACHED`, so each flag must
+        // be isolated: one condition's value must not have another's bit set.
+        const DETACHED: i64 = 1i64 << (i64::BITS - 1);
+        const MISMATCH: i64 = 1i64 << (i64::BITS - 3);
+
+        let already = DetachResult::AlreadyDetached.to_php_flags();
+        let mismatch = DetachResult::Mismatch.to_php_flags();
+        assert_ne!(already & DETACHED, 0);
+        assert_eq!(already & MISMATCH, 0);
+        assert_ne!(mismatch & MISMATCH, 0);
+        assert_eq!(mismatch & DETACHED, 0);
+    }
+
+    #[test]
+    fn only_a_real_detach_continues_teardown() {
+        // `is_detached` gates removing the local root span; a refused detach that reported
+        // true would drop a context userland can still reach.
+        assert!(DetachResult::Detached.is_detached());
+        assert!(!DetachResult::AlreadyDetached.is_detached());
+        assert!(!DetachResult::Mismatch.is_detached());
+    }
 }

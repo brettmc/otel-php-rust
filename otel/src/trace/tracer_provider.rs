@@ -138,15 +138,16 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
         tracing::debug!("OpenTelemetry is disabled for this request, returning no-op tracer provider");
         return NOOP_TRACER_PROVIDER.clone();
     }
-    provider::get_provider(&TRACER_PROVIDERS, "tracer", &NOOP_TRACER_PROVIDER)
+    provider::get_provider(&TRACER_PROVIDERS, "Tracer", &NOOP_TRACER_PROVIDER)
 }
 
-pub fn force_flush() {
-    provider::force_flush_registry(&TRACER_PROVIDERS, "tracer", |p| p.force_flush());
+/// Flush the current request's provider, reporting whether it succeeded.
+pub fn force_flush() -> bool {
+    provider::force_flush_registry(&TRACER_PROVIDERS, "Tracer", |p| p.force_flush())
 }
 
-pub fn shutdown() {
-    provider::shutdown_registry(&TRACER_PROVIDERS, "Tracer", |p| p.shutdown());
+pub fn shutdown() -> bool {
+    provider::shutdown_registry(&TRACER_PROVIDERS, "Tracer", |p| p.shutdown())
 }
 
 pub fn make_tracer_provider_class(
@@ -201,10 +202,28 @@ pub fn make_tracer_provider_class(
         .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable).with_default_value("[]"))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(TRACER_INTERFACE_NAME))));
 
-    class.add_method("forceFlush", Visibility::Public, |_, _| {
-        force_flush();
-        Ok::<_, Infallible>(())
-    });
+    // `forceFlush` and `shutdown` are declared on the class, not on
+    // `API\Trace\TracerProviderInterface`: upstream's API interface carries only `getTracer`,
+    // and these two belong to `SDK\Trace\TracerProviderInterface`, which this extension does
+    // not expose. Upstream also takes a `?CancellationInterface $cancellation = null` on
+    // both, which is omitted here: there is no cancellation type to name, and phper cannot
+    // give a class-typed argument a default value in any case.
+    class
+        // The return type must be declared *and* the handler must return a real bool: an
+        // internal function's return type is never verified by the engine, so a handler
+        // returning Rust `()` under this hint would hand userland NULL silently.
+        .add_method("forceFlush", Visibility::Public, |_, _| -> phper::Result<bool> {
+            Ok(force_flush())
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::Bool));
+
+    class
+        // The same `shutdown()` MSHUTDOWN runs, exposed to PHP so userland can flush and
+        // release a provider before the request ends rather than waiting for teardown.
+        .add_method("shutdown", Visibility::Public, |_, _| -> phper::Result<bool> {
+            Ok(shutdown())
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::Bool));
 
     class
 }
