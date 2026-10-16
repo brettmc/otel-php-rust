@@ -1,9 +1,8 @@
 use phper::{
-    classes::{InterfaceEntity},
-    functions::{ReturnType},
-    types::{ReturnTypeHint},
+    classes::InterfaceEntity,
+    functions::ReturnType,
+    types::ReturnTypeHint,
 };
-use crate::context::context_interface::CONTEXT_INTERFACE_NAME;
 
 pub const SCOPE_INTERFACE_NAME: &str = r"OpenTelemetry\Context\ScopeInterface";
 
@@ -26,9 +25,9 @@ pub fn make_scope_interface() -> InterfaceEntity {
         .add_method("detach")
         .return_type(ReturnType::new(ReturnTypeHint::Int));
 
-    interface
-        .add_method("context")
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
+    // `detach()` is deliberately the only method: `context()` belongs to
+    // `ContextStorageScopeInterface`, since only a scope handed out by a storage is required
+    // to know which context it belongs to.
 
     interface
 }

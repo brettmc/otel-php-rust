@@ -110,6 +110,12 @@ pub fn on_request_init() {
 
 /// RSHUTDOWN handler. Invoke request shutdown logic, call shutdown() on plugin manager.
 pub fn on_request_shutdown() {
+    // Before the disabled check, not after: the PHP classes are registered either way, so
+    // `Context::with()` can store PHP values during a request the extension is disabled for.
+    // Those are `ZVal`s -- PHP memory freed with the request -- so holding them in a
+    // thread-local past this point is a use-after-free on the next request on a reused worker,
+    // not a leak. Everything `shutdown()` cleans up below is plain Rust and can wait.
+    storage::clear_context_values();
     if module::is_disabled() {
         return;
     }

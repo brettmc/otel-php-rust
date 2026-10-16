@@ -3,11 +3,19 @@ use crate::{
     context::{
         context::{build_context_class, new_context_class},
         context_interface::make_context_interface,
+        context_key::make_context_key_class,
+        context_key_interface::make_context_key_interface,
         context_storage_interface::make_context_storage_interface,
+        context_storage_scope_interface::make_context_storage_scope_interface,
+        implicit_context_keyed_interface::make_implicit_context_keyed_interface,
         scope::{build_scope_class, new_scope_class},
         scope_interface::make_scope_interface,
         storage::{build_storage_class, new_storage_class},
-        propagation::text_map_propagator_interface::make_text_map_propagator_interface,
+        propagation::{
+            propagation_getter_interface::make_propagation_getter_interface,
+            propagation_setter_interface::make_propagation_setter_interface,
+            text_map_propagator_interface::make_text_map_propagator_interface,
+        },
     },
     trace::{
         local_root_span::make_local_root_span_class,
@@ -16,6 +24,8 @@ use crate::{
         span::make_span_class,
         span_interface::make_span_interface,
         span_builder::make_span_builder_class,
+        span_builder_interface::make_span_builder_interface,
+        span_context_interface::make_span_context_interface,
         status_code::make_status_code_interface,
         tracer::make_tracer_class,
         tracer_interface::make_tracer_interface,
@@ -51,23 +61,43 @@ use crate::{
 pub fn register_classes_and_interfaces(module: &mut Module) {
     // Interfaces first, so the classes below can implement them.
     let scope_interface = module.add_interface(make_scope_interface());
+    let implicit_context_keyed_interface =
+        module.add_interface(make_implicit_context_keyed_interface());
+    let context_key_interface = module.add_interface(make_context_key_interface());
+    // After the two above: `ContextInterface` names both in its declarations, and a type
+    // named in a signature has to be registered first or the signature cannot be built.
     let context_interface = module.add_interface(make_context_interface());
     let context_storage_interface = module.add_interface(make_context_storage_interface());
-    let tracer_interface = module.add_interface(make_tracer_interface());
     let tracer_provider_interface = module.add_interface(make_tracer_provider_interface());
     let text_map_propagator_interface = module.add_interface(make_text_map_propagator_interface());
-    let span_interface = module.add_interface(make_span_interface());
+    let _propagation_getter_interface = module.add_interface(make_propagation_getter_interface());
+    let _propagation_setter_interface = module.add_interface(make_propagation_setter_interface());
+    // `ContextStorageScopeInterface extends ScopeInterface`, and `SpanInterface` and
+    // `ContextInterface` both extend `ImplicitContextKeyedInterface`, so each parent has to
+    // be registered before the child that names it — rule 1 applies between interfaces too.
+    let context_storage_scope_interface =
+        module.add_interface(make_context_storage_scope_interface(&scope_interface));
+    let span_context_interface = module.add_interface(make_span_context_interface());
+    let span_interface = module.add_interface(make_span_interface(&implicit_context_keyed_interface));
+    let span_builder_interface = module.add_interface(make_span_builder_interface());
+    // After `SpanBuilderInterface`: `TracerInterface::spanBuilder()` returns it, and rule 1
+    // applies to a type named in a *signature* as much as to one that is `implements`ed.
+    let tracer_interface = module.add_interface(make_tracer_interface());
     let logger_interface = module.add_interface(make_logger_interface());
     let logger_provider_interface = module.add_interface(make_logger_provider_interface());
     let _status_code_interface = module.add_interface(make_status_code_interface());
     let _span_kind_interface = module.add_interface(make_span_kind_interface());
 
+    // `Context::createKey()` instantiates ContextKey, so its entity has to exist before
+    // Context is wired -- but it has no dependency of its own, so it is not part of the trio.
+    let context_key_class_entity = make_context_key_class(&context_key_interface);
+
     // The co-dependent trio: create all three, then wire them to each other (rule 3).
     let mut scope_class_entity = new_scope_class();
     let mut context_class_entity = new_context_class();
     let mut storage_class_entity = new_storage_class();
-    build_scope_class(&mut scope_class_entity, &context_class_entity, &scope_interface);
-    build_context_class(&mut context_class_entity, &scope_class_entity, &storage_class_entity, context_interface);
+    build_scope_class(&mut scope_class_entity, &context_class_entity, &context_storage_scope_interface);
+    build_context_class(&mut context_class_entity, &scope_class_entity, &storage_class_entity, &context_key_class_entity, context_interface);
     build_storage_class(&mut storage_class_entity, &scope_class_entity, &context_class_entity, &context_storage_interface);
 
     // Propagation reads the Context entity directly, so it registers before Context is moved.
@@ -77,11 +107,13 @@ pub fn register_classes_and_interfaces(module: &mut Module) {
     let context_class = module.add_class(context_class_entity);
     let _storage_class = module.add_class(storage_class_entity);
 
+    let _context_key_class = module.add_class(context_key_class_entity);
+
     // Trace: each line below depends on a handle from the line(s) above it.
-    let span_context_class = module.add_class(make_span_context_class());
+    let span_context_class = module.add_class(make_span_context_class(&span_context_interface));
     let span_class = module.add_class(make_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
     let non_recording_span_class = module.add_class(make_non_recording_span_class(scope_class.clone(), span_context_class.clone(), context_class.clone(), &span_interface));
-    let span_builder_class = module.add_class(make_span_builder_class(span_class.clone()));
+    let span_builder_class = module.add_class(make_span_builder_class(span_class.clone(), &span_builder_interface));
     let _local_root_span_class = module.add_class(make_local_root_span_class(span_class.clone(), non_recording_span_class.clone()));
     let tracer_class = module.add_class(make_tracer_class(span_builder_class.clone(), tracer_interface));
     let tracer_provider_class = module.add_class(make_tracer_provider_class(tracer_class.clone(), tracer_provider_interface));

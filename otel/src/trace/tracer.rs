@@ -1,7 +1,7 @@
 use phper::{
     classes::{ClassEntity, Interface, StateClass, Visibility},
-    functions::Argument,
-    types::ArgumentTypeHint,
+    functions::{Argument, ReturnType},
+    types::{ArgumentTypeHint, ReturnTypeHint},
 };
 use std::{
     convert::Infallible,
@@ -17,6 +17,7 @@ use crate::trace::span_builder::{
     SpanBuilderState,
     SpanBuilderClass,
 };
+use crate::trace::span_builder_interface::SPAN_BUILDER_INTERFACE_NAME;
 
 pub type TracerClass = StateClass<Option<SdkTracer>>;
 
@@ -48,7 +49,14 @@ pub fn make_tracer_class(
             *object.as_mut_state() = my_span_builder;
             Ok::<_, phper::Error>(object)
         })
-        .argument(Argument::new("spanName").with_type_hint(ArgumentTypeHint::String));
+        .argument(Argument::new("spanName").with_type_hint(ArgumentTypeHint::String))
+        // Declared on the class as well as the interface. An implementation inherits the
+        // interface's return type when it declares none, so this is not required for
+        // correctness -- but reflection then reports `<none>` on the class, and the class is
+        // what most callers actually look at.
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_BUILDER_INTERFACE_NAME,
+        ))));
 
     class
 }

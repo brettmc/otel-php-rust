@@ -44,6 +44,10 @@ function signature(string $class, string $method): string {
 $methods = [
     'setStatus', 'setAttribute', 'setAttributes', 'updateName',
     'recordException', 'addLink', 'addEvent', 'storeInContext', 'fromContext',
+    // `end` carries upstream's optional end timestamp, and `isRecording` is the question
+    // every instrumentation asks before doing work -- both have to be reachable through a
+    // SpanInterface, so both are pinned here.
+    'end', 'isRecording', 'getContext', 'getCurrent', 'activate',
 ];
 
 foreach ($methods as $method) {
@@ -58,7 +62,12 @@ setAttribute     (string $key, mixed $value)
 setAttributes    (iterable $attributes)
 updateName       (string $name)
 recordException  (Throwable $exception, iterable $attributes = array())
-addLink          (OpenTelemetry\API\Trace\SpanContext $context, iterable $attributes = array())
+addLink          (OpenTelemetry\API\Trace\SpanContextInterface $context, iterable $attributes = array())
 addEvent         (string $name, iterable $attributes = array(), ?int $timestamp = NULL)
 storeInContext   (OpenTelemetry\Context\ContextInterface $context)
 fromContext      (OpenTelemetry\Context\ContextInterface $context)
+end              (?int $endEpochNanos = NULL)
+isRecording      ()
+getContext       ()
+getCurrent       ()
+activate         ()
