@@ -11,6 +11,7 @@ use phper::{
     classes::{StateClass, Visibility},
     functions::Argument,
     types::ArgumentTypeHint,
+    values::ZVal,
 };
 use std::time::SystemTime;
 
@@ -143,20 +144,38 @@ fn insert_attribute(state: &mut LogRecordState, key: String, value_zval: &phper:
     Ok(())
 }
 
+/// Convert a PHP value to a log record body.
+///
+/// Shared by `__construct` and `setBody` so the two cannot disagree about what a body may be.
+fn zval_to_any_value(zval: &ZVal) -> phper::Result<AnyValue> {
+    Ok(if let Some(s) = zval.as_z_str() {
+        // Convert to owned String immediately to avoid lifetime issues
+        AnyValue::String(s.to_str()?.to_owned().into())
+    } else if let Some(b) = zval.as_bool() {
+        // Checked before long: a PHP bool converts to a long, so testing long first would
+        // record `true` as 1.
+        AnyValue::Boolean(b)
+    } else if let Some(i) = zval.as_long() {
+        AnyValue::Int(i)
+    } else if let Some(f) = zval.as_double() {
+        AnyValue::Double(f)
+    } else {
+        // fallback: string representation using Debug
+        AnyValue::String(format!("{:?}", zval).into())
+    })
+}
+
 pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
     let mut class =
         ClassEntity::<LogRecordState>::new_with_default_state_constructor(LOG_RECORD_CLASS_NAME);
 
     class
         .add_method("__construct", Visibility::Public, |this, arguments| {
-            //if argument 1 (body) is provided, set it
-            if let Some(body_zval) = arguments.first() {
-                let body_str = body_zval.expect_z_str()?;
-                if !body_str.is_empty() {
-                    // Convert to owned String immediately to avoid lifetime issues
-                    let body_any = AnyValue::String(body_str.to_str()?.to_owned().into());
-                    this.as_mut_state().body = Some(body_any);
-                }
+            // `mixed $body = null` upstream, so the slot may be absent or hold any type.
+            if let Some(body_zval) = arguments.first()
+                && body_zval.as_null().is_none()
+            {
+                this.as_mut_state().body = Some(zval_to_any_value(body_zval)?);
             }
             // Set trace context from current OpenTelemetry context if available
             let ctx = Context::current();
@@ -169,7 +188,18 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
             }
             Ok::<_, phper::Error>(())
         })
-        .argument(phper::functions::Argument::new("body").optional().with_default_value("").with_type_hint(phper::types::ArgumentTypeHint::String));
+        // `with_default_value` takes PHP *source text*, not a value: it is stored verbatim
+        // and compiled as a constant expression when something reads the default. So `"null"`
+        // here means the expression `null`, and a *string* default would need its quotes
+        // inside the Rust literal (`"''"`, not `""`). A value that is not a parseable
+        // expression compiles to a malformed AST and segfaults on the first read -- which
+        // reflection does, so `ReflectionClass` over the extension is enough to trigger it.
+        // Every default declared in this extension is read by declared-defaults-readable.phpt.
+        .argument(
+            Argument::new("body")
+                .with_type_hint(ArgumentTypeHint::Mixed)
+                .with_default_value("null"),
+        );
 
     class
         .add_method("setTimestamp", Visibility::Public, |this, arguments| {
@@ -183,7 +213,7 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
             this.as_mut_state().timestamp = Some(system_time);
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(phper::functions::Argument::new("timestamp").with_type_hint(ArgumentTypeHint::Int));
+        .argument(Argument::new("timestamp").with_type_hint(ArgumentTypeHint::Int));
 
     class
         .add_method("setSeverityNumber", Visibility::Public, |this, arguments| {
@@ -191,29 +221,23 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
             this.as_mut_state().severity = Some(map_severity_number(severity));
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(phper::functions::Argument::new("severityNumber").with_type_hint(ArgumentTypeHint::Int));
+        .argument(Argument::new("severityNumber").with_type_hint(ArgumentTypeHint::Int));
 
     class
         .add_method("setBody", Visibility::Public, |this, arguments| {
-            let body_zval = &arguments[0];
-            let body_any = if let Ok(s) = body_zval.expect_z_str() {
-                // Convert to owned String immediately to avoid lifetime issues
-                AnyValue::String(s.to_str()?.to_owned().into())
-            } else if let Ok(i) = body_zval.expect_long() {
-                AnyValue::Int(i)
-            } else if let Ok(f) = body_zval.expect_double() {
-                AnyValue::Double(f)
-            } else if let Ok(b) = body_zval.expect_bool() {
-                AnyValue::Boolean(b)
-            } else {
-                // fallback: string representation using Debug
-                let s = format!("{:?}", body_zval);
-                AnyValue::String(s.into())
+            // `mixed $body = null` upstream, so the slot may be absent.
+            let body = match arguments.first() {
+                Some(zval) if zval.as_null().is_none() => Some(zval_to_any_value(zval)?),
+                _ => None,
             };
-            this.as_mut_state().body = Some(body_any);
+            this.as_mut_state().body = body;
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(phper::functions::Argument::new("body"));
+        .argument(
+            Argument::new("body")
+                .with_type_hint(ArgumentTypeHint::Mixed)
+                .with_default_value("null"),
+        );
 
     class
         .add_method("setSeverityText", Visibility::Public, |this, arguments| {
@@ -222,7 +246,7 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(phper::functions::Argument::new("severityText"));
+        .argument(Argument::new("severityText").with_type_hint(ArgumentTypeHint::String));
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
@@ -232,8 +256,11 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
             insert_attribute(state, key, value_zval)?;
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("key"))
-        .argument(Argument::new("value").optional());
+        // Both required, as upstream has them. An `.optional()` on `$value` would let
+        // `setAttribute('k')` past Zend's arity check and into a slot the handler indexes,
+        // panicking across the FFI boundary -- which aborts the process rather than throwing.
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
+        .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed));
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
@@ -250,7 +277,7 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
             }
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("attributes"));
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable));
 
     class
         .add_method("setEventName", Visibility::Public, |this, arguments| {
@@ -258,7 +285,7 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
             this.as_mut_state().event_name = Some(name);
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(phper::functions::Argument::new("eventName"));
+        .argument(Argument::new("eventName").with_type_hint(ArgumentTypeHint::String));
 
     class
 }

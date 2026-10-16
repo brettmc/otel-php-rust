@@ -3,8 +3,9 @@ use phper::{
     alloc::ToRefOwned,
     classes::{ClassEntity, Interface, StateClass, Visibility},
     errors::ThrowObject,
-    functions::Argument,
+    functions::{Argument, ReturnType},
     objects::{ZObj, ZObject},
+    types::{ArgumentTypeHint, ReturnTypeHint},
 };
 use std::{
     borrow::Cow,
@@ -15,7 +16,6 @@ use opentelemetry::{
     Context,
     trace::{
         Span,
-        SpanContext,
         Status,
         TraceContextExt,
     }
@@ -27,11 +27,15 @@ use crate::{
             get_instance_id,
             ContextClass,
         },
+        context_interface::CONTEXT_INTERFACE_NAME,
         scope::ScopeClass,
+        scope_interface::SCOPE_INTERFACE_NAME,
         storage,
     },
     trace::{
-        span_context::SpanContextClass,
+        span_context::{span_context_from_object, SpanContextClass},
+        span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
+        span_interface::SPAN_INTERFACE_NAME,
         local_root_span::store_local_root_span,
     },
     util,
@@ -78,7 +82,17 @@ pub fn make_span_class(
             }
 
             Ok(())
-        });
+        })
+        // Upstream's `end(?int $endEpochNanos = null)`. The timestamp is accepted but not yet
+        // applied -- `SpanRef` has no `end_with_timestamp` -- so declaring it keeps the arity
+        // right for callers holding a `SpanInterface` without pretending it takes effect.
+        .argument(
+            Argument::new("endEpochNanos")
+                .with_type_hint(ArgumentTypeHint::Int)
+                .allow_null()
+                .with_default_value("null"),
+        )
+        .return_type(ReturnType::new(ReturnTypeHint::Void));
 
     class
         .add_method("setStatus", Visibility::Public, |this, arguments| {
@@ -86,15 +100,14 @@ pub fn make_span_class(
                 Ok(s) => s.to_string(),
                 Err(_) => return Ok(this.to_ref_owned()), // Ignore invalid UTF-8 input
             };
+            // `?string $description = null`, so the slot may be absent *or* hold an explicit
+            // null; neither is a string to unwrap.
             let description: Cow<'static, str> = arguments
                 .get(1)
-                .map(|d| d.expect_z_str())
-                .transpose()?
-                .map(|d| {
-                    match d.to_str() {
-                        Ok(s) => Cow::Owned(s.to_string()),
-                        Err(_) => Cow::Borrowed(""),
-                    }
+                .and_then(|d| d.as_z_str())
+                .map(|d| match d.to_str() {
+                    Ok(s) => Cow::Owned(s.to_string()),
+                    Err(_) => Cow::Borrowed(""),
                 })
                 .unwrap_or(Cow::Borrowed(""));
             let status_code = match status.as_str() {
@@ -113,8 +126,16 @@ pub fn make_span_class(
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("code"))
-        .argument(Argument::new("description").optional());
+        .argument(Argument::new("code").with_type_hint(ArgumentTypeHint::String))
+        .argument(
+            Argument::new("description")
+                .with_type_hint(ArgumentTypeHint::String)
+                .allow_null()
+                .with_default_value("null"),
+        )
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
@@ -130,7 +151,15 @@ pub fn make_span_class(
              }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::String))
+        // Upstream is `bool|int|float|string|array|null`. phper has no union type hint, so
+        // `mixed` stands in: it is wider than the union, and a parameter may be widened
+        // without breaking an implementer.
+        .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
@@ -147,7 +176,11 @@ pub fn make_span_class(
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("updateName", Visibility::Public, |this, arguments| {
@@ -163,7 +196,11 @@ pub fn make_span_class(
                 ctx.span().update_name(name);
             }
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("recordException", Visibility::Public, |this, arguments| {
@@ -177,16 +214,24 @@ pub fn make_span_class(
                 }
             }
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("exception").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from("Throwable"),
+        )))
+        // Declared to match upstream's arity, but not yet applied: the Rust SDK's
+        // `record_error` takes no attributes.
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        )
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("addLink", Visibility::Public, |this, arguments| {
-            let span_context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let state_obj = unsafe { span_context_obj.as_state_obj::<Option<SpanContext>>() };
-            let span_context = match state_obj.as_state() {
-                Some(v) => v.clone(),
-                None => return Err(phper::Error::boxed("Invalid SpanContext object")),
-            };
+            let span_context = span_context_from_object(arguments[0].expect_mut_z_obj()?)?;
 
             let instance_id = get_instance_id(this);
             let attributes = vec![];
@@ -198,7 +243,22 @@ pub fn make_span_class(
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        // The interface, as upstream declares it, not the concrete class -- so a userland
+        // `SpanContextInterface` is accepted. That is what makes the guarded cast in
+        // `span_context_from_object` necessary.
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(SPAN_CONTEXT_INTERFACE_NAME),
+        )))
+        // Declared to match upstream's arity; link attributes are not applied yet.
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        )
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("addEvent", Visibility::Public, |this, arguments| {
@@ -226,7 +286,23 @@ pub fn make_span_class(
             }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
-        });
+        })
+        .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        )
+        // Declared to match upstream's arity; an explicit event timestamp is not applied yet.
+        .argument(
+            Argument::new("timestamp")
+                .with_type_hint(ArgumentTypeHint::Int)
+                .allow_null()
+                .with_default_value("null"),
+        )
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("getContext", Visibility::Public, move |this, _| {
@@ -238,7 +314,29 @@ pub fn make_span_class(
                 *object.as_mut_state() = Some(ctx.span().span_context().clone());
             }
             Ok::<_, phper::Error>(object)
-        });
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_CONTEXT_INTERFACE_NAME,
+        ))));
+
+    class
+        // Both span shapes answer this: an owned `SdkSpan` directly, and a stored context
+        // through its `SpanRef`. It is the call instrumentation makes before doing expensive
+        // work, so it has to work on either.
+        .add_method("isRecording", Visibility::Public, |this, _| {
+            let instance_id = get_instance_id(this);
+            let is_recording = if let Some(span) = this.as_mut_state().as_mut() {
+                span.is_recording()
+            } else if let Some(ctx) = storage::get_context_instance(instance_id) {
+                ctx.span().is_recording()
+            } else {
+                // No span and no stored context: nothing is being recorded.
+                false
+            };
+
+            Ok::<_, phper::Error>(is_recording)
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::Bool));
 
     class
         .add_static_method("getCurrent", Visibility::Public, {
@@ -253,7 +351,10 @@ pub fn make_span_class(
 
                 Ok::<_, phper::Error>(object)
             }
-        });
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("activate", Visibility::Public, {
@@ -287,7 +388,10 @@ pub fn make_span_class(
                 object.set_property("context_id", instance_id.unwrap_or(0) as i64);
                 Ok::<_, phper::Error>(object)
             }
-        });
+        })
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SCOPE_INTERFACE_NAME,
+        ))));
 
     class
         .add_method("storeInContext", Visibility::Public, move |this, arguments| {
@@ -303,13 +407,22 @@ pub fn make_span_class(
             let context = storage::resolve_context(context_id);
             let arc_ctx = Arc::new(context.with_span(span));
             let instance_id = storage::store_context_instance(arc_ctx.clone());
+            // The returned Context is derived from `$context`, so it carries that context's
+            // PHP-side keys as well as the span.
+            storage::inherit_context_values(context_id, instance_id);
 
             let mut object = context_class.init_object()?;
             *object.as_mut_state() = Some(arc_ctx);
             object.set_property("context_id", instance_id.unwrap_or(0) as i64);
 
             Ok::<_, phper::Error>(object)
-        }); //argument ContextInterface, return ContextInterface
+        })
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(CONTEXT_INTERFACE_NAME),
+        )))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            CONTEXT_INTERFACE_NAME,
+        ))));
 
     let span_class_clone = class.bound_class();
     class
@@ -320,7 +433,13 @@ pub fn make_span_class(
             *object.as_mut_state() = None;
             object.set_property("context_id", instance_id);
             Ok::<_, phper::Error>(object)
-        });
+        })
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
+            String::from(CONTEXT_INTERFACE_NAME),
+        )))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
 }

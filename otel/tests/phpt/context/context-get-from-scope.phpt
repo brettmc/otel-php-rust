@@ -10,23 +10,31 @@ OTEL_METRICS_EXPORTER=none
 <?php
 use OpenTelemetry\Context\Context;
 
+$key = Context::createKey('some_key');
+
 $context = Context::getCurrent();
-$context = $context->with('some_key', 'A');
+$context = $context->with($key, 'A');
 $scope = $context->activate();
 var_dump($scope);
 
 $ctx = $scope->context();
 var_dump($ctx);
-assert($ctx->get('some_key') === 'A');
-assert(Context::getCurrent()->get('some_key') === 'A');
+// A Context reached back through its Scope must carry the same values as the one activated,
+// which is only true because `activate()` copies them onto the new context id.
+var_dump($ctx->get($key) === 'A');
+var_dump(Context::getCurrent()->get($key) === 'A');
 $scope->detach();
 ?>
 --EXPECTF--
-object(OpenTelemetry\Context\Scope)#2 (1) {
+object(OpenTelemetry\Context\Scope)#%d (2) {
   ["context_id":"OpenTelemetry\Context\Scope":private]=>
-  int(1)
+  int(%d)
+  ["localStorage":"OpenTelemetry\Context\Scope":private]=>
+  NULL
 }
-object(OpenTelemetry\Context\Context)#3 (1) {
+object(OpenTelemetry\Context\Context)#%d (1) {
   ["context_id":"OpenTelemetry\Context\Context":private]=>
-  int(1)
+  int(%d)
 }
+bool(true)
+bool(true)

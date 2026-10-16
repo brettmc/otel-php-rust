@@ -63,13 +63,20 @@ pub fn lock_registry<P>(
 ///
 /// Shutting down explicitly rather than just dropping our `Arc` matters: the provider's
 /// `Drop` only flushes if no clone handed out to a caller is still alive, and a failed
-/// flush should be logged rather than silently dropping telemetry. `signal` names the
-/// signal in those log messages.
+/// flush should be logged rather than silently dropping telemetry.
+///
+/// `signal` names the signal in those log messages. Every message here interpolates it as
+/// `"{}Provider"`, so callers pass it capitalised ("Tracer", not "tracer") to keep one object
+/// from appearing under two names in the logs.
+///
+/// Returns whether every provider shut down cleanly, which is what userland's
+/// `shutdown(): bool` reports. Having nothing to shut down counts as success: the
+/// postcondition the caller asked for already holds.
 pub fn shutdown_registry<P>(
     registry: &Mutex<HashMap<ProviderKey, Arc<P>>>,
     signal: &str,
     shutdown: impl Fn(&P) -> Result<(), opentelemetry_sdk::error::OTelSdkError>,
-) {
+) -> bool {
     let pid = process::id();
     let mut providers = lock_registry(registry);
     let keys: Vec<ProviderKey> = providers
@@ -79,36 +86,52 @@ pub fn shutdown_registry<P>(
         .collect();
 
     if keys.is_empty() {
-        tracing::info!("no {} providers to shutdown for pid {}", signal, pid);
-        return;
+        tracing::info!("no {}Providers to shutdown for pid {}", signal, pid);
+        return true;
     }
     tracing::info!("Shutting down all {}Providers for pid {}", signal, pid);
+    let mut all_succeeded = true;
     for key in keys {
         tracing::debug!("Shutting down {}Provider for key {:?}", signal, key);
+        // Carry on through a failure rather than returning early: the remaining providers
+        // still need shutting down, and this also runs from MSHUTDOWN.
         if let Some(provider) = providers.remove(&key)
             && let Err(err) = shutdown(&provider) {
             tracing::warn!("Failed to shut down {}Provider for key {:?}: {}", signal, key, err);
+            all_succeeded = false;
         }
     }
+
+    all_succeeded
 }
 
 /// Flush the provider the current request would use, if one exists.
+///
+/// Returns whether the flush succeeded, which is what userland's `forceFlush(): bool`
+/// reports. Having no provider to flush counts as success, for the same reason as in
+/// [`shutdown_registry`]: there is no buffered telemetry left unflushed.
 pub fn force_flush_registry<P>(
     registry: &Mutex<HashMap<ProviderKey, Arc<P>>>,
     signal: &str,
     force_flush: impl Fn(&P) -> Result<(), opentelemetry_sdk::error::OTelSdkError>,
-) {
+) -> bool {
     let pid = process::id();
     let providers = lock_registry(registry);
     let key = provider_key();
     let Some(provider) = providers.get(&key) else {
-        tracing::info!("no {} provider to flush for pid {}", signal, pid);
-        return;
+        tracing::info!("no {}Provider to flush for pid {}", signal, pid);
+        return true;
     };
     tracing::info!("Flushing {}Provider for pid {}", signal, pid);
     match force_flush(provider) {
-        Ok(()) => tracing::debug!("OpenTelemetry {} provider flush success", signal),
-        Err(err) => tracing::warn!("Failed to flush OpenTelemetry {} provider: {:?}", signal, err),
+        Ok(()) => {
+            tracing::debug!("{}Provider flush success", signal);
+            true
+        }
+        Err(err) => {
+            tracing::warn!("Failed to flush {}Provider: {:?}", signal, err);
+            false
+        }
     }
 }
 
@@ -123,7 +146,7 @@ pub fn get_provider<P>(
     match providers.get(&key) {
         Some(provider) => provider.clone(),
         None => {
-            tracing::warn!("no {} provider initialized for key {:?}, using no-op", signal, key);
+            tracing::warn!("no {}Provider initialized for key {:?}, using no-op", signal, key);
             fallback.clone()
         }
     }

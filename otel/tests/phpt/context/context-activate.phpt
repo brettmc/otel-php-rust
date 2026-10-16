@@ -10,12 +10,16 @@ OTEL_METRICS_EXPORTER=none
 <?php
 use OpenTelemetry\Context\Context;
 
+$key = Context::createKey('some_key');
+
 $context = Context::getCurrent();
-$context = $context->with('some_key', 'A');
+$context = $context->with($key, 'A');
 $scope = $context->activate();
 
-assert(Context::getCurrent()->get('some_key') === 'A');
+var_dump(Context::getCurrent()->get($key) === 'A');
 $scope->detach();
-assert(Context::getCurrent()->get('some_key') === null);
+var_dump(Context::getCurrent()->get($key) === null);
 ?>
 --EXPECT--
+bool(true)
+bool(true)
