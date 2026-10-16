@@ -111,10 +111,24 @@ jobs:
         working-directory: otel
         run: (cd tests/auto/zf1 && composer update --no-dev)
 
+      # No laminas-mvc release supports PHP 8.5 yet (3.8.0, the newest, caps at ~8.4.0), so
+      # the resolver falls back to mvc 2.x -- which hard-requires laminas-form, and every
+      # matching form release carries an unfixable XSS advisory. Composer >=2.9 blocks
+      # installing those by default, so the step fails outright rather than resolving.
+      #
+      # --ignore-platform-req=php keeps mvc 3.8.0 instead. That is the version 8.4 already
+      # tests against, it needs no advisory ignore, and the suite passes on it. The flag is
+      # scoped to 8.5 on purpose: on 7.x/8.0 it would force 3.8.0 onto a PHP it cannot run.
       - name: Install dependencies (7.1+)
         working-directory: otel
         if: matrix.php-version != '7.0'
-        run: (cd tests/auto/laminas && composer update --no-dev)
+        run: |
+          cd tests/auto/laminas
+          if [ "${{ matrix.php-version }}" = "8.5" ]; then
+            composer update --no-dev --ignore-platform-req=php
+          else
+            composer update --no-dev
+          fi
 
       - name: Install dependencies (7.2+)
         working-directory: otel

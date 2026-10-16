@@ -26,6 +26,13 @@
             "laminas/laminas-component-installer": true,
             "laminas/laminas-skeleton-installer": true,
             "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "policy": {
+            "advisories": {
+                "ignore-id": {
+                    "PKSA-64sp-d9d9-67qy": "CVE-2021-3007, RCE in laminas-http <2.14.2. Only reached on PHP 7.1/7.2: the fix (2.14.2) requires php ^7.3, and on 7.2 the newest resolvable laminas-mvc is 3.1.1, which pins http back to 2.13.0. This fixture is a local instrumentation test target that makes no outbound HTTP requests and deserialises no untrusted input, so the vulnerable code path is never entered. Remove this once PHP 7.1/7.2 leave the test matrix."
+                }
+            }
         }
     }
 }
