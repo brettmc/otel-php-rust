@@ -28,14 +28,28 @@ var_dump($loggerProvider->forceFlush());
 // handler returning Rust `()` would satisfy `: bool` and hand userland NULL anyway.
 // Checking the declaration as well as the value catches the inverse regression: a correct
 // value with the declaration dropped.
-foreach ([TracerProvider::class, LoggerProvider::class] as $class) {
-    foreach (['forceFlush', 'shutdown'] as $method) {
-        // getName(), not string interpolation: casting a ReflectionType to string is
-        // deprecated in PHP 7.4 and the notice would land in the middle of the expected
-        // output. `bool` is a builtin type hint, which phper-sys registers on 7.x as well
-        // as 8.x, so there is a real type to read on every version we support.
-        $returnType = (new ReflectionMethod($class, $method))->getReturnType();
-        echo $class, '::', $method, '(): ', $returnType->getName(), "\n";
+//
+// Guarded rather than skipping the whole file: the return *values* checked above are the
+// point of this test and are worth asserting on every version. Only the declaration needs
+// 7.2, because phper-sys gates ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX at PHP_VERSION_ID
+// >= 70200 and falls back to ZEND_BEGIN_ARG_INFO_EX below it -- so on 7.0/7.1 even a
+// builtin return type is never registered and getReturnType() is NULL. (The class-valued
+// OBJ variant needs 8.0; see interface-surface.phpt.)
+//
+// Reports mismatches instead of echoing each signature, so the expected output stays the
+// same on every version rather than forking on one.
+if (PHP_VERSION_ID >= 70200) {
+    foreach ([TracerProvider::class, LoggerProvider::class] as $class) {
+        foreach (['forceFlush', 'shutdown'] as $method) {
+            // getName(), not string interpolation: casting a ReflectionType to string is
+            // deprecated in PHP 7.4 and the notice would land in the middle of the
+            // expected output.
+            $returnType = (new ReflectionMethod($class, $method))->getReturnType();
+            $actual = $returnType === null ? 'none' : $returnType->getName();
+            if ($actual !== 'bool') {
+                echo $class, '::', $method, '() declares ', $actual, ', expected bool', "\n";
+            }
+        }
     }
 }
 
@@ -55,10 +69,6 @@ var_dump($tracerProvider->shutdown());
 --EXPECT--
 bool(true)
 bool(true)
-OpenTelemetry\API\Trace\TracerProvider::forceFlush(): bool
-OpenTelemetry\API\Trace\TracerProvider::shutdown(): bool
-OpenTelemetry\API\Logs\LoggerProvider::forceFlush(): bool
-OpenTelemetry\API\Logs\LoggerProvider::shutdown(): bool
 bool(true)
 bool(true)
 bool(true)
