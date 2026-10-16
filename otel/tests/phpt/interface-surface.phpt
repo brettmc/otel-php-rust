@@ -112,7 +112,7 @@ foreach ($expected as $interface => $methods) {
         continue;
     }
     $reflection = new ReflectionClass($interface);
-    foreach ($methods as $method => [$required, $total]) {
+    foreach ($methods as $method => list($required, $total)) {
         if (!$reflection->hasMethod($method)) {
             $errors[] = "$interface::$method() is not declared";
             continue;
@@ -126,7 +126,7 @@ foreach ($expected as $interface => $methods) {
                 $m->getNumberOfRequiredParameters(),
                 $m->getNumberOfParameters(),
                 $required,
-                $total,
+                $total
             );
         }
     }
@@ -153,7 +153,7 @@ $returns = [
 // phper-sys compiles ZEND_BEGIN_ARG_WITH_RETURN_OBJ_INFO_EX out on 7.x, so a class-valued
 // return type is never registered there and every one of them reflects as ''.
 if (PHP_VERSION_ID >= 80000) {
-    foreach ($returns as [$class, $method, $expectedReturn]) {
+    foreach ($returns as list($class, $method, $expectedReturn)) {
         $actual = (string) (new ReflectionMethod($class, $method))->getReturnType();
         if ($actual !== $expectedReturn) {
             $errors[] = "$class::$method() returns '$actual', expected '$expectedReturn'";
