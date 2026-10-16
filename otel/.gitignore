@@ -1,5 +1,8 @@
 target/
-Cargo.lock
+# Cargo.lock is committed: this is a cdylib with publish = false, so the lockfile is
+# never seen by downstream consumers and only affects our own builds. Committing it
+# keeps the 11-version CI matrix and every contributor on one dependency graph, and
+# lets `cargo audit` scan what we actually build rather than a fresh resolve.
 
 *.diff
 *.exp

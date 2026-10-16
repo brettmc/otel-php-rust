@@ -5,8 +5,10 @@ use phper::{
 };
 use crate::logs::log_record::LOG_RECORD_CLASS_NAME;
 
+pub const LOGGER_INTERFACE_NAME: &str = r"OpenTelemetry\API\Logs\LoggerInterface";
+
 pub fn make_logger_interface() -> InterfaceEntity {
-    let mut interface = InterfaceEntity::new(r"OpenTelemetry\API\Logs\LoggerInterface");
+    let mut interface = InterfaceEntity::new(LOGGER_INTERFACE_NAME);
 
     interface
         .add_method("emit")

@@ -7,12 +7,10 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     env,
-    process,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 use opentelemetry::{
     InstrumentationScope,
-    KeyValue,
     trace::TracerProvider,
 };
 use opentelemetry_stdout::SpanExporter as StdoutSpanExporter;
@@ -28,46 +26,33 @@ use opentelemetry_sdk::{
     },
     Resource,
 };
-use once_cell::sync::{
-    Lazy,
-};
 use crate::{
+    provider::{self, ProviderKey},
     request,
     trace::{
         memory_exporter::MEMORY_EXPORTER,
-        tracer::TracerClass
+        tracer::TracerClass,
+        tracer_interface::TRACER_INTERFACE_NAME,
     },
-    util,
     runtime::init_tokio_runtime,
+    util,
 };
 
 const TRACER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\TracerProvider";
 
 pub type TracerProviderClass = StateClass<()>;
 
-/// (pid, "service_name:resource_attributes")
-type ProviderKey = (u32, String);
-
-static TRACER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkTracerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static NOOP_TRACER_PROVIDER: Lazy<Arc<SdkTracerProvider>> = Lazy::new(|| {
+static TRACER_PROVIDERS: LazyLock<Mutex<HashMap<ProviderKey, Arc<SdkTracerProvider>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static NOOP_TRACER_PROVIDER: LazyLock<Arc<SdkTracerProvider>> = LazyLock::new(|| {
     Arc::new(SdkTracerProvider::builder()
         .with_resource(Resource::builder_empty().build())
         .with_sampler(AlwaysOff)
         .build())
 });
 
-//tracer provider per (service_name, resource_attributes) pair (from .env, if enabled)
-fn get_tracer_provider_key() -> ProviderKey {
-    let pid = process::id();
-    let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_default();
-    let resource_attrs = env::var("OTEL_RESOURCE_ATTRIBUTES").unwrap_or_default();
-    let key = format!("{}:{}", service_name, resource_attrs);
-    (pid, key)
-}
-
 pub fn init_once() {
-    let key = get_tracer_provider_key();
-    let mut providers = TRACER_PROVIDERS.lock().unwrap();
+    let key = provider::provider_key();
+    let mut providers = provider::lock_registry(&TRACER_PROVIDERS);
     if providers.contains_key(&key) {
         tracing::debug!("tracer provider already exists for key {:?}", key);
         return;
@@ -85,15 +70,7 @@ pub fn init_once() {
         return;
     }
 
-    let resource = Resource::builder()
-        .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
-        .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
-        .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
-        .with_attribute(KeyValue::new("process.runtime.name", util::get_sapi_module_name()))
-        .with_attribute(KeyValue::new("process.runtime.version", util::get_php_version()))
-        .with_attribute(KeyValue::new("process.pid", process::id().to_string()))
-        .with_attribute(KeyValue::new("host.name", hostname::get().unwrap_or_default().to_string_lossy().to_string()))
-        .build();
+    let resource = provider::build_resource();
 
     let mut builder = SdkTracerProvider::builder();
     if env::var("OTEL_TRACES_EXPORTER").as_deref() == Ok("console") {
@@ -121,12 +98,16 @@ pub fn init_once() {
                 .build()
         } else {
             tracing::debug!("Using gRPC trace exporter with tokio runtime");
-            let runtime = init_tokio_runtime();
-            runtime.block_on(async {
-                OtlpSpanExporter::builder()
-                    .with_tonic()
-                    .build()
-            })
+            match init_tokio_runtime() {
+                Some(runtime) => runtime.block_on(async {
+                    OtlpSpanExporter::builder()
+                        .with_tonic()
+                        .build()
+                }),
+                None => Err(opentelemetry_otlp::ExporterBuildError::InternalFailure(
+                    "no tokio runtime available for gRPC export".to_string(),
+                )),
+            }
         };
         match exporter {
             Ok(exporter) => {
@@ -157,48 +138,15 @@ pub fn get_tracer_provider() -> Arc<SdkTracerProvider> {
         tracing::debug!("OpenTelemetry is disabled for this request, returning no-op tracer provider");
         return NOOP_TRACER_PROVIDER.clone();
     }
-    let providers = TRACER_PROVIDERS.lock().unwrap();
-    let key = get_tracer_provider_key();
-    if let Some(provider) = providers.get(&key) {
-        provider.clone()
-    } else {
-        tracing::warn!("no tracer provider initialized for key {:?}, using no-op", key);
-        NOOP_TRACER_PROVIDER.clone()
-    }
+    provider::get_provider(&TRACER_PROVIDERS, "tracer", &NOOP_TRACER_PROVIDER)
 }
 
 pub fn force_flush() {
-    let pid = process::id();
-    let providers = TRACER_PROVIDERS.lock().unwrap();
-    let key = get_tracer_provider_key();
-    if let Some(provider) = providers.get(&key) {
-        tracing::info!("Flushing TracerProvider for pid {}", pid);
-        match provider.force_flush() {
-            Ok(_) => tracing::debug!("OpenTelemetry tracer provider flush success"),
-            Err(err) => tracing::warn!("Failed to flush OpenTelemetry tracer provider: {:?}", err),
-        }
-    } else {
-        tracing::info!("no tracer provider to flush for pid {}", pid);
-    }
+    provider::force_flush_registry(&TRACER_PROVIDERS, "tracer", |p| p.force_flush());
 }
 
 pub fn shutdown() {
-    let pid = process::id();
-    let mut providers = TRACER_PROVIDERS.lock().unwrap();
-    let keys_to_remove: Vec<_> = providers
-        .keys()
-        .filter(|(k_pid, _)| *k_pid == pid)
-        .cloned()
-        .collect();
-    if !keys_to_remove.is_empty() {
-        tracing::info!("Shutting down all TracerProviders for pid {}", pid);
-        for key in keys_to_remove {
-            tracing::debug!("Shutting down TracerProvider for key {:?}", key);
-            providers.remove(&key);
-        }
-    } else {
-        tracing::info!("no tracer providers to shutdown for pid {}", pid);
-    }
+    provider::shutdown_registry(&TRACER_PROVIDERS, "Tracer", |p| p.shutdown());
 }
 
 pub fn make_tracer_provider_class(
@@ -250,8 +198,8 @@ pub fn make_tracer_provider_class(
         .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
         .argument(Argument::new("version").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
         .argument(Argument::new("schemaUrl").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
-        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]"))
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Trace\TracerInterface"))));
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable).with_default_value("[]"))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(TRACER_INTERFACE_NAME))));
 
     class.add_method("forceFlush", Visibility::Public, |_, _| {
         force_flush();

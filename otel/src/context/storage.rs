@@ -1,6 +1,37 @@
+//! Bridges PHP's object lifetime to opentelemetry-rust's `Context`.
+//!
+//! A `Context` is immutable and cheap to clone, but PHP needs to hand userland a handle it
+//! can pass around and compare. That handle is an integer `context_id`, exposed as a private
+//! `context_id` property on the PHP object and resolved back to an `Arc<Context>` here.
+//! A `context_id` of 0 means "no stored instance" (see [`resolve_context`]), which is what
+//! `Context::getCurrent()` reports — so 0 is a normal value, not an error.
+//!
+//! Three thread-locals, with distinct jobs:
+//!
+//! - `CONTEXT_STORAGE` — `context_id` -> `Arc<Context>`, the contexts PHP currently holds.
+//! - `GUARD_STACK` — the `ContextGuard`s from `activate()`, innermost last. A guard restores
+//!   the previous context when dropped, so this must stay a stack: dropping out of order
+//!   would restore the wrong context.
+//! - `CONTEXT_GUARD_MAP` — guards owned by the auto-instrumentation observer, keyed by
+//!   `ExecuteData` address. The observer attaches on function entry and detaches on exit,
+//!   which does not nest the way userland `activate()`/`detach()` does, so it cannot share
+//!   the stack above.
+//!
+//! All three are thread-local because a request belongs to a thread: under a threaded SAPI,
+//! sharing them would leak one request's active span into another's.
+//!
+//! Entries outlive both their PHP object and their scope deliberately. An activated context
+//! is kept alive by the guard stack after the PHP `Context` object is collected, and a
+//! detached `Scope` can still be asked for its context. Because PHP-side holders reference a
+//! context by its integer id rather than by `Arc`, `Arc::strong_count` alone cannot decide
+//! when an entry is dead — removal is conditional, see [`maybe_remove_context_instance`] and
+//! [`detach_context`].
+
 use crate::context::{
     context::ContextClassEntity,
+    context_interface::CONTEXT_INTERFACE_NAME,
     scope::ScopeClassEntity,
+    scope_interface::SCOPE_INTERFACE_NAME,
 };
 use phper::{
     classes::{ClassEntity, Interface, StateClass, Visibility},
@@ -21,6 +52,7 @@ use std::{
 use opentelemetry::{
     Context,
     ContextGuard,
+    trace::TraceContextExt,
 };
 use tracing::debug;
 
@@ -43,9 +75,17 @@ pub fn current_context() -> Arc<Context> {
         .unwrap_or_else(|| Arc::new(Context::current()))
 }
 
+/// Look up a stored context by id, falling back to the current context.
+///
+/// A userland Context object can outlive its stored instance (for example if its scope was
+/// already detached), so a missing id is a recoverable condition rather than a panic: the
+/// current context is the same answer `None` gets.
 pub fn resolve_context(instance_id: Option<u64>) -> Arc<Context> {
     match instance_id {
-        Some(id) => get_context_instance(Some(id)).expect("context not found"),
+        Some(id) => get_context_instance(Some(id)).unwrap_or_else(|| {
+            debug!("Context instance {} not found, falling back to current context", id);
+            Arc::new(Context::current())
+        }),
         None => Arc::new(Context::current()),
     }
 }
@@ -142,19 +182,76 @@ pub fn attach_context(instance_id: Option<u64>) -> Result<(), &'static str> {
     }
 }
 
-pub fn detach_context(instance_id: Option<u64>) {
+/// Detach a scope, if it is the innermost one.
+///
+/// Detaching out of order is a userland mistake (the spec calls it undefined behaviour), and
+/// the only safe response is to do nothing: a `ContextGuard` restores whatever context was
+/// active when it was created, so dropping the inner guard because the *outer* scope was
+/// detached would leave the inner span active with no way to ever deactivate it.
+///
+/// Detaching a context is not the same as deleting it: detaching ends a *scope*, while the
+/// context itself lives until nothing can reach it. The canonical post-hook shape reaches
+/// the context *after* the detach:
+///
+/// ```php
+/// $scope->detach();
+/// Span::fromContext($scope->context())->end();
+/// ```
+///
+/// Both the `Scope` and a `fromContext()` span refer to the context by its integer id, which
+/// `Arc::strong_count` cannot see — so a refcount of 1 after popping the guard does not mean
+/// nobody is holding it. A context carrying an unended span is therefore kept, and removal
+/// left to `Span::end()`, `Context::__destruct`, or the RSHUTDOWN sweep. A context with no
+/// span has nothing left to do once detached, so it is released here rather than lingering
+/// for the rest of the request.
+/// Returns whether the scope was actually detached, so callers can skip the rest of their
+/// teardown when the request was refused.
+pub fn detach_context(instance_id: Option<u64>) -> bool {
     if let Some(id) = instance_id {
         debug!("Detaching context instance {}", id);
-        GUARD_STACK.with(|stack| {
-            if let Some((_guard, stack_id)) = stack.borrow_mut().pop() {
-                if stack_id == id {
-                    maybe_remove_context_instance(Some(stack_id));
-                } else {
-                    debug!("Not detaching context instance {}, is not top-most", id);
+        let detached = GUARD_STACK.with(|stack| {
+            let mut stack = stack.borrow_mut();
+            // Inspect the top before popping: popping first and checking afterwards would
+            // already have dropped the guard, deactivating a scope nobody asked to detach.
+            match stack.last() {
+                Some((_, stack_id)) if *stack_id == id => stack.pop().map(|(_, id)| id),
+                Some((_, stack_id)) => {
+                    debug!(
+                        "Not detaching context instance {}, is not top-most (top is {})",
+                        id, stack_id
+                    );
+                    None
+                }
+                None => {
+                    debug!("Not detaching context instance {}, guard stack is empty", id);
+                    None
                 }
             }
         });
+        // Outside the GUARD_STACK borrow: this touches CONTEXT_STORAGE, and the dropped
+        // guard above may run arbitrary Drop code.
+        if let Some(id) = detached
+            && !detached_context_holds_span(id)
+        {
+            maybe_remove_context_instance(Some(id));
+        }
+        detached.is_some()
+    } else {
+        false
     }
+}
+
+/// Whether a context carries a span that userland could still want to end.
+///
+/// An invalid span context means `Context::current()` had no span to begin with, so there is
+/// nothing a later `Span::fromContext()` could usefully retrieve.
+fn detached_context_holds_span(instance_id: u64) -> bool {
+    CONTEXT_STORAGE.with(|storage| {
+        storage
+            .borrow()
+            .get(&instance_id)
+            .is_some_and(|context| context.span().span_context().is_valid())
+    })
 }
 
 pub fn current_context_instance_id() -> Option<u64> {
@@ -194,7 +291,7 @@ pub fn build_storage_class(
             *object.as_mut_state() = Some(context);
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
 
     let scope_ce_attach = scope_ce.clone();
     class
@@ -210,17 +307,20 @@ pub fn build_storage_class(
             }
             Ok::<_, phper::Error>(object)
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))))
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))));
+        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SCOPE_INTERFACE_NAME))));
 
     let scope_ce_scope = scope_ce.clone();
     class
+        // Reading the current scope must not change it: `scope()` is an accessor, and the
+        // caller detaches through the returned Scope object. Peek at the innermost guard
+        // rather than popping it, which would deactivate the context just by looking.
         .add_method("scope", Visibility::Public, move |_, _arguments| {
-            let popped = GUARD_STACK.with(|stack| {
-                stack.borrow_mut().pop()
+            let current = GUARD_STACK.with(|stack| {
+                stack.borrow().last().map(|(_, context_id)| *context_id)
             });
-            match popped {
-                Some((_guard, context_id)) => {
+            match current {
+                Some(context_id) => {
                     let mut object = scope_ce_scope.init_object()?;
                     object.set_property("context_id", context_id as i64);
                     Ok::<_, phper::Error>(object.into())
@@ -230,7 +330,7 @@ pub fn build_storage_class(
                 }
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))).allow_null());
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SCOPE_INTERFACE_NAME))).allow_null());
 }
 
 pub fn get_context_ids() -> Vec<u64> {

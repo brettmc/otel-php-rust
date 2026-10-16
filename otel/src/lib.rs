@@ -13,6 +13,7 @@ pub mod globals;
 pub mod request;
 pub mod logging;
 pub mod logs;
+pub mod provider;
 pub mod runtime;
 pub mod util;
 pub mod module;

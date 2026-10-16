@@ -11,8 +11,11 @@ use crate::context::{
         get_instance_id,
         ContextClassEntity,
     },
+    context_interface::CONTEXT_INTERFACE_NAME,
     storage,
 };
+
+const TRACE_CONTEXT_PROPAGATOR_CLASS_NAME: &str = r"OpenTelemetry\API\Propagation\TraceContextPropagator";
 
 pub type TraceContextPropagatorClass = StateClass<()>;
 
@@ -21,7 +24,7 @@ pub fn make_trace_context_propagator_class(
     context_class: &ContextClassEntity,
 ) -> ClassEntity<()> {
     let mut class = ClassEntity::<()>::new_with_default_state_constructor(
-        r"OpenTelemetry\API\Propagation\TraceContextPropagator",
+        TRACE_CONTEXT_PROPAGATOR_CLASS_NAME,
     );
 
     class.implements(text_map_propagator_interface);
@@ -32,13 +35,21 @@ pub fn make_trace_context_propagator_class(
 
     class
         .add_method("inject", Visibility::Public, |_, arguments| -> phper::Result<()> {
-            // Context (optional, default to Context::current)
-            let context_obj = arguments[2].expect_mut_z_obj()?;
-            let context_id = get_instance_id(context_obj);
+            // Context is the third of three parameters and the first two are optional, so
+            // `inject($carrier)` — the ordinary call shape — passes only one argument.
+            // Indexing here rather than reaching for the slot aborted the process: a panic
+            // at an `extern "C"` boundary cannot unwind into PHP.
+            let context_id = arguments
+                .get(2)
+                .and_then(|arg| arg.as_z_obj())
+                .and_then(get_instance_id);
             tracing::debug!("inject() using context_id = {:?}", context_id);
 
-            let context = storage::get_context_instance(context_id);
-            let context_ref = context.as_ref().map(|arc| arc.as_ref()).expect("invalid context");
+            // `Context::getCurrent()` reports a context_id of 0, which resolves to `None`, so
+            // the overwhelmingly common call shape has no stored instance to look up. Fall
+            // back to the current context rather than treating that as an error.
+            let context = storage::resolve_context(context_id);
+            let context_ref = context.as_ref();
 
             // Carrier gymnastics (PHP array passed by ref)
             let carrier_ref = arguments[0].expect_mut_z_ref()?;
@@ -66,7 +77,7 @@ pub fn make_trace_context_propagator_class(
         .argument(Argument::new("carrier").with_type_hint(ArgumentTypeHint::Mixed).by_ref())
         .argument(Argument::new("setter").allow_null().with_default_value("null"))
         .argument(Argument::new("context")
-            .with_type_hint(ArgumentTypeHint::ClassEntry(r"OpenTelemetry\Context\ContextInterface".to_string()))
+            .with_type_hint(ArgumentTypeHint::ClassEntry(CONTEXT_INTERFACE_NAME.to_string()))
             .with_default_value("null")
             .allow_null()
         )
@@ -87,15 +98,12 @@ pub fn make_trace_context_propagator_class(
                 }
             }
 
-            // Parent context (optional)
-            let context_id = match arguments.get(2) {
-                Some(val) => {
-                    let obj = val.expect_z_obj()?;
-                    let id = obj.get_property("context_id").as_long().unwrap_or(0);
-                    if id > 0 { Some(id as u64) } else { None }
-                }
-                None => None,
-            };
+            // Parent context (optional, and declared `allow_null()`, so an explicit null is
+            // a legal way to ask for the current context rather than a type error).
+            let context_id = arguments
+                .get(2)
+                .and_then(|arg| arg.as_z_obj())
+                .and_then(get_instance_id);
 
             let parent_cx = context_id
                 .and_then(|id| storage::get_context_instance(Some(id)))
@@ -115,12 +123,12 @@ pub fn make_trace_context_propagator_class(
         .argument(Argument::new("carrier"))
         .argument(Argument::new("getter").allow_null().with_default_value("null"))
         .argument(Argument::new("context")
-            .with_type_hint(ArgumentTypeHint::ClassEntry(r"OpenTelemetry\Context\ContextInterface".to_string()))
+            .with_type_hint(ArgumentTypeHint::ClassEntry(CONTEXT_INTERFACE_NAME.to_string()))
             .with_default_value("null")
             .allow_null()
         )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(
-            r"OpenTelemetry\Context\ContextInterface".to_string()
+            CONTEXT_INTERFACE_NAME.to_string()
         )));
 
     class

@@ -1,5 +1,7 @@
 use crate::context::{
+    context_interface::CONTEXT_INTERFACE_NAME,
     scope::ScopeClassEntity,
+    scope_interface::SCOPE_INTERFACE_NAME,
     storage::{self, StorageClassEntity},
 };
 use phper::{
@@ -24,6 +26,13 @@ pub type ContextClassEntity = ClassEntity<Option<Arc<Context>>>;
 
 #[derive(Debug)]
 struct Test(String);
+
+/// The state of a Context is only populated by the factories on this class and on Storage.
+/// An instance obtained any other way (`newInstanceWithoutConstructor()`) has none, which is
+/// a userland mistake to report rather than a reason to panic across the FFI boundary.
+fn uninitialized() -> phper::Error {
+    phper::Error::boxed("Context was not created by a Context or Storage factory method")
+}
 
 pub fn new_context_class() -> ContextClassEntity {
     ClassEntity::<Option<Arc<Context>>>::new_with_default_state_constructor(CONTEXT_CLASS_NAME)
@@ -67,7 +76,7 @@ pub fn build_context_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
 
 
     //TODO: this doesn't usefully work, since the "key" is the type of the struct,
@@ -75,7 +84,7 @@ pub fn build_context_class(
     // see https://github.com/open-telemetry/opentelemetry-rust/blob/opentelemetry-0.28.0/opentelemetry/src/context.rs#L391
     class
         .add_method("with", Visibility::Public, |this, arguments| {
-            let arc = this.as_mut_state().as_mut().unwrap();
+            let arc = this.as_mut_state().as_mut().ok_or_else(uninitialized)?;
             let mut new_ctx = (**arc).clone();
             let php_value = arguments[1].expect_z_str()?.to_str()?.to_string();
             new_ctx = new_ctx.with_value(Test(php_value));
@@ -87,7 +96,7 @@ pub fn build_context_class(
 
     class
         .add_method("get", Visibility::Public, |this, _arguments| -> phper::Result<ZVal> {
-            let arc = this.as_state().as_ref().unwrap();
+            let arc = this.as_state().as_ref().ok_or_else(uninitialized)?;
             let context = &**arc; // deref Arc<Context>
             let value = context.get::<Test>();
             match value {
@@ -101,7 +110,7 @@ pub fn build_context_class(
         .add_method("activate", Visibility::Public, {
             let scope_ce = scope_ce.clone();
             move |this, _arguments| {
-                let arc = this.as_state().as_ref().unwrap().clone(); // Arc<Context>
+                let arc = this.as_state().as_ref().ok_or_else(uninitialized)?.clone(); // Arc<Context>
                 let instance_id = storage::store_context_instance(arc.clone());
                 debug!("Storing context: {:?}", instance_id);
 
@@ -114,7 +123,7 @@ pub fn build_context_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ScopeInterface"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SCOPE_INTERFACE_NAME))));
 
     class
         .add_static_method("storage", Visibility::Public, move |_| {

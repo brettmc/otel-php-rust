@@ -7,11 +7,11 @@ use crate::{
     trace::tracer_provider,
 };
 use phper::ini::ini_get;
-use once_cell::sync::OnceCell;
 use tracing;
 use phper::modules::Module;
+use std::sync::OnceLock;
 
-static DISABLED: OnceCell<bool> = OnceCell::new();
+static DISABLED: OnceLock<bool> = OnceLock::new();
 
 pub fn on_module_init() {
     logging::init_once();

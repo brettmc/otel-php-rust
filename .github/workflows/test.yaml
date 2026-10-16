@@ -1,17 +1,15 @@
-name: Build PHP Extension
+name: Build and test
 
 on:
   push:
-    branches: [main, gh-action]
+    branches: [main]
   pull_request:
 
 jobs:
-  test:
+  # Dependency scanning is independent of the PHP version, so it runs once rather than
+  # being duplicated across the test matrix.
+  audit:
     runs-on: ubuntu-latest
-    continue-on-error: true
-    strategy:
-      matrix:
-        php-version: ['7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4']
     steps:
       - uses: actions/checkout@v4
 
@@ -19,6 +17,78 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          cache: false
+
+      # scans Cargo.lock against the RustSec advisory database. This can go red without
+      # any change on our side, when a new advisory lands against a dependency.
+      - name: Security audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: otel
+
+  # Cargo.lock is committed, which pins us to one dependency graph and hides upstream
+  # breakage until someone runs `cargo update`. This job is the counterweight recommended
+  # by https://doc.rust-lang.org/cargo/guide/continuous-integration.html#verifying-latest-dependencies
+  # -- it resolves the newest versions allowed by Cargo.toml and checks they still work,
+  # which is what anyone running `cargo add`/`cargo install` would get.
+  #
+  # continue-on-error is job-level and deliberate: a dependency published an hour ago
+  # should not block an unrelated PR. Expect to read this one's result rather than rely
+  # on it going red. Only Rust-level checks run here; the phpt suites stay in `test`.
+  latest-deps:
+    name: Latest dependencies
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      # stops the resolver from holding dependencies back over rust-version metadata
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: allow
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
+
+      # cargo build needs php-config, even though no extension is installed here
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      # ignores the committed lockfile and takes the newest semver-compatible versions
+      - name: Update to latest dependencies
+        working-directory: otel
+        run: cargo update --verbose
+
+      - name: Build
+        working-directory: otel
+        run: cargo build --features test --verbose
+
+      - name: Run cargo tests
+        working-directory: otel
+        run: cargo test --features test --verbose
+
+  test:
+    runs-on: ubuntu-latest
+    # NOTE: this is job-level, so it does not make individual steps non-fatal -- it only
+    # stops a failing matrix entry from failing the whole workflow run. A failing step
+    # still fails its job, which is what makes the clippy steps below a real gate.
+    continue-on-error: true
+    strategy:
+      matrix:
+        php-version: ['7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
           cache: false
 
       - name: Set up PHP
@@ -41,15 +111,38 @@ jobs:
         working-directory: otel
         run: (cd tests/auto/zf1 && composer update --no-dev)
 
+      # No laminas-mvc release supports PHP 8.5 yet (3.8.0, the newest, caps at ~8.4.0), so
+      # the resolver falls back to mvc 2.x -- which hard-requires laminas-form, and every
+      # matching form release carries an unfixable XSS advisory. Composer >=2.9 blocks
+      # installing those by default, so the step fails outright rather than resolving.
+      #
+      # --ignore-platform-req=php keeps mvc 3.8.0 instead. That is the version 8.4 already
+      # tests against, it needs no advisory ignore, and the suite passes on it. The flag is
+      # scoped to 8.5 on purpose: on 7.x/8.0 it would force 3.8.0 onto a PHP it cannot run.
       - name: Install dependencies (7.1+)
         working-directory: otel
         if: matrix.php-version != '7.0'
-        run: (cd tests/auto/laminas && composer update --no-dev)
+        run: |
+          cd tests/auto/laminas
+          if [ "${{ matrix.php-version }}" = "8.5" ]; then
+            composer update --no-dev --ignore-platform-req=php
+          else
+            composer update --no-dev
+          fi
 
       - name: Install dependencies (7.2+)
         working-directory: otel
         if: matrix.php-version != '7.0' && matrix.php-version != '7.1'
         run: (cd tests/auto/psr18 && composer update --no-dev)
+
+      # Clippy runs per PHP version on purpose. build.rs sets otel_observer_supported on
+      # PHP 8+ and otel_observer_not_supported on 7.x, and auto/mod.rs compiles only one
+      # of auto/observer.rs (8+) or auto/execute.rs (7.x) -- so a single-version run is
+      # blind to the other file entirely. It also reuses the Build step's target/, which
+      # makes it a few seconds rather than a fresh compile.
+      - name: Clippy
+        working-directory: otel
+        run: cargo clippy --all-targets --features test -- -D warnings
 
       - name: Run cargo tests
         working-directory: otel

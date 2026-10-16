@@ -1,6 +1,6 @@
 use crate::{
     auto::{
-        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, Target},
         utils::{start_and_activate_span, record_exception},
     },
     context::storage::{take_guard},
@@ -54,17 +54,18 @@ impl Plugin for Psr18Plugin {
         &self.handlers
     }
     fn get_name(&self) -> &str {
-        "psr-18"
+        "psr18"
     }
 }
 
 pub struct Psr18SendRequestHandler;
 
 impl Handler for Psr18SendRequestHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"Psr\Http\Client\ClientInterface"), "sendRequest"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"Psr\Http\Client\ClientInterface", "sendRequest"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -79,7 +80,7 @@ impl Handler for Psr18SendRequestHandler {
 }
 
 impl Psr18SendRequestHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.psr18");
         let mut name = "psr18.request".to_string();
 
@@ -135,7 +136,7 @@ impl Psr18SendRequestHandler {
         *request_zval = modified_request;
     }
 
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         retval: &mut ZVal,
         exception: Option<&mut ZObj>

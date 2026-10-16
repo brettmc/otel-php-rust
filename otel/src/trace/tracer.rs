@@ -36,7 +36,11 @@ pub fn make_tracer_class(
 
     class
         .add_method("spanBuilder", Visibility::Public, move |this, arguments| {
-            let tracer: &SdkTracer = this.as_state().as_ref().unwrap();
+            // Populated only by `TracerProvider::getTracer()`; anything else is a userland
+            // mistake to report, not a reason to panic across the FFI boundary.
+            let tracer: &SdkTracer = this.as_state().as_ref().ok_or_else(|| {
+                phper::Error::boxed("Tracer was not created by TracerProvider::getTracer()")
+            })?;
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
             let span_builder: SpanBuilder = tracer.span_builder(name);
             let my_span_builder = SpanBuilderState::new(span_builder, tracer.clone());

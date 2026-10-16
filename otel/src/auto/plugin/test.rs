@@ -4,7 +4,7 @@
 use crate::{
     auto::{
         execute_data::get_fqn,
-        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin},
+        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, Target},
         utils,
     },
     context::storage::take_guard,
@@ -61,14 +61,15 @@ impl Plugin for TestPlugin {
 pub struct DemoHandler;
 
 impl Handler for DemoHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some("DemoClass"), "test"),
-            (Some("DemoClass"), "inner"),
-            (None, "phpversion"),
-            (Some("IDemo"), "foo"),
-            (Some("IDemo"), "bar"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method("DemoClass", "test"),
+            Target::method("DemoClass", "inner"),
+            Target::function("phpversion"),
+            Target::method("IDemo", "foo"),
+            Target::method("IDemo", "bar"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -83,7 +84,7 @@ impl Handler for DemoHandler {
 }
 
 impl DemoHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
         let exec_data_ref = unsafe { &*exec_data };
         let span_name = get_fqn(exec_data_ref).unwrap_or_default();
@@ -91,7 +92,7 @@ impl DemoHandler {
         unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
 
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         _exception: Option<&mut ZObj>
@@ -103,10 +104,11 @@ impl DemoHandler {
 pub struct DemoHelloHandler;
 
 impl Handler for DemoHelloHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some("DemoClass"), "hello"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method("DemoClass", "hello"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -119,7 +121,7 @@ impl Handler for DemoHelloHandler {
 }
 
 impl DemoHelloHandler {
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         _exec_data: *mut ExecuteData,
         retval: &mut ZVal,
         _exception: Option<&mut ZObj>
@@ -137,10 +139,11 @@ impl DemoHelloHandler {
 pub struct DemoFunctionHandler;
 
 impl Handler for DemoFunctionHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (None, "demoFunction"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::function("demoFunction"),
+        ];
+        TARGETS
     }
 
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -156,7 +159,7 @@ impl Handler for DemoFunctionHandler {
 }
 
 impl DemoFunctionHandler {
-    unsafe extern "C" fn pre_callback(exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.test");
         let attributes = vec![KeyValue::new("my-attribute", "my-value".to_string())];
         let span_name = "demo-function";
@@ -164,7 +167,7 @@ impl DemoFunctionHandler {
         unsafe { utils::start_and_activate_span(tracer, span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal); }
     }
 
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
         exception: Option<&mut ZObj>
@@ -183,11 +186,12 @@ impl DemoFunctionHandler {
 
 pub struct TestClassHandler;
 impl Handler for TestClassHandler {
-    fn get_targets(&self) -> Vec<(Option<&'static str>, &'static str)> {
-        vec![
-            (Some(r"OpenTelemetry\Test\ITestClass"), "getString"),
-            (Some(r"OpenTelemetry\Test\ITestClass"), "throwException"),
-        ]
+    fn get_targets(&self) -> &'static [Target] {
+        const TARGETS: &[Target] = &[
+            Target::method(r"OpenTelemetry\Test\ITestClass", "getString"),
+            Target::method(r"OpenTelemetry\Test\ITestClass", "throwException"),
+        ];
+        TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
         HandlerCallbacks {
@@ -202,11 +206,11 @@ impl Handler for TestClassHandler {
 }
 
 impl TestClassHandler {
-    unsafe extern "C" fn pre_callback(_exec_data: *mut ExecuteData) {
+    unsafe fn pre_callback(_exec_data: *mut ExecuteData) {
         tracing::debug!("TestClassHandler: pre_callback called");
     }
 
-    unsafe extern "C" fn post_callback(
+    unsafe fn post_callback(
         _exec_data: *mut ExecuteData,
         retval: &mut ZVal,
         exception: Option<&mut ZObj>

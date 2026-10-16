@@ -15,6 +15,7 @@ use crate::{
     trace::{
         non_recording_span::{NonRecordingSpanClass},
         span::SpanClass,
+        span_interface::SPAN_INTERFACE_NAME,
     },
 };
 use opentelemetry::Context;
@@ -50,7 +51,7 @@ pub fn make_local_root_span_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Span\SpanInterface"))))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SPAN_INTERFACE_NAME))))
     ;
 
     class

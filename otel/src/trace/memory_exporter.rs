@@ -4,17 +4,17 @@ use phper::{
 use phper::functions::ReturnType;
 use phper::types::ReturnTypeHint;
 use phper::arrays::ZArray;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::convert::Infallible;
-use once_cell::sync::Lazy;
 use opentelemetry_sdk::trace::InMemorySpanExporter;
+use crate::util;
 
 pub type MemoryExporterClass = StateClass<()>;
 
 const MEMORY_EXPORTER_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\SpanExporter\Memory";
 
 // Static instance of the exporter
-pub static MEMORY_EXPORTER: Lazy<Mutex<InMemorySpanExporter>> = Lazy::new(|| {
+pub static MEMORY_EXPORTER: LazyLock<Mutex<InMemorySpanExporter>> = LazyLock::new(|| {
     Mutex::new(InMemorySpanExporter::default())
 });
 
@@ -55,66 +55,10 @@ pub fn make_memory_exporter_class() -> ClassEntity<()> {
             scope.insert("name", span.instrumentation_scope.name());
             scope.insert("version", span.instrumentation_scope.version().unwrap_or(""));
             scope.insert("schema_url", span.instrumentation_scope.schema_url().unwrap_or(""));
-            let mut scope_attributes = ZArray::new();
-            for kv in span.instrumentation_scope.attributes() {
-                match &kv.value {
-                    opentelemetry::Value::String(s) => scope_attributes.insert(kv.key.as_str(), s.as_str()),
-                    opentelemetry::Value::I64(i) => scope_attributes.insert(kv.key.as_str(), *i),
-                    opentelemetry::Value::F64(f) => scope_attributes.insert(kv.key.as_str(), *f),
-                    opentelemetry::Value::Bool(b) => scope_attributes.insert(kv.key.as_str(), *b),
-                    _ => {
-                        // For simplicity, we will not handle other types like bool, array, etc.
-                        continue;
-                    }
-                }
-            }
-            scope.insert("attributes", scope_attributes);
+            scope.insert("attributes", util::attributes_to_zarray(span.instrumentation_scope.attributes()));
             arr.insert("instrumentation_scope", scope);
             arr.insert("status", format!("{:?}", span.status));
-            let mut attributes = ZArray::new();
-            for kv in span.attributes.iter() {
-                match &kv.value {
-                    opentelemetry::Value::String(s) => attributes.insert(kv.key.as_str(), s.as_str()),
-                    opentelemetry::Value::I64(i) => attributes.insert(kv.key.as_str(), *i),
-                    opentelemetry::Value::F64(f) => attributes.insert(kv.key.as_str(), *f),
-                    opentelemetry::Value::Bool(b) => attributes.insert(kv.key.as_str(), *b),
-                    opentelemetry::Value::Array(arr) => {
-                        let mut arr_values = ZArray::new();
-                        match arr {
-                            opentelemetry::Array::Bool(vec) => {
-                                for v in vec {
-                                    arr_values.insert((), *v);
-                                }
-                            }
-                            opentelemetry::Array::I64(vec) => {
-                                for v in vec {
-                                    arr_values.insert((), *v);
-                                }
-                            }
-                            opentelemetry::Array::F64(vec) => {
-                                for v in vec {
-                                    arr_values.insert((), *v);
-                                }
-                            }
-                            opentelemetry::Array::String(vec) => {
-                                for v in vec {
-                                    arr_values.insert((), v.as_str());
-                                }
-                            }
-                            _ => {
-                                // For simplicity, we will not handle other types like bool, array, etc.
-                                continue;
-                            }
-                        }
-                        attributes.insert(kv.key.as_str(), arr_values);
-                    }
-                    _ => {
-                        // For simplicity, we will not handle other types like bool, array, etc.
-                        continue;
-                    }
-                }
-            }
-            arr.insert("attributes", attributes);
+            arr.insert("attributes", util::attributes_to_zarray(span.attributes.iter()));
             let mut events = ZArray::new();
             for event in span.events.clone() {
                 let mut event_arr = ZArray::new();
@@ -122,28 +66,7 @@ pub fn make_memory_exporter_class() -> ClassEntity<()> {
                 let timestamp = event.timestamp.duration_since(std::time::UNIX_EPOCH).unwrap().as_micros();
                 event_arr.insert("timestamp", timestamp as i64);
 
-                let mut event_attributes = ZArray::new();
-                for kv in event.attributes.iter() {
-                    match &kv.value {
-                        opentelemetry::Value::String(s) => event_attributes.insert(kv.key.as_str(), s.as_str()),
-                        opentelemetry::Value::I64(i) => event_attributes.insert(kv.key.as_str(), *i),
-                        opentelemetry::Value::F64(f) => event_attributes.insert(kv.key.as_str(), *f),
-                        opentelemetry::Value::Bool(b) => event_attributes.insert(kv.key.as_str(), *b),
-                        opentelemetry::Value::Array(arr) => {
-                            let mut arr_values = ZArray::new();
-                            match arr {
-                                opentelemetry::Array::Bool(vec) => for v in vec { arr_values.insert((), *v); },
-                                opentelemetry::Array::I64(vec) => for v in vec { arr_values.insert((), *v); },
-                                opentelemetry::Array::F64(vec) => for v in vec { arr_values.insert((), *v); },
-                                opentelemetry::Array::String(vec) => for v in vec { arr_values.insert((), v.as_str()); },
-                                _ => continue,
-                            }
-                            event_attributes.insert(kv.key.as_str(), arr_values);
-                        }
-                        _ => continue,
-                    }
-                }
-                event_arr.insert("attributes", event_attributes);
+                event_arr.insert("attributes", util::attributes_to_zarray(event.attributes.iter()));
                 events.insert((), event_arr);
             }
             arr.insert("events", events);
@@ -159,28 +82,7 @@ pub fn make_memory_exporter_class() -> ClassEntity<()> {
                 link_arr.insert("span_context", link_context);
 
                 // Link attributes
-                let mut link_attributes = ZArray::new();
-                for kv in link.attributes.iter() {
-                    match &kv.value {
-                        opentelemetry::Value::String(s) => link_attributes.insert(kv.key.as_str(), s.as_str()),
-                        opentelemetry::Value::I64(i) => link_attributes.insert(kv.key.as_str(), *i),
-                        opentelemetry::Value::F64(f) => link_attributes.insert(kv.key.as_str(), *f),
-                        opentelemetry::Value::Bool(b) => link_attributes.insert(kv.key.as_str(), *b),
-                        opentelemetry::Value::Array(arr) => {
-                            let mut arr_values = ZArray::new();
-                            match arr {
-                                opentelemetry::Array::Bool(vec) => for v in vec { arr_values.insert((), *v); },
-                                opentelemetry::Array::I64(vec) => for v in vec { arr_values.insert((), *v); },
-                                opentelemetry::Array::F64(vec) => for v in vec { arr_values.insert((), *v); },
-                                opentelemetry::Array::String(vec) => for v in vec { arr_values.insert((), v.as_str()); },
-                                _ => continue,
-                            }
-                            link_attributes.insert(kv.key.as_str(), arr_values);
-                        }
-                        _ => continue,
-                    }
-                }
-                link_arr.insert("attributes", link_attributes);
+                link_arr.insert("attributes", util::attributes_to_zarray(link.attributes.iter()));
                 links.insert((), link_arr);
             }
             arr.insert("links", links);

@@ -7,12 +7,10 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     env,
-    process,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 use opentelemetry::{
     logs::LoggerProvider,
-    KeyValue,
     InstrumentationScope,
 };
 use opentelemetry_stdout::LogExporter as StdoutLogExporter;
@@ -25,12 +23,13 @@ use opentelemetry_sdk::{
     },
     Resource,
 };
-use once_cell::sync::Lazy;
 use crate::{
     logs::{
         logger::LoggerClass,
+        logger_interface::LOGGER_INTERFACE_NAME,
         memory_exporter::MEMORY_EXPORTER,
     },
+    provider::{self, ProviderKey},
     request,
     util,
     runtime::init_tokio_runtime,
@@ -45,42 +44,23 @@ pub const LOGGER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\LoggerProv
 
 pub type LoggerProviderClass = StateClass<()>;
 
-/// (pid, "service_name:resource_attributes")
-type ProviderKey = (u32, String);
-
-static LOGGER_PROVIDERS: Lazy<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static NOOP_LOGGER_PROVIDER: Lazy<Arc<SdkLoggerProvider>> = Lazy::new(|| {
+static LOGGER_PROVIDERS: LazyLock<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static NOOP_LOGGER_PROVIDER: LazyLock<Arc<SdkLoggerProvider>> = LazyLock::new(|| {
     Arc::new(SdkLoggerProvider::builder()
         .with_resource(Resource::builder_empty().build())
         .build())
 });
 
-fn get_logger_provider_key() -> ProviderKey {
-    let pid = process::id();
-    let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_default();
-    let resource_attrs = env::var("OTEL_RESOURCE_ATTRIBUTES").unwrap_or_default();
-    let key = format!("{}:{}", service_name, resource_attrs);
-    (pid, key)
-}
-
 pub fn init_once() {
-    let key = get_logger_provider_key();
-    let mut providers = LOGGER_PROVIDERS.lock().unwrap();
+    let key = provider::provider_key();
+    let mut providers = provider::lock_registry(&LOGGER_PROVIDERS);
     if providers.contains_key(&key) {
         tracing::debug!("logger provider already exists for key {:?}", key);
         return;
     }
     tracing::debug!("creating logger provider for key {:?}", key);
 
-    let resource = Resource::builder()
-        .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
-        .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
-        .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
-        .with_attribute(KeyValue::new("process.runtime.name", util::get_sapi_module_name()))
-        .with_attribute(KeyValue::new("process.runtime.version", util::get_php_version()))
-        .with_attribute(KeyValue::new("process.pid", process::id().to_string()))
-        .with_attribute(KeyValue::new("host.name", hostname::get().unwrap_or_default().to_string_lossy().to_string()))
-        .build();
+    let resource = provider::build_resource();
 
     let mut builder = SdkLoggerProvider::builder().with_resource(resource);
 
@@ -126,12 +106,16 @@ pub fn init_once() {
                 .build()
         } else {
             tracing::debug!("Using gRPC log exporter with tokio runtime");
-            let runtime = init_tokio_runtime();
-            runtime.block_on(async {
-                OtlpLogExporter::builder()
-                    .with_tonic()
-                    .build()
-            })
+            match init_tokio_runtime() {
+                Some(runtime) => runtime.block_on(async {
+                    OtlpLogExporter::builder()
+                        .with_tonic()
+                        .build()
+                }),
+                None => Err(opentelemetry_otlp::ExporterBuildError::InternalFailure(
+                    "no tokio runtime available for gRPC export".to_string(),
+                )),
+            }
         };
         match exporter {
             Ok(exporter) => {
@@ -164,33 +148,15 @@ pub fn get_logger_provider() -> Arc<SdkLoggerProvider> {
         tracing::debug!("OpenTelemetry is disabled for this request, returning no-op logger provider");
         return NOOP_LOGGER_PROVIDER.clone();
     }
-    let providers = LOGGER_PROVIDERS.lock().unwrap();
-    let key = get_logger_provider_key();
-    if let Some(provider) = providers.get(&key) {
-        provider.clone()
-    } else {
-        tracing::warn!("no logger provider initialized for key {:?}, using no-op", key);
-        NOOP_LOGGER_PROVIDER.clone()
-    }
+    provider::get_provider(&LOGGER_PROVIDERS, "logger", &NOOP_LOGGER_PROVIDER)
+}
+
+pub fn force_flush() {
+    provider::force_flush_registry(&LOGGER_PROVIDERS, "logger", |p| p.force_flush());
 }
 
 pub fn shutdown() {
-    let pid = process::id();
-    let mut providers = LOGGER_PROVIDERS.lock().unwrap();
-    let keys_to_remove: Vec<_> = providers
-        .keys()
-        .filter(|(k_pid, _)| *k_pid == pid)
-        .cloned()
-        .collect();
-    if !keys_to_remove.is_empty() {
-        tracing::info!("Shutting down all LoggerProviders for pid {}", pid);
-        for key in keys_to_remove {
-            tracing::debug!("Shutting down LoggerProvider for key {:?}", key);
-            providers.remove(&key);
-        }
-    } else {
-        tracing::info!("no logger providers to shutdown for pid {}", pid);
-    }
+    provider::shutdown_registry(&LOGGER_PROVIDERS, "Logger", |p| p.shutdown());
 }
 
 pub fn make_logger_provider_class(
@@ -243,8 +209,13 @@ pub fn make_logger_provider_class(
         .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
         .argument(Argument::new("version").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
         .argument(Argument::new("schemaUrl").optional().with_type_hint(ArgumentTypeHint::String).allow_null())
-        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Iterable"))).with_default_value("[]"))
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\API\Logs\LoggerInterface"))));
+        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable).with_default_value("[]"))
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(LOGGER_INTERFACE_NAME))));
+
+    class.add_method("forceFlush", Visibility::Public, |_, _| {
+        force_flush();
+        Ok::<_, Infallible>(())
+    });
 
     class
 }

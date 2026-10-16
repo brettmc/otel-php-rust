@@ -4,6 +4,7 @@ use crate::{
             get_instance_id,
             ContextClassEntity,
         },
+        context_interface::CONTEXT_INTERFACE_NAME,
         storage,
     },
     trace::local_root_span,
@@ -47,8 +48,11 @@ pub fn build_scope_class(
     class
         .add_method("detach", Visibility::Public, |this, _| -> phper::Result<()> {
             let instance_id = get_instance_id(this);
-            if instance_id.is_some() {
-                storage::detach_context(instance_id);
+            // Only tear down the local root span if the scope really was detached. An
+            // out-of-order detach is refused (see `storage::detach_context`), and clearing
+            // the local root for a scope that is still active would drop its context while
+            // userland can still reach it through the still-active inner scope.
+            if storage::detach_context(instance_id) {
                 local_root_span::maybe_remove_local_root_span(instance_id);
             }
             Ok(())
@@ -64,5 +68,5 @@ pub fn build_scope_class(
             object.set_property("context_id", instance_id.unwrap_or(0) as i64);
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(r"OpenTelemetry\Context\ContextInterface"))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
 }

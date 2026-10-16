@@ -259,16 +259,27 @@ pub fn make_span_class(
         .add_method("activate", Visibility::Public, {
             let scope_ce = scope_class.clone();
             move |this, _arguments| {
-                let span = this.as_mut_state().take().expect("No span stored!");
-                let is_local_root = !storage::current_context().span().span_context().is_valid();
+                // A Span object only owns an `SdkSpan` if it was created by a Tracer and has
+                // not been activated yet. Spans obtained from `getCurrent()`/`fromContext()`,
+                // and spans activated a second time, instead reference a stored context — so
+                // re-attach that context rather than panicking on the empty state.
+                let instance_id = match this.as_mut_state().take() {
+                    Some(span) => {
+                        let is_local_root = !storage::current_context().span().span_context().is_valid();
 
-                let ctx = Context::current_with_span(span);
-                let instance_id = storage::store_context_instance(Arc::new(ctx.clone()));
-                this.set_property("context_id", instance_id.unwrap_or(0) as i64);
-                if is_local_root {
-                    this.set_property("is_local_root", true);
-                    store_local_root_span(instance_id);
-                }
+                        let ctx = Context::current_with_span(span);
+                        let instance_id = storage::store_context_instance(Arc::new(ctx.clone()));
+                        this.set_property("context_id", instance_id.unwrap_or(0) as i64);
+                        if is_local_root {
+                            this.set_property("is_local_root", true);
+                            store_local_root_span(instance_id);
+                        }
+                        instance_id
+                    }
+                    None => get_instance_id(this).ok_or_else(|| {
+                        phper::Error::boxed("Cannot activate a Span that holds no span")
+                    }).map(Some)?,
+                };
 
                 storage::attach_context(instance_id).map_err(phper::Error::boxed)?;
 
@@ -280,7 +291,11 @@ pub fn make_span_class(
 
     class
         .add_method("storeInContext", Visibility::Public, move |this, arguments| {
-            let span = this.as_mut_state().take().expect("No span stored!");
+            // Unlike `activate()`, there is nothing sensible to store when this object does
+            // not own a span, so report it to userland instead of panicking.
+            let span = this.as_mut_state().take().ok_or_else(|| {
+                phper::Error::boxed("Cannot store a Span that holds no span in a Context")
+            })?;
 
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
             let context_id = get_instance_id(context_obj);

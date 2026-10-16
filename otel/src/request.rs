@@ -1,3 +1,29 @@
+//! Per-request lifecycle: the RINIT and RSHUTDOWN halves of a PHP request.
+//!
+//! [`on_request_init`] and [`on_request_shutdown`] are the only entry points the module
+//! wires up (see [`crate::module`]); everything else here exists to serve them. The two must
+//! stay symmetric — a request runs in a worker process that will serve the next one, so
+//! anything RINIT establishes (an active context, mutated environment, a root span) has to
+//! be unwound in RSHUTDOWN or it leaks across the request boundary into an unrelated trace.
+//!
+//! The work splits into four concerns:
+//!
+//! - **Disabling.** `otel.disabled`, `.env`, and the excluded-URL list decide whether this
+//!   request is traced at all. [`is_disabled`] is on the hot path — consulted once per
+//!   auto-instrumented function — so its answer is memoized per request.
+//! - **Environment.** A request may carry its own `.env`, which is applied over the process
+//!   environment and restored at RSHUTDOWN from `ENV_BACKUP`. The SDK reads configuration
+//!   from env vars, so this is how per-directory config reaches it at all.
+//! - **The root span.** For a web request, RINIT opens a span from the propagated remote
+//!   context, named for the HTTP method, and RSHUTDOWN finishes it with the response status.
+//!   Both are skipped under CLI unless `otel.cli.enabled` is set.
+//! - **`$_SERVER` reading.** Request attributes (method, uri, headers) and the incoming
+//!   traceparent all come from `$_SERVER`, which is why RINIT has to force-populate it when
+//!   `auto_globals_jit` would otherwise leave it empty.
+//!
+//! All request state lives in thread-locals rather than process statics, because a request
+//! belongs to a thread: under a threaded SAPI, sharing them would let one request's root
+//! span or env backup clobber another's.
 use anyhow::Context as _;
 use phper::{
     eg,
@@ -8,15 +34,14 @@ use phper::{
     arrays::{IterKey, ZArr},
     values::ZVal,
 };
-use once_cell::sync::Lazy;
+use regex::Regex;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     env,
     fs,
     path::{Path, PathBuf},
     sync::Arc,
-    sync::Mutex,
 };
 use opentelemetry::{
     global,
@@ -42,9 +67,24 @@ use crate::{
 thread_local! {
     static OTEL_REQUEST_GUARD: RefCell<Option<opentelemetry::ContextGuard>> = const { RefCell::new(None) };
     static OTEL_CONTEXT_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
+    /// Memoized result of `is_disabled()` for the current request. The answer cannot
+    /// change within a request, but `is_disabled()` is on the hot path (it is consulted
+    /// by every `get_tracer_provider`/`get_logger_provider` call, i.e. once per
+    /// auto-instrumented function), and computing it reads `$_SERVER` and re-parses
+    /// the excluded-URL list. Cleared in RSHUTDOWN.
+    static DISABLED_FOR_REQUEST: Cell<Option<bool>> = const { Cell::new(None) };
+    /// The excluded-URL list as it was last seen, with the regex compiled from it (`None`
+    /// if that list compiled to nothing). Compiling is far more expensive than matching,
+    /// and the list rarely changes, so hold onto it across requests.
+    static EXCLUDED_URL_CACHE: RefCell<Option<(String, Option<Regex>)>> = const { RefCell::new(None) };
+    /// The OTEL_* environment as it was before this request's `.env` was applied, so
+    /// RSHUTDOWN can put it back.
+    ///
+    /// Thread-local, not keyed by pid: a request belongs to a thread, and under a threaded
+    /// SAPI two concurrent requests in one process would otherwise share (and clobber) a
+    /// single pid-keyed backup.
+    static ENV_BACKUP: RefCell<Option<HashMap<String, String>>> = const { RefCell::new(None) };
 }
-//backup mutating environment variables for request duration
-static ENV_BACKUP: Lazy<Mutex<HashMap<u32, HashMap<String, String>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// RINIT handler.
 pub fn on_request_init() {
@@ -76,13 +116,30 @@ pub fn on_request_shutdown() {
     tracing::debug!("OpenTelemetry::RSHUTDOWN");
     shutdown();
     if let Some(plugin_manager) = auto::plugin_manager::get_global() {
-        let pm = plugin_manager.read().expect("Failed to acquire read lock");
+        // A poisoned lock means an earlier panic; the manager is only mutated during MINIT,
+        // so its contents are still sound to read. Skipping per-request plugin cleanup here
+        // would leak this request's state into the next one.
+        let pm = match plugin_manager.read() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         pm.request_shutdown();
     }
 }
 
 /// Check if OpenTelemetry is disabled for the current request (by env, .env or excluded URL)
+///
+/// The result is memoized for the duration of the request; see `DISABLED_FOR_REQUEST`.
 pub fn is_disabled() -> bool {
+    if let Some(cached) = DISABLED_FOR_REQUEST.get() {
+        return cached;
+    }
+    let disabled = compute_is_disabled();
+    DISABLED_FOR_REQUEST.set(Some(disabled));
+    disabled
+}
+
+fn compute_is_disabled() -> bool {
     let request_details = get_request_details();
 
     // Check for excluded URL before creating root span
@@ -262,54 +319,63 @@ fn find_dotenv() -> Option<PathBuf> {
     }
 }
 
+/// Translate one comma-separated excluded-URL list into a regex that matches any of its
+/// patterns in full.
+///
+/// `*` is a wildcard matching any run of characters; everything else is literal, so a
+/// pattern containing regex metacharacters (`.`, `?`, `+`, bare `(`) matches those
+/// characters rather than being interpreted — or failing to compile.
+fn compile_excluded_urls(list: &str) -> Option<Regex> {
+    let alternatives: Vec<String> = list
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|pattern| {
+            pattern
+                .split('*')
+                .map(regex::escape)
+                .collect::<Vec<_>>()
+                .join(".*")
+        })
+        .collect();
+
+    if alternatives.is_empty() {
+        return None;
+    }
+    // Anchored: a pattern has to describe the whole URI, as the un-wildcarded case always
+    // did (it compared for equality).
+    let combined = format!("^(?:{})$", alternatives.join("|"));
+    match Regex::new(&combined) {
+        Ok(re) => Some(re),
+        Err(err) => {
+            // Escaping should make this unreachable; if it ever happens, excluding nothing
+            // is the safer failure than excluding everything.
+            tracing::error!("Failed to compile excluded URL patterns '{}': {}", list, err);
+            None
+        }
+    }
+}
+
 /// Returns true if the given URI matches any pattern in the excluded URLs list.
 /// Patterns support '*' as a wildcard (prefix/suffix/anywhere).
 fn is_excluded_url(uri: &str) -> bool {
-    match std::env::var("OTEL_PHP_EXCLUDED_URLS") {
-        Ok(list) => {
-            tracing::debug!("is_excluded_url: OTEL_PHP_EXCLUDED_URLS='{}'", list);
-            list.split(',')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .any(|pattern| {
-                    if pattern.contains('*') {
-                        let parts: Vec<&str> = pattern.split('*').collect();
-                        let mut pos = 0;
-                        let mut matched = true;
-                        for (i, part) in parts.iter().enumerate() {
-                            if part.is_empty() {
-                                continue;
-                            }
-                            if i == 0 {
-                                if !uri.starts_with(part) {
-                                    matched = false;
-                                    break;
-                                }
-                                pos += part.len();
-                            } else if i == parts.len() - 1 {
-                                if !uri.ends_with(part) {
-                                    matched = false;
-                                    break;
-                                }
-                            } else {
-                                if let Some(idx) = uri[pos..].find(*part) {
-                                    pos += idx + part.len();
-                                } else {
-                                    matched = false;
-                                    break;
-                                }
-                            }
-                        }
-                        matched
-                    } else {
-                        uri == pattern
-                    }
-                })
+    let Ok(list) = std::env::var("OTEL_PHP_EXCLUDED_URLS") else {
+        return false;
+    };
+    tracing::debug!("is_excluded_url: OTEL_PHP_EXCLUDED_URLS='{}'", list);
+
+    // Keyed on the list itself rather than compiled once: the value comes from the
+    // environment, which a `.env` file can change between requests in a reused worker.
+    EXCLUDED_URL_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if cache.as_ref().map(|(cached, _)| cached.as_str()) != Some(list.as_str()) {
+            *cache = Some((list.clone(), compile_excluded_urls(&list)));
         }
-        Err(_) => {
-            false
+        match cache.as_ref() {
+            Some((_, Some(re))) => re.is_match(uri),
+            _ => false,
         }
-    }
+    })
 }
 
 /// Initialize the request handler, creating a root span if necessary.
@@ -378,52 +444,19 @@ fn init() {
 /// Restore the environment variables to their original state.
 fn shutdown() {
     restore_env();
-    let context_id = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take());
-    let is_tracing = context_id.is_some();
-    if is_tracing {
-        let context_id = context_id.unwrap();
-        let is_http_request = get_sapi_module_name() != "cli";
-        tracing::debug!("RSHUTDOWN::auto-closing root span...");
-        let ctx = storage::get_context_instance(Some(context_id));
-        if ctx.is_none() {
-            tracing::warn!("RSHUTDOWN::no context found for id {}", context_id);
-            return;
-        }
-        let ctx = ctx.unwrap();
-        let span = ctx.span();
-        if span.span_context().is_valid() {
-            if is_http_request {
-                let response_code = get_response_status_code();
-                span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
-                if response_code >= 500 {
-                    let mut func = ZVal::from("error_get_last");
-                    let mut args: Vec<ZVal> = Vec::new();
-                    let error = ZVal::call(&mut func, &mut args).ok();
-                    if let Some(error) = error
-                        && error.get_type_info().is_array() {
-                        tracing::debug!("RSHUTDOWN::HTTP error detected: {:?}", error);
-                        let attributes = php_error_to_attributes(&error);
-                        span.add_event("exception", attributes);
-                    }
-                    // https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-                    span.set_status(opentelemetry::trace::Status::error(""));
-                }
-            }
-            span.end();
-            tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
-            drop(ctx);
-            storage::maybe_remove_context_instance(Some(context_id));
-        }
+    close_root_span();
 
-        OTEL_REQUEST_GUARD.with(|slot| {
-            *slot.borrow_mut() = None;
-        });
-        OTEL_CONTEXT_ID.with(|slot| {
-            *slot.borrow_mut() = None;
-        });
-    } else {
-        tracing::debug!("RSHUTDOWN::not auto-closing root span...");
-    }
+    // Request-scoped cleanup is unconditional: these thread-locals outlive the request
+    // on a reused worker, so returning early on an unexpected path would leak guards
+    // and context instances into subsequent requests.
+    OTEL_REQUEST_GUARD.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+    OTEL_CONTEXT_ID.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+    DISABLED_FOR_REQUEST.set(None);
+
     //final check: there should be zero stored context
     let stored_context_ids = storage::get_context_ids();
     if !stored_context_ids.is_empty() {
@@ -434,11 +467,55 @@ fn shutdown() {
     storage::clear_context_storage();
 }
 
+/// End the root span created in RINIT, recording the response status code (and any
+/// fatal error) for HTTP requests. Does nothing if no root span was created.
+fn close_root_span() {
+    let Some(context_id) = OTEL_CONTEXT_ID.with(|cell| cell.borrow_mut().take()) else {
+        tracing::debug!("RSHUTDOWN::not auto-closing root span...");
+        return;
+    };
+    tracing::debug!("RSHUTDOWN::auto-closing root span...");
+    let Some(ctx) = storage::get_context_instance(Some(context_id)) else {
+        tracing::warn!("RSHUTDOWN::no context found for id {}", context_id);
+        return;
+    };
+    let span = ctx.span();
+    if !span.span_context().is_valid() {
+        return;
+    }
+    if get_sapi_module_name() != "cli" {
+        let response_code = get_response_status_code();
+        span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
+        if response_code >= 500 {
+            let mut func = ZVal::from("error_get_last");
+            let mut args: Vec<ZVal> = Vec::new();
+            let error = ZVal::call(&mut func, &mut args).ok();
+            if let Some(error) = error
+                && error.get_type_info().is_array() {
+                tracing::debug!("RSHUTDOWN::HTTP error detected: {:?}", error);
+                let attributes = php_error_to_attributes(&error);
+                span.add_event("exception", attributes);
+            }
+            // https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+            span.set_status(opentelemetry::trace::Status::error(""));
+        }
+    }
+    span.end();
+    tracing::debug!("RSHUTDOWN::removing context: {}", context_id);
+    drop(ctx);
+    storage::maybe_remove_context_instance(Some(context_id));
+}
+
 /// Ensure $_SERVER is initialized, which may not be true if auto_globals_jit is enabled.
 fn jit_initialization() {
     unsafe {
-        let jit_initialization: u8 = pg!(auto_globals_jit).into();
-        if jit_initialization != 0 {
+        // `auto_globals_jit` is `zend_bool` (a `u8`) on PHP 7.x but a real `bool` on PHP 8+,
+        // so neither a `u8` annotation nor a `bool` one compiles everywhere, and converting
+        // between them is a useless conversion (which clippy denies) on whichever version
+        // already has the target type. Comparing against `Default::default()` infers the
+        // field's own type, so it is both correct and lint-clean on every version.
+        let jit_initialization = pg!(auto_globals_jit);
+        if jit_initialization != Default::default() {
             tracing::debug!("JIT auto_globals_jit enabled, initializing $_SERVER");
             let mut server = "_SERVER".to_string();
             sys::zend_is_auto_global_str(server.as_mut_ptr().cast(), server.len());
@@ -555,14 +632,12 @@ fn backup_env() {
     let env = env::vars()
         .filter(|(k, _)| k.starts_with("OTEL_"))
         .collect::<HashMap<_, _>>();
-    let pid = std::process::id();
-    ENV_BACKUP.lock().unwrap().insert(pid, env);
+    ENV_BACKUP.with(|slot| *slot.borrow_mut() = Some(env));
 }
 
 fn restore_env() {
     tracing::debug!("Restoring environment variables from backup");
-    let pid = std::process::id();
-    if let Some(backup) = ENV_BACKUP.lock().unwrap().remove(&pid) {
+    if let Some(backup) = ENV_BACKUP.with(|slot| slot.borrow_mut().take()) {
         // Remove any new env vars not in the backup
         for (k, _) in env::vars() {
             if !backup.contains_key(&k) && k.starts_with("OTEL_") {
@@ -574,5 +649,93 @@ fn restore_env() {
         for (k, v) in backup {
             unsafe { env::set_var(k, v) };
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `is_excluded_url` reads the environment, so the matching logic is tested through the
+    /// compiled regex directly.
+    fn matches(list: &str, uri: &str) -> bool {
+        match compile_excluded_urls(list) {
+            Some(re) => re.is_match(uri),
+            None => false,
+        }
+    }
+
+    #[test]
+    fn exact_patterns_match_the_whole_uri() {
+        assert!(matches("/health", "/health"));
+        assert!(!matches("/health", "/health-check"));
+        assert!(!matches("/health", "/foo/health"));
+    }
+
+    #[test]
+    fn wildcards_match_prefix_suffix_and_middle() {
+        assert!(matches("/health*", "/health-check"));
+        assert!(matches("*.css", "/assets/site.css"));
+        assert!(matches("/api/*/status", "/api/v2/status"));
+        assert!(!matches("/api/*/status", "/api/v2/health"));
+    }
+
+    #[test]
+    fn a_bare_wildcard_matches_everything() {
+        assert!(matches("*", "/anything/at/all"));
+    }
+
+    #[test]
+    fn any_pattern_in_the_list_can_match() {
+        // the list from tests/http/ignore-url.phpt
+        assert!(matches("/health*,/foo/bar", "/health-check"));
+        assert!(matches("/health*,/foo/bar", "/foo/bar"));
+        assert!(!matches("/health*,/foo/bar", "/foo/baz"));
+    }
+
+    #[test]
+    fn whitespace_and_empty_entries_are_ignored() {
+        assert!(matches(" /health , , /foo ", "/health"));
+        assert!(matches(" /health , , /foo ", "/foo"));
+        assert!(!matches(",,", "/health"));
+        assert!(!matches("", "/health"));
+    }
+
+    #[test]
+    fn regex_metacharacters_are_matched_literally() {
+        // '.' must not match an arbitrary character...
+        assert!(matches("/a.b", "/a.b"));
+        assert!(!matches("/a.b", "/axb"));
+        // ...and a pattern that is not valid regex must still work rather than blow up
+        assert!(matches("/foo(1)", "/foo(1)"));
+        assert!(matches("/foo[", "/foo["));
+        assert!(matches("/q?x=1", "/q?x=1"));
+        assert!(!matches("/q?x=1", "/qx=1"));
+    }
+
+    #[test]
+    fn parses_resource_attributes() {
+        let attrs = parse_resource_attributes("service.name=foo,service.version=1.0");
+        assert_eq!(attrs.get("service.name"), Some(&"foo".to_string()));
+        assert_eq!(attrs.get("service.version"), Some(&"1.0".to_string()));
+        assert_eq!(attrs.len(), 2);
+    }
+
+    #[test]
+    fn resource_attribute_values_may_contain_equals() {
+        let attrs = parse_resource_attributes("k=a=b");
+        assert_eq!(attrs.get("k"), Some(&"a=b".to_string()));
+    }
+
+    #[test]
+    fn resource_attributes_are_trimmed_and_incomplete_pairs_dropped() {
+        let attrs = parse_resource_attributes(" a = 1 ,novalue,=noKey,b=2,");
+        assert_eq!(attrs.get("a"), Some(&"1".to_string()));
+        assert_eq!(attrs.get("b"), Some(&"2".to_string()));
+        assert_eq!(attrs.len(), 2);
+    }
+
+    #[test]
+    fn empty_resource_attributes_yield_nothing() {
+        assert!(parse_resource_attributes("").is_empty());
     }
 }
