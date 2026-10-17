@@ -47,9 +47,13 @@ $result = $statement->execute();
 
 $adapter->getDriver()->getConnection()->rollback();
 
-//"other"
+//"other" - any statement the span-name regexes in auto/utils.rs don't recognise lands
+//here, so this only needs to be something that isn't SELECT/INSERT/UPDATE/DELETE. It must
+//also be read-only: `vacuum` names the same span but rewrites the database file, which left
+//the committed fixture showing as modified in git after every test run. The writes above are
+//safe because they roll back, and a rolled-back transaction leaves the file byte-identical.
 $statement = $adapter->createStatement();
-$statement->prepare('vacuum');
+$statement->prepare('pragma user_version');
 $result = $statement->execute();
 
 var_dump(Memory::count());

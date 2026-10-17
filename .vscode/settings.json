@@ -31,6 +31,20 @@
   "intelephense.files.exclude": [
     "**/tests/**/*.phpt"
   ],
+  // Intelephense is the PHP language server here, so VS Code's own built-in PHP
+  // support is turned off rather than left to run alongside it. Both would otherwise
+  // report on the same file: the built-in linter shells out to `php -l`, which stops
+  // at the first syntax error and knows nothing of the project, and the built-in
+  // suggestions are keyword-only yet rank above Intelephense's own completions.
+  //
+  // This matters more than usual here because the only PHP in the repository is
+  // `.phpt` tests mapped to the PHP language above. Their non-PHP section headers
+  // are a syntax error to `php -l`, so the built-in linter reports every test file.
+  //
+  // The dev containers additionally set php.validate.executablePath, which is what
+  // the built-in linter would use if you turned php.validate.enable back on.
+  "php.validate.enable": false,
+  "php.suggest.basic": false,
   // the root Makefile has no configure step for the Makefile Tools extension
   // to run, and its prompt on every open is noise
   "makefile.configureOnOpen": false

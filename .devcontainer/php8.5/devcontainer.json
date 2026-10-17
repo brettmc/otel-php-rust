@@ -22,6 +22,12 @@
   // from workspaceFolder, but that is only a "should" in the spec and the
   // reference implementation falls back to the home folder
   "postStartCommand": "${containerWorkspaceFolder}/.devcontainer/setup-signing-key.sh",
+  // The composer fixtures under tests/auto/*/vendor are per-version volumes (see
+  // compose.yaml), and a fresh volume is empty, so tests/auto would fail on missing
+  // vendor/ until this ran. postCreate rather than postStart: it only needs to happen
+  // when the container is created, and it is slow. `make update` installs only the
+  // fixtures the running PHP can resolve.
+  "postCreateCommand": "make -C ${containerWorkspaceFolder}/otel update",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -43,6 +49,9 @@
         // Makefile and Cargo.toml.
         "terminal.integrated.cwd": "${containerWorkspaceFolder}/otel",
         "terminal.integrated.defaultProfile.linux": "bash",
+        // The built-in PHP language features are disabled in the repository's own
+        // .vscode/settings.json, which is portable. This is the container-specific
+        // half: the path the built-in linter would use if you turned it back on.
         "php.validate.executablePath": "/usr/bin/php"
       }
     }
