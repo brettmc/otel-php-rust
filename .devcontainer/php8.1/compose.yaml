@@ -13,7 +13,25 @@ services:
       # CONTRIBUTING.md requires when switching versions, and keeps each
       # version's build cache warm.
       - target:/workspace/otel/target
+      # The composer fixtures get a volume each, for the same reason: composer
+      # resolves them against the PHP it runs under, so a vendor/ installed on 8.x
+      # holds code that does not parse on 7.x. On the bind-mounted repository they
+      # were shared, and whichever version installed them last was what every
+      # container saw -- the auto/laminas tests then failed with parse errors inside
+      # vendor/ rather than anything to do with the extension.
+      #
+      # A fresh volume is empty, and the fixtures' composer.lock is gitignored, so
+      # devcontainer.json runs `make update` as its postCreateCommand to populate it.
+      - laminas-vendor:/workspace/otel/tests/auto/laminas/vendor
+      - zf1-vendor:/workspace/otel/tests/auto/zf1/vendor
+      - psr18-vendor:/workspace/otel/tests/auto/psr18/vendor
 
 volumes:
   target:
     name: otel-php-rust-target-php81
+  laminas-vendor:
+    name: otel-php-rust-laminas-vendor-php81
+  zf1-vendor:
+    name: otel-php-rust-zf1-vendor-php81
+  psr18-vendor:
+    name: otel-php-rust-psr18-vendor-php81

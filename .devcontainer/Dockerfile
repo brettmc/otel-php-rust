@@ -76,9 +76,18 @@ RUN apt-get update \
 RUN ln -s /workspace/otel/modules/otel.so $(php-config --extension-dir)/otel.so \
   && cp $(php-config --extension-dir)/build/run-tests.php /home/${USERNAME}/
 
-# docker seeds a new named volume from the image directory it covers, so
-# creating this up front gives the cargo target volume the right owner
+# Docker seeds a new named volume from the image directory it covers, so creating these
+# up front gives each volume the right owner. A volume mounted at a path the image does
+# not have is created root-owned and mode 0755, which leaves it unwritable by this user --
+# composer then fails with "Permission denied" rather than anything that names the cause.
+#
+# target/ is the cargo build cache; the three tests/auto dirs are the composer fixtures,
+# which get a volume each so a vendor/ installed on one PHP version is not what every
+# other container sees (composer resolves against the PHP it runs under).
 RUN mkdir -p /workspace/otel/target \
+             /workspace/otel/tests/auto/laminas/vendor \
+             /workspace/otel/tests/auto/zf1/vendor \
+             /workspace/otel/tests/auto/psr18/vendor \
   && chown -R ${USER_UID}:${USER_GID} /workspace
 
 COPY --from=composer /usr/bin/composer /usr/local/bin/composer

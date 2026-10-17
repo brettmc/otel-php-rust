@@ -1,0 +1,59 @@
+{
+  "name": "otel-php-rust (PHP 7.1)",
+  "dockerComposeFile": [
+    "../compose.base.yaml",
+    "compose.yaml"
+  ],
+  "service": "php",
+  "runServices": [
+    "php",
+    "collector"
+  ],
+  "initializeCommand": ".devcontainer/build-image.sh 7.1",
+  // the whole repository, not just otel/. The Cargo workspace is one level
+  // down, but opening the root is what makes the committed .vscode/,
+  // .github/, the top-level Makefile and CONTRIBUTING.md visible and
+  // editable, and it puts the git repository at the workspace root rather
+  // than above it. Shells and tasks still start in otel/ -- see
+  // terminal.integrated.cwd below and .vscode/tasks.json.
+  "workspaceFolder": "/workspace",
+  "remoteUser": "php-rust",
+  // an absolute path rather than a relative one: lifecycle commands run
+  // from workspaceFolder, but that is only a "should" in the spec and the
+  // reference implementation falls back to the home folder
+  "postStartCommand": "${containerWorkspaceFolder}/.devcontainer/setup-signing-key.sh",
+  // The composer fixtures under tests/auto/*/vendor are per-version volumes (see
+  // compose.yaml), and a fresh volume is empty, so tests/auto would fail on missing
+  // vendor/ until this ran. postCreate rather than postStart: it only needs to happen
+  // when the container is created, and it is slow. `make update` installs only the
+  // fixtures the running PHP can resolve.
+  "postCreateCommand": "make -C ${containerWorkspaceFolder}/otel update",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "tamasfe.even-better-toml",
+        "fill-labs.dependi",
+        "bmewburn.vscode-intelephense-client",
+        "ms-azuretools.vscode-docker"
+      ],
+      // Only container-specific settings belong here. Everything portable
+      // (rust-analyzer, .phpt handling, Problems sorting) is in the
+      // repository's own .vscode/settings.json, which is committed and now
+      // read by VS Code because the workspace opens at the repository root.
+      "settings": {
+        // VS Code always spawns the shell with an explicit cwd -- the
+        // compose service's working_dir is never consulted -- so without
+        // this every terminal would open at /workspace, one level above the
+        // Makefile and Cargo.toml.
+        "terminal.integrated.cwd": "${containerWorkspaceFolder}/otel",
+        "terminal.integrated.defaultProfile.linux": "bash",
+        // The built-in PHP language features are disabled in the repository's own
+        // .vscode/settings.json, which is portable. This is the container-specific
+        // half: the path the built-in linter would use if you turned it back on.
+        "php.validate.executablePath": "/usr/bin/php"
+      }
+    }
+  }
+}

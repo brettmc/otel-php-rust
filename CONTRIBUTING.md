@@ -8,10 +8,21 @@ test in. I've added `Makefile`s to make things easier, and written some tests us
 
 ### Dev containers
 
-Alternatively, there is a dev container per PHP version (7.4-8.5) in
+Alternatively, there is a dev container per PHP version (7.0-8.5) in
 [.devcontainer](.devcontainer), each with the rust toolchain, PHP debug symbols, a
 collector for the `otlp` tests. Each version gets its own
 cargo `target/`, so no `make clean` is needed when switching between them.
+
+The composer fixtures under `otel/tests/auto/*/vendor/` get a volume per version too, for the
+same reason: composer resolves them against the PHP it runs under, so a `vendor/` installed on
+8.x holds code that doesn't parse on 7.x. They are installed for you when the container is
+created, so nothing to run after switching versions.
+
+Outside the dev containers they sit on the working tree and are therefore shared, so whichever
+version installed them last is what you get — run `make update` (or `composer update --no-dev`
+in the fixture) after switching; `make test-all` does it for you. `make update` installs only
+the fixtures the running PHP can resolve: `zf1` always, `laminas` on 7.1+, `psr18` on 7.2+,
+matching CI.
 Opening one builds its image for you, via `.devcontainer/build-image.sh`.
 See [.devcontainer/README.md](.devcontainer/README.md).
 
@@ -38,7 +49,16 @@ Tests are organised as:
 
 (tested back to 7.0)
 
-Note that a couple of tests are skipped because they check for logs written during RSHUTDOWN/MSHUTDOWN, which doesn't work in PHP 7.x.
+Note that a handful of tests skip on 7.x, for three reasons:
+
+* a couple check for logs written during RSHUTDOWN/MSHUTDOWN, which doesn't work in PHP 7.x.
+* several reflect over the signatures we declare. `phper-sys` compiles both class-valued type
+  hints (`ZEND_ARG_OBJ_INFO`) and argument default values out before PHP 8.0, so those
+  signatures aren't registered on 7.x and there is nothing for the test to read.
+* one uses named arguments, which are 8.0 syntax.
+
+Each skip says which of these it is. A test that *can* run on 7.x should: prefer guarding the
+version-specific assertion over skipping the whole file, as `interface-surface.phpt` does.
 
 ## Building and running the tests
 

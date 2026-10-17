@@ -42,11 +42,33 @@ clean:
 	rm -rf tests/auto/laminas/vendor/* tests/auto/laminas/composer.lock
 	rm -rf tests/auto/zf1/vendor/* tests/auto/zf1/composer.lock
 	rm -rf tests/auto/psr18/vendor/* tests/auto/psr18/composer.lock
+# Which fixtures can resolve depends on the running PHP, so this mirrors the gates in
+# .github/workflows/test.yaml rather than duplicating the version matrix: zf1 always,
+# laminas on 7.1+, psr18 on 7.2+. Running all three unconditionally fails on 7.0/7.1,
+# where the skipped dirs have no resolvable release.
+#
+# 8.5 needs --ignore-platform-req=php for laminas: no laminas-mvc release supports it yet
+# (3.8.0 caps at ~8.4.0), and without the flag the resolver falls back to mvc 2.x, which
+# hard-requires laminas-form -- every matching release of which carries an unfixable XSS
+# advisory that composer >=2.9 refuses to install. The flag keeps 3.8.0, which is what 8.4
+# already tests against. It is scoped to 8.5 on purpose: on 7.x/8.0 it would force 3.8.0
+# onto a PHP that cannot run it.
+PHP_VERSION_ID := $(shell php -r 'echo PHP_VERSION_ID;')
 update:
-	@echo "Updating composer dependencies..."
-	(cd tests/auto/laminas && composer update --no-dev)
+	@echo "Updating composer dependencies (PHP_VERSION_ID=$(PHP_VERSION_ID))..."
 	(cd tests/auto/zf1 && composer update --no-dev)
+ifeq ($(shell test $(PHP_VERSION_ID) -ge 80500 && echo yes),yes)
+	(cd tests/auto/laminas && composer update --no-dev --ignore-platform-req=php)
+else ifeq ($(shell test $(PHP_VERSION_ID) -ge 70100 && echo yes),yes)
+	(cd tests/auto/laminas && composer update --no-dev)
+else
+	@echo "⏭  skipping laminas: needs PHP 7.1+"
+endif
+ifeq ($(shell test $(PHP_VERSION_ID) -ge 70200 && echo yes),yes)
 	(cd tests/auto/psr18 && composer update --no-dev)
+else
+	@echo "⏭  skipping psr18: needs PHP 7.2+"
+endif
 	@echo "✅ Composer dependencies updated"
 clean-build-test: clean test-all
 test: build-test

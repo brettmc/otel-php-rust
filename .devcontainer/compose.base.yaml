@@ -27,6 +27,10 @@ services:
       # config on every rebuild; point such a tool here from your own .env.
       # Nothing in this repository writes to it -- see .devcontainer/README.md
       - tool-config:/home/php-rust/.config/dev-tools
+      # Claude Code's config directory: credentials, settings, session history and
+      # auto memory. Shared across every version deliberately -- see the environment
+      # block below and .devcontainer/README.md. Inert unless you install Claude Code.
+      - claude-config:/home/php-rust/.claude
     env_file:
       # Your own environment, not committed: anything in the repository's .env
       # is passed into the container, which is where personal tools that read
@@ -38,6 +42,17 @@ services:
       # set below env_file, so these win over anything .env defines
       TEST_PHP_EXECUTABLE: /usr/bin/php
       CARGO_HOME: /home/php-rust/.cargo
+      # Claude Code keeps its auth token, settings and history under ~/.claude, but
+      # its OAuth account and per-project trust in ~/.claude.json -- a separate file
+      # *outside* that directory, so the volume above alone would not keep you signed
+      # in. CLAUDE_CONFIG_DIR moves .claude.json into the volume too.
+      CLAUDE_CONFIG_DIR: /home/php-rust/.claude
+      # Auto memory lives in <config dir>/projects/<project>/memory, where <project>
+      # is normally derived from the repository path. Naming it explicitly keeps all
+      # eleven versions on one memory directory: without this they would agree anyway
+      # (every container bind-mounts the repo at the same /workspace), but then so
+      # would any *other* project opened at /workspace, which is the real hazard.
+      CLAUDE_CODE_PROJECT_DIR_NAME: otel-php-rust
     user: php-rust
     working_dir: /workspace/otel
     # keep the container alive; the dev container attaches to it
@@ -60,3 +75,5 @@ volumes:
     name: otel-php-rust-cargo-git
   tool-config:
     name: otel-php-rust-tool-config
+  claude-config:
+    name: otel-php-rust-claude-config

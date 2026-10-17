@@ -5,6 +5,10 @@ PHP development headers.
 
 | Dev container            | PHP   |
 |--------------------------|-------|
+| `otel-php-rust (PHP 7.0)`| 7.0   |
+| `otel-php-rust (PHP 7.1)`| 7.1   |
+| `otel-php-rust (PHP 7.2)`| 7.2   |
+| `otel-php-rust (PHP 7.3)`| 7.3   |
 | `otel-php-rust (PHP 7.4)`| 7.4   |
 | `otel-php-rust (PHP 8.0)`| 8.0   |
 | `otel-php-rust (PHP 8.1)`| 8.1   |
@@ -36,9 +40,10 @@ make test-http    # cli-server tests
 make test-all     # composer fixtures, then every suite
 ```
 
-The `tests/auto` suite needs its composer fixtures installed, so run
-`make update` (or `make test-all`, which does it for you) before `make test-auto`
-in a fresh container — otherwise those tests fail on missing `vendor/` dirs.
+The `tests/auto` suite needs its composer fixtures installed. That happens for you when the
+container is created — see [Composer fixtures](#composer-fixtures) — so `make test-auto` works
+directly. If you ever need to redo it, `make update` installs them and `make test-all` runs it
+for you.
 
 ## How the image is built
 
@@ -73,9 +78,10 @@ built. To build one by hand:
   dependencies, and PHP
 
 That is the whole toolchain: no AI assistants, linters or other personal tools
-are installed. See
+are installed — including Claude Code, though the committed configuration does
+make its state persist if you install it yourself. See
 [AI assistants and other personal tooling](#ai-assistants-and-other-personal-tooling)
-to add your own.
+to add your own, and [Claude Code](#claude-code) for that one in particular.
 
 `php-config --extension-dir`/`otel.so` is symlinked to
 `/workspace/otel/modules/otel.so`, so `php -d extension=otel` picks up
@@ -200,7 +206,9 @@ The dev containers give each PHP version its own `target/` volume
 (`otel-php-rust-target-php84` and friends), so **you do not need to
 `make clean` when switching between them**, and each version keeps a warm
 build cache. The cargo download caches (`~/.cargo/registry`, `~/.cargo/git`)
-and the tool-config volume are shared across all of them.
+and the two personal-tooling volumes (`dev-tools`, `claude-config`) are shared
+across all of them. The composer fixtures are per-version, like `target/` —
+see [Composer fixtures](#composer-fixtures).
 
 Each version also uses its own compose project name, so several dev
 containers can run side by side.
@@ -210,6 +218,47 @@ To reclaim the disk a version's build cache is using:
 ```shell
 docker volume rm otel-php-rust-target-php84
 ```
+
+## Composer fixtures
+
+The `tests/auto/{laminas,zf1,psr18}` fixtures get a volume each, per version, for the same
+reason `target/` does: composer resolves dependencies against the PHP it runs under, so a
+`vendor/` installed on 8.x holds code that does not parse on 7.x.
+
+They used to sit on the bind-mounted repository, which made them shared — whichever version
+installed them last was what every container saw, and the `auto/laminas` tests then failed
+with parse errors *inside* `vendor/` rather than anything to do with the extension. That is
+now impossible between dev containers; it still applies on the host, where the working tree
+is all there is.
+
+A fresh volume is empty and the fixtures' `composer.lock` is gitignored, so each
+`devcontainer.json` populates it with a `postCreateCommand`:
+
+```jsonc
+"postCreateCommand": "make -C ${containerWorkspaceFolder}/otel update"
+```
+
+The first open of a version therefore spends a minute or so on composer. After that the
+volume is warm and reopening is immediate. `postCreate` rather than `postStart` because it
+only needs to happen once per container.
+
+`make update` installs only the fixtures the running PHP can resolve — `zf1` always,
+`laminas` on 7.1+, `psr18` on 7.2+ — mirroring the gates in `.github/workflows/test.yaml`
+rather than duplicating the version matrix. On 8.5 it adds `--ignore-platform-req=php` for
+laminas, for the reason given in that workflow. Running all three unconditionally is what
+used to fail on 7.0 and 7.1.
+
+To force a reinstall, remove the volume and rebuild, or just run `make update` again:
+
+```shell
+docker volume rm otel-php-rust-laminas-vendor-php84
+```
+
+One wrinkle worth knowing if you add a volume of your own: Docker seeds a new named volume
+from the image directory it covers, and a volume mounted at a path the image does **not**
+have is created root-owned and unwritable by `php-rust`. Composer then fails with a bare
+`Permission denied`. That is why [Dockerfile](Dockerfile) pre-creates and `chown`s each of
+these mount points.
 
 ## Git
 
@@ -268,10 +317,15 @@ that only affects local verification, not the signature itself.
 
 ## AI assistants and other personal tooling
 
-Nothing of this kind is installed, and the committed configuration does not
-assume you use any of it. If you want a CLI assistant, a language server or any
-other personal tool inside the dev containers, add it through your own VS Code
-**user** settings — nothing to commit, and no effect on anyone else.
+Nothing of this kind is installed. If you want a CLI assistant, a language
+server or any other personal tool inside the dev containers, add it through
+your own VS Code **user** settings — nothing to commit, and no effect on anyone
+else.
+
+The committed configuration does not *require* any of it. The one exception is
+that it provides the volume and environment for Claude Code's state, since that
+is the awkward part of using it across eleven containers — see
+[Claude Code](#claude-code). It is inert if you do not install it.
 
 Dev container *features* install software into the image:
 
@@ -316,13 +370,15 @@ config file or an API token on the host needs one of two mechanisms here:
 * **A named volume**, for a tool that writes a credential or state file and
   would otherwise lose it on every rebuild. `compose.base.yaml` carries one
   general-purpose volume for this, mounted at
-  `/home/php-rust/.config/dev-tools`, shared across all seven versions and
+  `/home/php-rust/.config/dev-tools`, shared across all eleven versions and
   inert if nothing writes to it. Point your tool at it with whatever variable
   it uses for its config directory, set in `.env`.
 
   If a tool keeps some state *outside* its config directory, check whether it
   has a variable to relocate that too — otherwise the volume alone will not be
-  enough to survive a rebuild.
+  enough to survive a rebuild. That is common enough to be worth checking
+  first: Claude Code needs exactly this, and the next section shows what it
+  took.
 
 If a tool wraps a hosted API and you repoint it at an internal gateway, expect
 to set a base URL, a token, and possibly resource or model names that the
@@ -330,6 +386,99 @@ gateway publishes rather than the vendor's own. Those names are often absent
 from the tool's built-in list, so warnings about an unrecognised model or
 capability are common and frequently cosmetic — check whether the tool still
 works, and whether the message is only on stderr, before chasing it.
+
+### Claude Code
+
+Nothing here installs it, and the configuration below is inert if you do not use it. But
+because it keeps state in a known place, `compose.base.yaml` provides the volume and the two
+environment variables that make it behave the same in all eleven containers — which is
+otherwise the awkward part of running it across this many.
+
+To install it, in your own VS Code **user** settings:
+
+```jsonc
+"dev.containers.defaultFeatures": {
+  "ghcr.io/devcontainers/features/node:1": {},
+  "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+},
+"dev.containers.defaultExtensions": [
+  "anthropic.claude-code"
+]
+```
+
+The feature installs the CLI; the extension adds the editor panel. Both run *inside* the
+container and share one `~/.claude`. The `node` feature is there because the Claude Code
+feature needs Node and this image does not carry it — without it the build stops with
+`Failed to install Node.js and npm`. Features are baked into the image, so **rebuild** rather
+than reopen after adding them.
+
+The `:1.0` tag pins the feature's install script, not the CLI, which installs latest and
+auto-updates. `DISABLE_AUTOUPDATER=1` in your `.env` stops that.
+
+What the committed configuration does for you:
+
+```yaml
+volumes:
+  - claude-config:/home/php-rust/.claude
+environment:
+  CLAUDE_CONFIG_DIR: /home/php-rust/.claude
+  CLAUDE_CODE_PROJECT_DIR_NAME: otel-php-rust
+```
+
+* **One volume, `otel-php-rust-claude-config`, shared by every version.** Without it the
+  container's home directory is discarded on rebuild and you sign in again each time — eleven
+  containers, each rebuilt whenever a feature changes, is a lot of signing in.
+* **`CLAUDE_CONFIG_DIR`** is the part that is easy to miss. The auth token, settings and
+  session history live under `~/.claude`, but the OAuth account and per-project trust live in
+  `~/.claude.json` — a separate file *outside* that directory, so the volume alone does not
+  keep you signed in. This variable moves that file into the volume too.
+* **`CLAUDE_CODE_PROJECT_DIR_NAME`** fixes the project identity used for memory (below).
+
+Credentials come from the repository's `.env` like any other tool's
+(`ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, and whatever model names your gateway
+publishes) — see
+[Your own environment variables](#your-own-environment-variables).
+
+#### Shared knowledge across sessions
+
+Two mechanisms, and they answer different needs.
+
+**Instructions you write** go in `AGENTS.md` at the repository root, which is committed and
+read automatically. It holds what the codebase cannot show on its own — the traps where the
+obvious change aborts a PHP worker. Claude reads a `CLAUDE.md` *instead* of `AGENTS.md` if one
+exists in or above the working directory, so there deliberately isn't one here.
+
+For personal instructions you do not want committed, either add a `CLAUDE.local.md` or import
+one from your home directory. Prefer the import: `.gitignore` already covers
+`CLAUDE.local.md`, but adding one **stops Claude reading `AGENTS.md`**, which is probably not
+what you want. An import from outside the workspace needs one-time approval, and a file in
+your home directory is on the container's own filesystem, so point it at the volume:
+
+```markdown
+@~/.claude/otel-php-rust-notes.md
+```
+
+**Notes Claude keeps itself** — auto memory — live in
+`<config dir>/projects/<project>/memory/`, as a `MEMORY.md` index plus a file per fact. Since
+that is inside the volume, it persists across rebuilds and is the *same* memory in all eleven
+containers: something learned on 8.4 is there on 7.0.
+
+`CLAUDE_CODE_PROJECT_DIR_NAME` is what makes that reliable. `<project>` is normally derived
+from the repository path, which here is `/workspace` in every container — so they would agree
+anyway, but so would any *other* project opened at `/workspace` in a container sharing this
+volume, which is the real hazard. Naming it explicitly keeps this project's memory to this
+project.
+
+Auto memory is machine-local and is **not** shared with the Claude Code you run on the host:
+same repository, different machine as far as it is concerned. The memory directory is also
+exempt from the `cleanupPeriodDays` sweep that deletes old transcripts.
+
+One caveat about the shared volume: it is one directory, so several containers running Claude
+Code *at the same time* are writing to it at the same time. Sequential use across versions,
+which is the normal way to work here, is fine. If you want per-version isolation instead, move
+the `claude-config` volume out of `compose.base.yaml` into each `php*/compose.yaml` with a
+per-version `name:`, as `target` is done — at the cost of signing in eleven times and eleven
+separate memories.
 
 ## Troubleshooting
 
@@ -387,7 +536,7 @@ These are additive: the repository's top-level `Dockerfile`,
 `docker-compose.yaml` and `make bash` workflow still work. The dev containers
 use their own `Dockerfile` here, based on `debian:bookworm`, whose
 [sury](https://packages.sury.org/php/) repository carries every PHP version
-from 7.4 to 8.5 — the top-level image is `debian:bullseye` and is not changed
+from 7.0 to 8.5 — the top-level image is `debian:bullseye` and is not changed
 by any of this.
 
 The two now agree on paths: `make bash` also mounts the whole repository at
