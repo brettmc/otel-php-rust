@@ -473,6 +473,35 @@ Auto memory is machine-local and is **not** shared with the Claude Code you run 
 same repository, different machine as far as it is concerned. The memory directory is also
 exempt from the `cleanupPeriodDays` sweep that deletes old transcripts.
 
+#### Sharing host config and memory
+
+Every `devcontainer.json` also loads `.devcontainer/compose.local.yml`, which is not
+committed. `build-image.sh` creates it as an empty `services: {}` when it is missing. Use it
+to layer your host's Claude Code files over the volume:
+
+```yaml
+services:
+  php:
+    volumes:
+      - ~/.claude/settings.json:/home/php-rust/.claude/settings.json:ro
+      - ~/.claude/CLAUDE.md:/home/php-rust/.claude/CLAUDE.md:ro
+      - ~/.claude/projects/<host-project>/memory:/home/php-rust/.claude/projects/otel-php-rust/memory
+```
+
+`<host-project>` is the repository's host path with each `/` and `.` replaced by `-`, as
+listed under `~/.claude/projects`. Add any file your `CLAUDE.md` imports by `~/` path, since
+the import resolves inside the container. Only mount paths that exist: Docker creates a
+missing host path as an empty directory.
+
+Docker creates the mount point for a nested mount as root. The image creates
+`projects/otel-php-rust/memory` as `php-rust` so that a new volume is seeded with the right
+owner. A volume created before that needs it made once, as the container user:
+
+```shell
+docker run --rm -u 1000:1000 -v otel-php-rust-claude-config:/c alpine \
+  mkdir -p /c/projects/otel-php-rust/memory
+```
+
 One caveat about the shared volume: it is one directory, so several containers running Claude
 Code *at the same time* are writing to it at the same time. Sequential use across versions,
 which is the normal way to work here, is fine. If you want per-version isolation instead, move
