@@ -28,6 +28,7 @@ pub fn make_trace_context_propagator_class(
     let mut class =
         ClassEntity::<()>::new_with_default_state_constructor(TRACE_CONTEXT_PROPAGATOR_CLASS_NAME);
 
+    class.set_final();
     class.implements(text_map_propagator_interface);
 
     class.add_method("__construct", Visibility::Private, |_, _| {

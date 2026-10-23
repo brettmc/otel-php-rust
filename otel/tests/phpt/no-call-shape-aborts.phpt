@@ -43,14 +43,23 @@ foreach (get_declared_classes() as $class) {
             continue; // not callable this way, and __destruct runs on teardown regardless
         }
         $swept++;
+        // Most of these classes have a private constructor and are handed out by a factory.
+        // An instance with no state is exactly the awkward case: the handler must report it,
+        // not panic on an empty Option. Built outside the try, so a class that cannot be
+        // instantiated this way fails the test instead of counting as survived.
+        // newInstanceWithoutConstructor() refuses an internal final class; unserialize()
+        // still skips the constructor.
+        $instance = null;
+        if (!$method->isStatic()) {
+            $instance = $rc->isFinal()
+                ? unserialize(sprintf('O:%d:"%s":0:{}', strlen($class), $class))
+                : $rc->newInstanceWithoutConstructor();
+        }
         try {
             if ($method->isStatic()) {
                 $class::$name();
             } else {
-                // Most of these classes have a private constructor and are handed out by a
-                // factory. An instance with no state is exactly the awkward case: the
-                // handler must report it, not panic on an empty Option.
-                $rc->newInstanceWithoutConstructor()->$name();
+                $instance->$name();
             }
         } catch (Throwable $e) {
             // Catchable is the whole point.
