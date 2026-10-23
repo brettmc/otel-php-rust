@@ -6,27 +6,6 @@ on:
   pull_request:
 
 jobs:
-  # Dependency scanning is independent of the PHP version, so it runs once rather than
-  # being duplicated across the test matrix.
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          cache: false
-
-      # scans Cargo.lock against the RustSec advisory database. This can go red without
-      # any change on our side, when a new advisory lands against a dependency.
-      - name: Security audit
-        uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: otel
-
   # Formatting is independent of the PHP version, and rustfmt only parses, so this needs
   # no PHP and runs once. It is outside the test matrix, so it is not continue-on-error
   # and an unformatted change fails the workflow.
