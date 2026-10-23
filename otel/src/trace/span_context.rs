@@ -1,3 +1,5 @@
+use crate::trace::span_context_interface::SPAN_CONTEXT_INTERFACE_NAME;
+use opentelemetry::trace::{SpanContext, SpanId, TraceFlags, TraceId, TraceState};
 use phper::{
     classes::{ClassEntity, ClassEntry, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
@@ -5,18 +7,7 @@ use phper::{
     types::{ArgumentTypeHint, ReturnTypeHint},
     values::ZVal,
 };
-use std::{
-    convert::Infallible,
-    sync::LazyLock,
-};
-use crate::trace::span_context_interface::SPAN_CONTEXT_INTERFACE_NAME;
-use opentelemetry::trace::{
-    SpanContext,
-    TraceFlags,
-    TraceState,
-    SpanId,
-    TraceId,
-};
+use std::{convert::Infallible, sync::LazyLock};
 
 pub const SPAN_CONTEXT_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\SpanContext";
 
@@ -25,8 +16,9 @@ pub type SpanContextClass = StateClass<Option<SpanContext>>;
 pub fn make_span_context_class(
     span_context_interface: &Interface,
 ) -> ClassEntity<Option<SpanContext>> {
-    let mut class =
-        ClassEntity::<Option<SpanContext>>::new_with_default_state_constructor(SPAN_CONTEXT_CLASS_NAME);
+    let mut class = ClassEntity::<Option<SpanContext>>::new_with_default_state_constructor(
+        SPAN_CONTEXT_CLASS_NAME,
+    );
     let span_context_class = class.bound_class();
 
     class.implements(span_context_interface.clone());
@@ -43,7 +35,9 @@ pub fn make_span_context_class(
             *object.as_mut_state() = Some(span_context);
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SPAN_CONTEXT_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_CONTEXT_INTERFACE_NAME,
+        ))));
 
     let span_context_class_create = span_context_class.clone();
     class
@@ -60,16 +54,24 @@ pub fn make_span_context_class(
                 .with_type_hint(ArgumentTypeHint::Int)
                 .with_default_value("0"),
         )
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SPAN_CONTEXT_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_CONTEXT_INTERFACE_NAME,
+        ))));
 
     let span_context_class_create_from_remote_parent = span_context_class.clone();
     class
-        .add_static_method("createFromRemoteParent", Visibility::Public, move |arguments| {
-            let span_context = span_context_from_arguments(arguments, true)?;
-            let mut object = span_context_class_create_from_remote_parent.clone().init_object()?;
-            *object.as_mut_state() = Some(span_context);
-            Ok::<_, phper::Error>(object)
-        })
+        .add_static_method(
+            "createFromRemoteParent",
+            Visibility::Public,
+            move |arguments| {
+                let span_context = span_context_from_arguments(arguments, true)?;
+                let mut object = span_context_class_create_from_remote_parent
+                    .clone()
+                    .init_object()?;
+                *object.as_mut_state() = Some(span_context);
+                Ok::<_, phper::Error>(object)
+            },
+        )
         .argument(Argument::new("traceId").with_type_hint(ArgumentTypeHint::String))
         .argument(Argument::new("spanId").with_type_hint(ArgumentTypeHint::String))
         .argument(
@@ -77,7 +79,9 @@ pub fn make_span_context_class(
                 .with_type_hint(ArgumentTypeHint::Int)
                 .with_default_value("0"),
         )
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SPAN_CONTEXT_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_CONTEXT_INTERFACE_NAME,
+        ))));
 
     // An unpopulated state means we never had a span context to wrap (for example
     // `getContext()` on a Span with neither an SdkSpan nor a stored context). Reporting
@@ -92,14 +96,18 @@ pub fn make_span_context_class(
 
     class
         .add_method("getTraceId", Visibility::Public, |this, _| {
-            let trace_id = span_context_or_invalid(this.as_state()).trace_id().to_string();
+            let trace_id = span_context_or_invalid(this.as_state())
+                .trace_id()
+                .to_string();
             Ok::<_, phper::Error>(trace_id)
         })
         .return_type(ReturnType::new(ReturnTypeHint::String));
 
     class
         .add_method("getSpanId", Visibility::Public, |this, _| {
-            let span_id = span_context_or_invalid(this.as_state()).span_id().to_string();
+            let span_id = span_context_or_invalid(this.as_state())
+                .span_id()
+                .to_string();
             Ok::<_, phper::Error>(span_id)
         })
         .return_type(ReturnType::new(ReturnTypeHint::String));
@@ -108,7 +116,9 @@ pub fn make_span_context_class(
     // by hand, or to read a flag `isSampled()` does not cover.
     class
         .add_method("getTraceFlags", Visibility::Public, |this, _| {
-            let flags = span_context_or_invalid(this.as_state()).trace_flags().to_u8();
+            let flags = span_context_or_invalid(this.as_state())
+                .trace_flags()
+                .to_u8();
             Ok::<_, phper::Error>(flags as i64)
         })
         .return_type(ReturnType::new(ReturnTypeHint::Int));
@@ -139,10 +149,7 @@ pub fn make_span_context_class(
 ///
 /// Upstream also takes a fourth `?TraceStateInterface $traceState = null`, which is not
 /// declared here: there is no `TraceState` class to accept, so trace state is defaulted.
-fn span_context_from_arguments(
-    arguments: &mut [ZVal],
-    remote: bool,
-) -> phper::Result<SpanContext> {
+fn span_context_from_arguments(arguments: &mut [ZVal], remote: bool) -> phper::Result<SpanContext> {
     let trace_id = arguments[0].expect_z_str()?.to_str()?;
     let span_id = arguments[1].expect_z_str()?.to_str()?;
     // Declared optional with a default, so a two-argument call leaves no slot to index.
@@ -152,8 +159,7 @@ fn span_context_from_arguments(
     };
 
     Ok(SpanContext::new(
-        TraceId::from_hex(trace_id)
-            .map_err(|_| phper::Error::boxed("Invalid trace id format"))?,
+        TraceId::from_hex(trace_id).map_err(|_| phper::Error::boxed("Invalid trace id format"))?,
         SpanId::from_hex(span_id).map_err(|_| phper::Error::boxed("Invalid span id format"))?,
         trace_flags,
         remote,

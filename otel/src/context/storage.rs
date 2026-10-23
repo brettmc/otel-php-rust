@@ -30,11 +30,12 @@
 //! [`detach_context`].
 
 use crate::context::{
-    context::{get_instance_id, ContextClassEntity, CONTEXT_CLASS_NAME},
+    context::{CONTEXT_CLASS_NAME, ContextClassEntity, get_instance_id},
     context_interface::CONTEXT_INTERFACE_NAME,
     context_storage_scope_interface::CONTEXT_STORAGE_SCOPE_INTERFACE_NAME,
     scope::ScopeClassEntity,
 };
+use opentelemetry::{Context, ContextGuard, trace::TraceContextExt};
 use phper::{
     classes::{ClassEntity, ClassEntry, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
@@ -50,11 +51,6 @@ use std::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-};
-use opentelemetry::{
-    Context,
-    ContextGuard,
-    trace::TraceContextExt,
 };
 use tracing::debug;
 
@@ -211,7 +207,10 @@ pub fn current_context() -> Arc<Context> {
 pub fn resolve_context(instance_id: Option<u64>) -> Arc<Context> {
     match instance_id {
         Some(id) => get_context_instance(Some(id)).unwrap_or_else(|| {
-            debug!("Context instance {} not found, falling back to current context", id);
+            debug!(
+                "Context instance {} not found, falling back to current context",
+                id
+            );
             Arc::new(Context::current())
         }),
         None => Arc::new(Context::current()),
@@ -244,9 +243,7 @@ pub fn store_context_instance(context: Arc<Context>) -> Option<u64> {
         "Storing context instance {} (ref count after clone = {})",
         instance_id, count
     );
-    CONTEXT_STORAGE.with(|storage| {
-        storage.borrow_mut().insert(instance_id, context)
-    });
+    CONTEXT_STORAGE.with(|storage| storage.borrow_mut().insert(instance_id, context));
 
     Some(instance_id)
 }
@@ -260,7 +257,8 @@ pub fn maybe_remove_context_instance(instance_id: Option<u64>) {
             match map.get(&id) {
                 Some(context) => {
                     let count = Arc::strong_count(context);
-                    if count == 1 { //the only reference is in CONTEXT_STORAGE
+                    if count == 1 {
+                        //the only reference is in CONTEXT_STORAGE
                         debug!(
                             "Removing context instance {} (ref count = 1, no external holders)",
                             id
@@ -436,7 +434,10 @@ pub fn detach_context(instance_id: Option<u64>) -> DetachResult {
                     }
                 }
                 None => {
-                    debug!("Not detaching context instance {}, guard stack is empty", id);
+                    debug!(
+                        "Not detaching context instance {}, guard stack is empty",
+                        id
+                    );
                     DetachResult::AlreadyDetached
                 }
             }
@@ -487,9 +488,7 @@ fn resolve_context_from_object(object: &mut ZObj) -> Arc<Context> {
 }
 
 pub fn current_context_instance_id() -> Option<u64> {
-    GUARD_STACK.with(|stack| {
-        stack.borrow().last().map(|(_, id)| *id)
-    })
+    GUARD_STACK.with(|stack| stack.borrow().last().map(|(_, id)| *id))
 }
 
 fn new_instance_id() -> u64 {
@@ -534,7 +533,9 @@ pub fn build_storage_class(
             );
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            CONTEXT_INTERFACE_NAME,
+        ))));
 
     let scope_ce_attach = scope_ce.clone();
     class
@@ -569,7 +570,11 @@ pub fn build_storage_class(
             }
             Ok::<_, phper::Error>(object)
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             CONTEXT_STORAGE_SCOPE_INTERFACE_NAME,
         ))));
@@ -580,18 +585,15 @@ pub fn build_storage_class(
         // caller detaches through the returned Scope object. Peek at the innermost guard
         // rather than popping it, which would deactivate the context just by looking.
         .add_method("scope", Visibility::Public, move |_, _arguments| {
-            let current = GUARD_STACK.with(|stack| {
-                stack.borrow().last().map(|(_, context_id)| *context_id)
-            });
+            let current =
+                GUARD_STACK.with(|stack| stack.borrow().last().map(|(_, context_id)| *context_id));
             match current {
                 Some(context_id) => {
                     let mut object = scope_ce_scope.init_object()?;
                     object.set_property("context_id", context_id as i64);
                     Ok::<_, phper::Error>(object.into())
                 }
-                None => {
-                    Ok::<_, phper::Error>(ZVal::from(()))
-                }
+                None => Ok::<_, phper::Error>(ZVal::from(())),
             }
         })
         .return_type(

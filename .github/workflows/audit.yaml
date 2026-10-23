@@ -1,0 +1,35 @@
+name: Security audit
+
+# Scans Cargo.lock against the RustSec advisory database. A new advisory can turn this
+# red with no change on our side, so it does not run on every pull request: that would
+# fail whichever unrelated PR happened to be open. Instead it runs daily and on main,
+# which is where a new advisory should show up, and on pull requests that change the
+# dependency graph, which is where we could introduce one.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - otel/Cargo.toml
+      - otel/Cargo.lock
+      - .github/workflows/audit.yaml
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # a prebuilt binary; `cargo install cargo-audit` compiles it from source, which
+      # takes several minutes on every run
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: Audit
+        working-directory: otel
+        run: cargo audit

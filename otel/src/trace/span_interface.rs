@@ -1,11 +1,11 @@
+use crate::{
+    context::context_interface::CONTEXT_INTERFACE_NAME,
+    trace::span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
+};
 use phper::{
     classes::{Interface, InterfaceEntity},
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
-};
-use crate::{
-    context::context_interface::CONTEXT_INTERFACE_NAME,
-    trace::span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
 };
 
 pub const SPAN_INTERFACE_NAME: &str = r"OpenTelemetry\API\Trace\SpanInterface";
@@ -19,18 +19,18 @@ pub const SPAN_INTERFACE_NAME: &str = r"OpenTelemetry\API\Trace\SpanInterface";
 ///
 /// `activate()` and `storeInContext()` are not declared here, as upstream does not: they come
 /// from `ImplicitContextKeyedInterface`, which this extends.
-pub fn make_span_interface(
-    implicit_context_keyed_interface: &Interface,
-) -> InterfaceEntity {
+pub fn make_span_interface(implicit_context_keyed_interface: &Interface) -> InterfaceEntity {
     let mut interface = InterfaceEntity::new(SPAN_INTERFACE_NAME);
 
     interface.extends(implicit_context_keyed_interface.clone());
 
     interface
         .add_static_method("fromContext")
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_INTERFACE_NAME,
         ))));
@@ -71,9 +71,11 @@ pub fn make_span_interface(
 
     interface
         .add_method("addLink")
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(SPAN_CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                SPAN_CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .argument(
             Argument::new("attributes")
                 .with_type_hint(ArgumentTypeHint::Iterable)
@@ -103,9 +105,10 @@ pub fn make_span_interface(
 
     interface
         .add_method("recordException")
-        .argument(Argument::new("exception").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from("Throwable"),
-        )))
+        .argument(
+            Argument::new("exception")
+                .with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Throwable"))),
+        )
         .argument(
             Argument::new("attributes")
                 .with_type_hint(ArgumentTypeHint::Iterable)

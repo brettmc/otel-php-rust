@@ -1,23 +1,13 @@
+use crate::trace::span_builder::{SpanBuilderClass, SpanBuilderState};
+use crate::trace::span_builder_interface::SPAN_BUILDER_INTERFACE_NAME;
+use opentelemetry::trace::{SpanBuilder, Tracer};
+use opentelemetry_sdk::trace::SdkTracer;
 use phper::{
     classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
 };
-use std::{
-    convert::Infallible,
-};
-use opentelemetry::{
-    trace::{
-        SpanBuilder,
-        Tracer,
-    }
-};
-use opentelemetry_sdk::trace::SdkTracer;
-use crate::trace::span_builder::{
-    SpanBuilderState,
-    SpanBuilderClass,
-};
-use crate::trace::span_builder_interface::SPAN_BUILDER_INTERFACE_NAME;
+use std::convert::Infallible;
 
 pub type TracerClass = StateClass<Option<SdkTracer>>;
 

@@ -1,24 +1,17 @@
-use phper::{
-    classes::{ClassEntity, Visibility},
-    functions::{ReturnType},
-    types::ReturnTypeHint,
-};
-use std::{
-    cell::RefCell,
-    convert::Infallible,
-    sync::Arc,
-};
 use crate::{
-    context::{
-        storage,
-    },
+    context::storage,
     trace::{
-        non_recording_span::{NonRecordingSpanClass},
-        span::SpanClass,
+        non_recording_span::NonRecordingSpanClass, span::SpanClass,
         span_interface::SPAN_INTERFACE_NAME,
     },
 };
 use opentelemetry::Context;
+use phper::{
+    classes::{ClassEntity, Visibility},
+    functions::ReturnType,
+    types::ReturnTypeHint,
+};
+use std::{cell::RefCell, convert::Infallible, sync::Arc};
 
 const LOCAL_ROOT_SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\LocalRootSpan";
 
@@ -51,8 +44,9 @@ pub fn make_local_root_span_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SPAN_INTERFACE_NAME))))
-    ;
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SPAN_INTERFACE_NAME,
+        ))));
 
     class
 }

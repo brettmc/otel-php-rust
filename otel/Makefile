@@ -1,4 +1,4 @@
-.PHONY: all build build-test re ri check clippy install clean update clean-build-test \
+.PHONY: all build build-test re ri check clippy fmt fmt-check install clean update clean-build-test \
 	test test-all test-phpt test-export test-auto test-http
 .DEFAULT_GOAL: build
 EXTENSION_NAME = otel
@@ -23,6 +23,10 @@ check:
 	cargo check
 clippy:
 	cargo clippy --all-targets --features test
+fmt:
+	cargo fmt
+fmt-check:
+	cargo fmt --check
 install: build
 	@echo "Installing..."
 	cp ${EXTENSION_FILE} ${EXTENSION_INSTALL_PATH}

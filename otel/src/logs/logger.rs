@@ -1,3 +1,6 @@
+use crate::logs::log_record::{LOG_RECORD_CLASS_NAME, LogRecordState};
+use opentelemetry::logs::{LogRecord, Logger};
+use opentelemetry_sdk::logs::SdkLogger;
 use phper::{
     classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
@@ -8,17 +11,12 @@ use std::{
     convert::Infallible,
     sync::{LazyLock, Mutex},
 };
-use opentelemetry::logs::{
-    Logger,
-    LogRecord,
-};
-use opentelemetry_sdk::logs::SdkLogger;
-use crate::logs::log_record::{LOG_RECORD_CLASS_NAME, LogRecordState};
 
 pub type LoggerClass = StateClass<Option<SdkLogger>>;
 
 const LOGGER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\Logger";
-static EVENT_NAMES: LazyLock<Mutex<HashSet<&'static str>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+static EVENT_NAMES: LazyLock<Mutex<HashSet<&'static str>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// Intern event names to avoid leaking memory since opentelemetry-rust requires &'static str
 /// This only reduces memory leaks by re-using event names, but does not eliminate them
@@ -68,9 +66,7 @@ fn map_severity_text(text: &str) -> Option<&'static str> {
     }
 }
 
-pub fn make_logger_class(
-    logger_interface: Interface,
-) -> ClassEntity<Option<SdkLogger>> {
+pub fn make_logger_class(logger_interface: Interface) -> ClassEntity<Option<SdkLogger>> {
     let mut class =
         ClassEntity::<Option<SdkLogger>>::new_with_default_state_constructor(LOGGER_CLASS_NAME);
 
@@ -102,7 +98,8 @@ pub fn make_logger_class(
                 log_record.set_body(body.clone());
             }
             if let Some(ref severity_text) = record_state.severity_text
-                && let Some(static_str) = map_severity_text(severity_text.as_str()) {
+                && let Some(static_str) = map_severity_text(severity_text.as_str())
+            {
                 log_record.set_severity_text(static_str);
             }
             if let Some(ref event_name) = record_state.event_name {
@@ -110,11 +107,7 @@ pub fn make_logger_class(
                 log_record.set_event_name(static_str);
             }
             if let (Some(trace_id), Some(span_id)) = (record_state.trace_id, record_state.span_id) {
-                log_record.set_trace_context(
-                    trace_id,
-                    span_id,
-                    record_state.trace_flags,
-                );
+                log_record.set_trace_context(trace_id, span_id, record_state.trace_flags);
             }
             if let Some(timestamp) = record_state.timestamp {
                 log_record.set_timestamp(timestamp);
@@ -122,11 +115,15 @@ pub fn make_logger_class(
             if !record_state.attributes.is_empty() {
                 for attr in &record_state.attributes {
                     let any_value = match &attr.value {
-                        opentelemetry::Value::String(s) => opentelemetry::logs::AnyValue::String(s.clone()),
+                        opentelemetry::Value::String(s) => {
+                            opentelemetry::logs::AnyValue::String(s.clone())
+                        }
                         opentelemetry::Value::Bool(b) => opentelemetry::logs::AnyValue::Boolean(*b),
                         opentelemetry::Value::I64(i) => opentelemetry::logs::AnyValue::Int(*i),
                         opentelemetry::Value::F64(f) => opentelemetry::logs::AnyValue::Double(*f),
-                        _ => opentelemetry::logs::AnyValue::String(format!("{:?}", attr.value).into()),
+                        _ => opentelemetry::logs::AnyValue::String(
+                            format!("{:?}", attr.value).into(),
+                        ),
                     };
                     log_record.add_attribute(attr.key.clone(), any_value);
                 }
@@ -137,7 +134,11 @@ pub fn make_logger_class(
 
             Ok::<_, phper::Error>(())
         })
-        .argument(Argument::new("record").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(LOG_RECORD_CLASS_NAME))))
+        .argument(
+            Argument::new("record").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                LOG_RECORD_CLASS_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::Void));
 
     class

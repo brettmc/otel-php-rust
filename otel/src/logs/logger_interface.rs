@@ -1,9 +1,9 @@
+use crate::logs::log_record::LOG_RECORD_CLASS_NAME;
 use phper::{
-    classes::{InterfaceEntity},
+    classes::InterfaceEntity,
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
 };
-use crate::logs::log_record::LOG_RECORD_CLASS_NAME;
 
 pub const LOGGER_INTERFACE_NAME: &str = r"OpenTelemetry\API\Logs\LoggerInterface";
 
@@ -12,9 +12,12 @@ pub fn make_logger_interface() -> InterfaceEntity {
 
     interface
         .add_method("emit")
-        .argument(Argument::new("record").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(LOG_RECORD_CLASS_NAME))))
-        .return_type(ReturnType::new(ReturnTypeHint::Void))
-    ;
+        .argument(
+            Argument::new("record").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                LOG_RECORD_CLASS_NAME,
+            ))),
+        )
+        .return_type(ReturnType::new(ReturnTypeHint::Void));
 
     interface
 }

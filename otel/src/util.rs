@@ -1,13 +1,8 @@
+use opentelemetry::{Array, KeyValue, StringValue, Value};
 use phper::{
     arrays::{IterKey, ZArray},
-    values::ZVal,
     sys::sapi_module,
-};
-use opentelemetry::{
-    Array,
-    KeyValue,
-    StringValue,
-    Value,
+    values::ZVal,
 };
 use std::ffi::CStr;
 
@@ -15,7 +10,8 @@ use std::ffi::CStr;
 pub fn zval_to_key_value(key: &str, value: &ZVal) -> Option<KeyValue> {
     let type_info = value.get_type_info();
     if type_info.is_string() {
-        return value.as_z_str()
+        return value
+            .as_z_str()
             .and_then(|z| z.to_str().ok())
             .map(|s| KeyValue::new(key.to_string(), s.to_string()));
     }
@@ -41,13 +37,14 @@ pub fn zval_arr_to_key_value_vec(arr: ZArray) -> Vec<KeyValue> {
     //iterate over zarr
     for (key, value) in arr.iter() {
         match key {
-            IterKey::Index(_) => {}, // Skip integer keys
+            IterKey::Index(_) => {} // Skip integer keys
             IterKey::ZStr(zstr) => {
                 if let Ok(key_str) = zstr.to_str()
-                    && let Some(kv) = zval_to_key_value(key_str, value) {
+                    && let Some(kv) = zval_to_key_value(key_str, value)
+                {
                     result.push(kv);
                 }
-            },
+            }
         };
     }
 
@@ -69,10 +66,26 @@ pub fn insert_attribute(arr: &mut ZArray, kv: &KeyValue) {
         Value::Array(values) => {
             let mut arr_values = ZArray::new();
             match values {
-                Array::Bool(vec) => for v in vec { arr_values.insert((), *v); },
-                Array::I64(vec) => for v in vec { arr_values.insert((), *v); },
-                Array::F64(vec) => for v in vec { arr_values.insert((), *v); },
-                Array::String(vec) => for v in vec { arr_values.insert((), v.as_str()); },
+                Array::Bool(vec) => {
+                    for v in vec {
+                        arr_values.insert((), *v);
+                    }
+                }
+                Array::I64(vec) => {
+                    for v in vec {
+                        arr_values.insert((), *v);
+                    }
+                }
+                Array::F64(vec) => {
+                    for v in vec {
+                        arr_values.insert((), *v);
+                    }
+                }
+                Array::String(vec) => {
+                    for v in vec {
+                        arr_values.insert((), v.as_str());
+                    }
+                }
                 // `Array` is non-exhaustive upstream; skip kinds we cannot represent.
                 _ => return,
             }
@@ -94,7 +107,11 @@ pub fn attributes_to_zarray<'a>(attributes: impl IntoIterator<Item = &'a KeyValu
 
 /// Get the name of the SAPI module.
 pub fn get_sapi_module_name() -> String {
-    unsafe { CStr::from_ptr(sapi_module.name).to_string_lossy().into_owned() }
+    unsafe {
+        CStr::from_ptr(sapi_module.name)
+            .to_string_lossy()
+            .into_owned()
+    }
 }
 
 /// Get the PHP version as a string.
@@ -132,7 +149,10 @@ fn zval_to_vec(key: &str, value: &ZVal) -> Option<KeyValue> {
         return Some(KeyValue::new(
             key.to_string(),
             Value::Array(Array::from(
-                string_values.into_iter().map(StringValue::from).collect::<Vec<_>>(),
+                string_values
+                    .into_iter()
+                    .map(StringValue::from)
+                    .collect::<Vec<_>>(),
             )),
         ));
     } else if !int_values.is_empty() {

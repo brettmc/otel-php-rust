@@ -2,23 +2,14 @@ use crate::{
     auto::{
         execute_data::get_fqn,
         plugin::{FunctionObserver, Plugin, Target},
-        plugin::{
-            laminas::LaminasPlugin,
-            psr18::Psr18Plugin,
-            zf1::Zf1Plugin,
-        },
+        plugin::{laminas::LaminasPlugin, psr18::Psr18Plugin, zf1::Zf1Plugin},
     },
     config,
 };
-use phper::{
-    classes::ClassEntry,
-    functions::ZFunc,
-    ini::ini_get,
-    values::ExecuteData,
-};
+use phper::{classes::ClassEntry, functions::ZFunc, ini::ini_get, values::ExecuteData};
 use std::{
-    ffi::CStr,
     collections::{HashMap, HashSet},
+    ffi::CStr,
     sync::{Arc, OnceLock, RwLock},
 };
 
@@ -33,10 +24,13 @@ static PLUGIN_MANAGER: OnceLock<RwLock<PluginManager>> = OnceLock::new();
 /// Keyed on the fully-qualified name rather than the `zend_function *`, deliberately: a
 /// closure or `eval`'d function is freed mid-request and its address can be reused by an
 /// unrelated function, which would make a pointer-keyed entry return the wrong hooks.
-static FUNCTION_OBSERVER_CACHE: OnceLock<RwLock<HashMap<String, Arc<FunctionObserver>>>> = OnceLock::new();
+static FUNCTION_OBSERVER_CACHE: OnceLock<RwLock<HashMap<String, Arc<FunctionObserver>>>> =
+    OnceLock::new();
 
 pub fn init_observer_cache() {
-    FUNCTION_OBSERVER_CACHE.set(RwLock::new(HashMap::new())).ok();
+    FUNCTION_OBSERVER_CACHE
+        .set(RwLock::new(HashMap::new()))
+        .ok();
 }
 
 /// Look up an already-built observer for `fqn`.
@@ -71,7 +65,7 @@ impl PluginManager {
         tracing::debug!("PluginManager::init");
         init_observer_cache();
         // tracing::debug!("PluginManager::new");
-        let mut manager = Self {plugins: vec![] };
+        let mut manager = Self { plugins: vec![] };
         manager.init();
         manager
     }
@@ -113,7 +107,10 @@ impl PluginManager {
         &self.plugins
     }
 
-    pub fn get_function_observer(&self, execute_data: &mut ExecuteData) -> Option<Arc<FunctionObserver>> {
+    pub fn get_function_observer(
+        &self,
+        execute_data: &mut ExecuteData,
+    ) -> Option<Arc<FunctionObserver>> {
         let fqn = get_fqn(execute_data)?;
 
         // Check cache
@@ -126,7 +123,11 @@ impl PluginManager {
         let mut observer = FunctionObserver::new();
         for plugin in &self.plugins {
             for handler in plugin.get_handlers() {
-                if should_trace(execute_data.func(), handler.get_targets(), plugin.get_name()) {
+                if should_trace(
+                    execute_data.func(),
+                    handler.get_targets(),
+                    plugin.get_name(),
+                ) {
                     let callbacks = handler.get_callbacks();
                     if let Some(pre) = callbacks.pre_observe {
                         observer.add_pre_hook(Box::new(move |execute_data| {
@@ -149,8 +150,12 @@ impl PluginManager {
         if let Some(cache) = FUNCTION_OBSERVER_CACHE.get() {
             tracing::trace!("Caching observer for function: {}", fqn);
             match cache.write() {
-                Ok(mut guard) => { guard.insert(fqn, arc_observer.clone()); }
-                Err(poisoned) => { poisoned.into_inner().insert(fqn, arc_observer.clone()); }
+                Ok(mut guard) => {
+                    guard.insert(fqn, arc_observer.clone());
+                }
+                Err(poisoned) => {
+                    poisoned.into_inner().insert(fqn, arc_observer.clone());
+                }
             }
         }
         Some(arc_observer)

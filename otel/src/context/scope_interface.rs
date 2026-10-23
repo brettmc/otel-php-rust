@@ -1,8 +1,4 @@
-use phper::{
-    classes::InterfaceEntity,
-    functions::ReturnType,
-    types::ReturnTypeHint,
-};
+use phper::{classes::InterfaceEntity, functions::ReturnType, types::ReturnTypeHint};
 
 pub const SCOPE_INTERFACE_NAME: &str = r"OpenTelemetry\Context\ScopeInterface";
 

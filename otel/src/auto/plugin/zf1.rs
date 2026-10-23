@@ -1,38 +1,24 @@
 use crate::{
     auto::{
         execute_data,
-        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, Target, db},
+        plugin::{Handler, HandlerCallbacks, HandlerList, HandlerSlice, Plugin, Target, db},
         utils,
     },
     config::trace_attributes,
-    context::storage::{take_guard},
-    trace::{
-        local_root_span::get_local_root_span_context,
-        tracer_provider,
-    },
+    context::storage::take_guard,
+    trace::{local_root_span::get_local_root_span_context, tracer_provider},
 };
 use opentelemetry::{
     KeyValue,
-    trace::{
-        SpanContext,
-        TraceContextExt,
-        TracerProvider,
-    },
+    trace::{SpanContext, TraceContextExt, TracerProvider},
 };
 use opentelemetry_semantic_conventions as SemConv;
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    sync::Arc,
-};
 use phper::{
     alloc::ToRefOwned,
     objects::ZObj,
-    values::{
-        ExecuteData,
-        ZVal,
-    },
+    values::{ExecuteData, ZVal},
 };
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 // Zend Framework 1 (ZF1) plugin for OpenTelemetry PHP auto-instrumentation.
 // db connections are not tracked, as the _connect method is called before every db operation,
@@ -105,9 +91,7 @@ pub struct Zf1RouteHandler;
 
 impl Handler for Zf1RouteHandler {
     fn get_targets(&self) -> &'static [Target] {
-        const TARGETS: &[Target] = &[
-            Target::method("Zend_Controller_Router_Interface", "route"),
-        ];
+        const TARGETS: &[Target] = &[Target::method("Zend_Controller_Router_Interface", "route")];
         TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -124,17 +108,20 @@ impl Zf1RouteHandler {
     unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         retval: &mut ZVal,
-        _exception: Option<&mut ZObj>
+        _exception: Option<&mut ZObj>,
     ) {
         tracing::debug!("Auto::Zf1::post (Router_Interface::route)");
         let ctx = match get_local_root_span_context() {
             Some(ctx) => ctx,
             None => {
-                tracing::debug!("Auto::Zf1::post (Router_Interface::route) - no local root span found, skipping");
+                tracing::debug!(
+                    "Auto::Zf1::post (Router_Interface::route) - no local root span found, skipping"
+                );
                 return;
             }
         };
-        ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "zf1"));
+        ctx.span()
+            .set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_NAME, "zf1"));
 
         // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
         // instead use the first parameter of the execute_data (which is also the request object)
@@ -147,25 +134,34 @@ impl Zf1RouteHandler {
 
         if let Some(zf1_request_obj) = zf1_request_zval.as_mut_z_obj() {
             tracing::debug!("Auto::Zf1::converted zf1_request_obj to ZObj");
-            let method = zf1_request_obj
-                .call("getMethod", [])
-                .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())));
+            let method = zf1_request_obj.call("getMethod", []).ok().and_then(|zv| {
+                zv.as_z_str()
+                    .and_then(|s| s.to_str().ok().map(|s| s.to_owned()))
+            });
 
             let module = zf1_request_obj
                 .call("getModuleName", [])
                 .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())));
+                .and_then(|zv| {
+                    zv.as_z_str()
+                        .and_then(|s| s.to_str().ok().map(|s| s.to_owned()))
+                });
 
             let controller = zf1_request_obj
                 .call("getControllerName", [])
                 .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())));
+                .and_then(|zv| {
+                    zv.as_z_str()
+                        .and_then(|s| s.to_str().ok().map(|s| s.to_owned()))
+                });
 
             let action = zf1_request_obj
                 .call("getActionName", [])
                 .ok()
-                .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())));
+                .and_then(|zv| {
+                    zv.as_z_str()
+                        .and_then(|s| s.to_str().ok().map(|s| s.to_owned()))
+                });
 
             let span_name = format!(
                 "{} {}/{}/{}",
@@ -178,13 +174,22 @@ impl Zf1RouteHandler {
             tracing::debug!("Auto::Zf1::updateName (Router_Interface::route)");
             ctx.span().update_name(span_name);
             if let Some(module) = &module {
-                ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_MODULE_NAME, module.clone()));
+                ctx.span().set_attribute(KeyValue::new(
+                    trace_attributes::PHP_FRAMEWORK_MODULE_NAME,
+                    module.clone(),
+                ));
             }
             if let Some(controller) = &controller {
-                ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_CONTROLLER_NAME, controller.clone()));
+                ctx.span().set_attribute(KeyValue::new(
+                    trace_attributes::PHP_FRAMEWORK_CONTROLLER_NAME,
+                    controller.clone(),
+                ));
             }
             if let Some(action) = &action {
-                ctx.span().set_attribute(KeyValue::new(trace_attributes::PHP_FRAMEWORK_ACTION_NAME, action.clone()));
+                ctx.span().set_attribute(KeyValue::new(
+                    trace_attributes::PHP_FRAMEWORK_ACTION_NAME,
+                    action.clone(),
+                ));
             }
         } else {
             tracing::debug!("Auto::Zf1::post - zf1_request_zval could not be converted to ZObj");
@@ -195,9 +200,10 @@ impl Zf1RouteHandler {
 pub struct Zf1SendResponseHandler;
 impl Handler for Zf1SendResponseHandler {
     fn get_targets(&self) -> &'static [Target] {
-        const TARGETS: &[Target] = &[
-            Target::method("Zend_Controller_Response_Abstract", "sendResponse"),
-        ];
+        const TARGETS: &[Target] = &[Target::method(
+            "Zend_Controller_Response_Abstract",
+            "sendResponse",
+        )];
         TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -214,17 +220,19 @@ impl Zf1SendResponseHandler {
     unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
-        _exception: Option<&mut ZObj>
+        _exception: Option<&mut ZObj>,
     ) {
         tracing::debug!("Auto::Zf1::post (Zend_Controller_Response_Abstract::sendResponse)");
 
         let exec_data_ref = unsafe { &mut *exec_data };
         if let Some(this_obj) = exec_data_ref.get_this_mut() {
-            let http_response_code = this_obj.call("getHttpResponseCode", [])
+            let http_response_code = this_obj
+                .call("getHttpResponseCode", [])
                 .ok()
                 .and_then(|zv| zv.as_long())
                 .unwrap_or(200);
-            let is_exception = this_obj.call("isException", [])
+            let is_exception = this_obj
+                .call("isException", [])
                 .ok()
                 .and_then(|zv| zv.as_bool())
                 .unwrap_or(false);
@@ -235,25 +243,37 @@ impl Zf1SendResponseHandler {
                         return;
                     }
                 };
-                let mut exceptions = this_obj.call("getException", [])
+                let mut exceptions = this_obj
+                    .call("getException", [])
                     .ok()
-                    .and_then(|zv| zv.as_z_arr().map(|arr| arr.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>()))
+                    .and_then(|zv| {
+                        zv.as_z_arr()
+                            .map(|arr| arr.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>())
+                    })
                     .unwrap_or_default();
 
                 let mut status_description = "exception".to_string();
 
                 if let Some(exception) = exceptions.first_mut()
-                    && let Some(exception_obj) = exception.as_mut_z_obj() {
-                    if let Ok(throwable) = phper::errors::ThrowObject::new(exception_obj.to_ref_owned()) {
+                    && let Some(exception_obj) = exception.as_mut_z_obj()
+                {
+                    if let Ok(throwable) =
+                        phper::errors::ThrowObject::new(exception_obj.to_ref_owned())
+                    {
                         ctx.span().record_error(&throwable);
                     }
-                    status_description = exception_obj.call("getMessage", [])
+                    status_description = exception_obj
+                        .call("getMessage", [])
                         .ok()
-                        .and_then(|zv| zv.as_z_str().and_then(|s| s.to_str().ok().map(|s| s.to_owned())))
+                        .and_then(|zv| {
+                            zv.as_z_str()
+                                .and_then(|s| s.to_str().ok().map(|s| s.to_owned()))
+                        })
                         .unwrap_or(status_description);
                 }
                 if http_response_code >= 500 {
-                    ctx.span().set_status(opentelemetry::trace::Status::error(status_description));
+                    ctx.span()
+                        .set_status(opentelemetry::trace::Status::error(status_description));
                 }
             }
         }
@@ -264,9 +284,7 @@ pub struct Zf1AdapterConnectHandler;
 
 impl Handler for Zf1AdapterConnectHandler {
     fn get_targets(&self) -> &'static [Target] {
-        const TARGETS: &[Target] = &[
-            Target::method("Zend_Db_Adapter_Abstract", "_connect"),
-        ];
+        const TARGETS: &[Target] = &[Target::method("Zend_Db_Adapter_Abstract", "_connect")];
         TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -284,54 +302,87 @@ impl Handler for Zf1AdapterConnectHandler {
 impl Zf1AdapterConnectHandler {
     unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
-        let exec_data_ref = unsafe {&mut *exec_data};
+        let exec_data_ref = unsafe { &mut *exec_data };
         let this_obj = exec_data_ref.get_this_mut().unwrap();
 
         let connection = this_obj.get_property("_connection");
-        tracing::debug!("Zf1AdapterConnectHandler: connection type: {:?}", connection.get_type_info());
-        let (_function_name, class_name) = execute_data::get_function_and_class_name(unsafe {&mut *exec_data})
-            .unwrap_or((None, None));
+        tracing::debug!(
+            "Zf1AdapterConnectHandler: connection type: {:?}",
+            connection.get_type_info()
+        );
+        let (_function_name, class_name) =
+            execute_data::get_function_and_class_name(unsafe { &mut *exec_data })
+                .unwrap_or((None, None));
         let is_abstract = class_name.as_deref().unwrap_or("").ends_with("_Abstract");
-        tracing::debug!("Zf1AdapterConnectHandler: class_name: {:?}, is_abstract: {:?}", class_name, is_abstract);
+        tracing::debug!(
+            "Zf1AdapterConnectHandler: class_name: {:?}, is_abstract: {:?}",
+            class_name,
+            is_abstract
+        );
 
-        let should_start_span = !is_abstract && connection.get_type_info() == phper::types::TypeInfo::NULL;
+        let should_start_span =
+            !is_abstract && connection.get_type_info() == phper::types::TypeInfo::NULL;
         if should_start_span {
             let span_name = "connect".to_string();
             let mut execute_attributes = vec![];
             let mut attributes = vec![];
             if let Some(class_name) = &class_name {
-                execute_attributes.push(KeyValue::new(SemConv::trace::DB_SYSTEM_NAME, map_adapter_class_to_db_system(class_name)));
+                execute_attributes.push(KeyValue::new(
+                    SemConv::trace::DB_SYSTEM_NAME,
+                    map_adapter_class_to_db_system(class_name),
+                ));
             }
 
             let config = this_obj.get_property("_config");
             if let Some(arr) = config.as_z_arr()
-                && let Some(dbname) = arr.get("dbname") {
+                && let Some(dbname) = arr.get("dbname")
+            {
                 tracing::debug!("Database: {:?}", dbname);
                 execute_attributes.push(KeyValue::new(
                     SemConv::trace::DB_NAMESPACE,
-                    dbname.as_z_str()
+                    dbname
+                        .as_z_str()
                         .and_then(|s| s.to_str().ok())
                         .unwrap_or_default()
-                        .to_string()
+                        .to_string(),
                 ));
             }
             attributes.extend_from_slice(&execute_attributes);
 
-            unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
+            unsafe {
+                utils::start_and_activate_span(
+                    tracer,
+                    &span_name,
+                    attributes,
+                    exec_data,
+                    opentelemetry::trace::SpanKind::Client,
+                );
+            }
 
             let connection_id = get_object_id(this_obj);
-            CONNECTION_ATTRS.with(|map| map.borrow_mut().insert(connection_id, ConnectionInfo {
-                attributes: execute_attributes.clone(),
-                span_context: opentelemetry::Context::current().span().span_context().clone(),
-            }));
+            CONNECTION_ATTRS.with(|map| {
+                map.borrow_mut().insert(
+                    connection_id,
+                    ConnectionInfo {
+                        attributes: execute_attributes.clone(),
+                        span_context: opentelemetry::Context::current()
+                            .span()
+                            .span_context()
+                            .clone(),
+                    },
+                )
+            });
         }
-        tracing::debug!("Zf1AdapterConnectHandler: should_start_span: {}", should_start_span);
+        tracing::debug!(
+            "Zf1AdapterConnectHandler: should_start_span: {}",
+            should_start_span
+        );
         execute_data::set_exec_data_flag(exec_data, should_start_span);
     }
     unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
-        exception: Option<&mut ZObj>
+        exception: Option<&mut ZObj>,
     ) {
         let mut _guard = None;
         let did_start_span = execute_data::get_exec_data_flag(exec_data).unwrap_or(false);
@@ -350,9 +401,7 @@ pub struct Zf1AdapterPrepareHandler;
 
 impl Handler for Zf1AdapterPrepareHandler {
     fn get_targets(&self) -> &'static [Target] {
-        const TARGETS: &[Target] = &[
-            Target::method("Zend_Db_Adapter_Abstract", "prepare"),
-        ];
+        const TARGETS: &[Target] = &[Target::method("Zend_Db_Adapter_Abstract", "prepare")];
         TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -370,28 +419,39 @@ impl Handler for Zf1AdapterPrepareHandler {
 impl Zf1AdapterPrepareHandler {
     unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         let tracer = tracer_provider::get_tracer_provider().tracer("php.otel.auto.zf1.db");
-        let exec_data_ref = unsafe {&mut *exec_data};
+        let exec_data_ref = unsafe { &mut *exec_data };
         let mut span_name = "prepare".to_string();
         let mut attributes = vec![];
         let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         if let Some(sql_str) = sql_zval.as_z_str() {
             if let Ok(sql) = sql_str.to_str() {
                 // Add SQL query as an attribute
-                attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
-                let sql_name = utils::extract_span_name_from_sql(sql)
-                    .unwrap_or_else(|| "OTHER".to_string());
+                attributes.push(KeyValue::new(
+                    SemConv::trace::DB_QUERY_TEXT,
+                    sql.to_string(),
+                ));
+                let sql_name =
+                    utils::extract_span_name_from_sql(sql).unwrap_or_else(|| "OTHER".to_string());
                 span_name = format!("prepare {}", sql_name);
             }
         } else {
             tracing::warn!("Zf1AdapterPrepareHandler: SQL parameter is not a string");
         }
 
-        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
+        unsafe {
+            utils::start_and_activate_span(
+                tracer,
+                &span_name,
+                attributes,
+                exec_data,
+                opentelemetry::trace::SpanKind::Client,
+            );
+        }
     }
     unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         retval: &mut ZVal,
-        exception: Option<&mut ZObj>
+        exception: Option<&mut ZObj>,
     ) {
         let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
@@ -400,7 +460,7 @@ impl Zf1AdapterPrepareHandler {
         //prepared statement is the return value
         if let Some(statement_obj) = retval.as_mut_z_obj() {
             let mut execute_attributes = vec![];
-            let exec_data_ref = unsafe {&mut *exec_data};
+            let exec_data_ref = unsafe { &mut *exec_data };
             if let Some(this_obj) = exec_data_ref.get_this_mut() {
                 let id = get_object_id(this_obj);
                 tracing::debug!("Zf1AdapterPrepareHandler: object id: {}", id);
@@ -417,7 +477,6 @@ impl Zf1AdapterPrepareHandler {
                 }
             }
 
-
             let exec_data_ref = unsafe { &mut *exec_data };
             let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
             if let Some(sql_str) = sql_zval.as_z_str() {
@@ -429,18 +488,25 @@ impl Zf1AdapterPrepareHandler {
                     let ctx = opentelemetry::Context::current();
                     let span = ctx.span();
                     span.update_name(prepare_span_name);
-                    execute_attributes.push(KeyValue::new(SemConv::trace::DB_QUERY_TEXT, sql.to_string()));
+                    execute_attributes.push(KeyValue::new(
+                        SemConv::trace::DB_QUERY_TEXT,
+                        sql.to_string(),
+                    ));
                     span.set_attributes(execute_attributes.clone());
                     let id = get_object_id(statement_obj);
                     // Add SQL query as an attribute
                     STATEMENT_ATTRS.with(|map| {
                         map.borrow_mut().insert(
                             id,
-                            StatementInfo{
+                            StatementInfo {
                                 attributes: execute_attributes.clone(),
                                 span_name: execute_span_name,
-                                span_context: opentelemetry::Context::current().span().span_context().clone(),
-                            })
+                                span_context: opentelemetry::Context::current()
+                                    .span()
+                                    .span_context()
+                                    .clone(),
+                            },
+                        )
                     });
                 }
             } else {
@@ -454,9 +520,7 @@ pub struct Zf1StatementExecuteHandler;
 
 impl Handler for Zf1StatementExecuteHandler {
     fn get_targets(&self) -> &'static [Target] {
-        const TARGETS: &[Target] = &[
-            Target::method("Zend_Db_Statement_Interface", "execute"),
-        ];
+        const TARGETS: &[Target] = &[Target::method("Zend_Db_Statement_Interface", "execute")];
         TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -484,7 +548,11 @@ impl Zf1StatementExecuteHandler {
             tracing::debug!("Zf1StatementExecuteHandler: object id: {}", id);
             let statement_info = STATEMENT_ATTRS.with(|map| {
                 map.borrow().get(&id).map(|info| {
-                    (info.attributes.clone(), info.span_name.clone(), info.span_context.clone())
+                    (
+                        info.attributes.clone(),
+                        info.span_name.clone(),
+                        info.span_context.clone(),
+                    )
                 })
             });
             if let Some((info_attributes, info_span_name, info_span_context)) = statement_info {
@@ -494,7 +562,15 @@ impl Zf1StatementExecuteHandler {
             }
         }
 
-        unsafe { utils::start_and_activate_span(tracer, &span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Client); }
+        unsafe {
+            utils::start_and_activate_span(
+                tracer,
+                &span_name,
+                attributes,
+                exec_data,
+                opentelemetry::trace::SpanKind::Client,
+            );
+        }
         if let Some(link) = link {
             opentelemetry::Context::current()
                 .span()
@@ -504,7 +580,7 @@ impl Zf1StatementExecuteHandler {
     unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
-        exception: Option<&mut ZObj>
+        exception: Option<&mut ZObj>,
     ) {
         let _guard = take_guard(exec_data);
         if let Some(exception) = exception {
@@ -529,25 +605,58 @@ mod tests {
 
     #[test]
     fn maps_pdo_adapter_classes() {
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Mysql"), "mysql");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Pgsql"), "postgresql");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Sqlite"), "sqlite");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Oci"), "oracle.db");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Ibm"), "ibm.db2");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Mssql"), "microsoft.sql_server");
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Mysql"),
+            "mysql"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Pgsql"),
+            "postgresql"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Sqlite"),
+            "sqlite"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Oci"),
+            "oracle.db"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Ibm"),
+            "ibm.db2"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Pdo_Mssql"),
+            "microsoft.sql_server"
+        );
     }
 
     #[test]
     fn maps_native_adapter_classes() {
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Mysqli"), "mysql");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Oracle"), "oracle.db");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Db2"), "ibm.db2");
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Sqlsrv"), "microsoft.sql_server");
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Mysqli"),
+            "mysql"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Oracle"),
+            "oracle.db"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Db2"),
+            "ibm.db2"
+        );
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Sqlsrv"),
+            "microsoft.sql_server"
+        );
     }
 
     #[test]
     fn unknown_adapter_falls_back() {
-        assert_eq!(map_adapter_class_to_db_system("Zend_Db_Adapter_Nonsense"), "other_sql");
+        assert_eq!(
+            map_adapter_class_to_db_system("Zend_Db_Adapter_Nonsense"),
+            "other_sql"
+        );
         assert_eq!(map_adapter_class_to_db_system("NoUnderscores"), "other_sql");
         assert_eq!(map_adapter_class_to_db_system(""), "other_sql");
     }

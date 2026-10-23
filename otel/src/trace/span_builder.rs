@@ -1,6 +1,20 @@
+use crate::{
+    context::{context::get_instance_id, context_interface::CONTEXT_INTERFACE_NAME, storage},
+    trace::{
+        span::SpanClass, span_builder_interface::SPAN_BUILDER_INTERFACE_NAME,
+        span_context::span_context_from_object,
+        span_context_interface::SPAN_CONTEXT_INTERFACE_NAME, span_interface::SPAN_INTERFACE_NAME,
+    },
+    util,
+};
+use opentelemetry::{
+    Context,
+    trace::{Link, SpanBuilder, SpanKind, Tracer},
+};
+use opentelemetry_sdk::trace::SdkTracer;
 use phper::{
-    classes::{ClassEntity, Interface, StateClass, Visibility},
     alloc::ToRefOwned,
+    classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
 };
@@ -8,31 +22,6 @@ use std::{
     convert::Infallible,
     sync::Arc,
     time::{Duration, UNIX_EPOCH},
-};
-use opentelemetry::{
-    Context,
-    trace::{
-        Link,
-        SpanBuilder,
-        SpanKind,
-        Tracer,
-    }
-};
-use opentelemetry_sdk::trace::SdkTracer;
-use crate::{
-    context::{
-        context::get_instance_id,
-        context_interface::CONTEXT_INTERFACE_NAME,
-        storage,
-    },
-    trace::{
-        span::SpanClass,
-        span_builder_interface::SPAN_BUILDER_INTERFACE_NAME,
-        span_context::span_context_from_object,
-        span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
-        span_interface::SPAN_INTERFACE_NAME,
-    },
-    util,
 };
 
 pub struct SpanBuilderState {
@@ -43,10 +32,18 @@ pub struct SpanBuilderState {
 // @see https://github.com/open-telemetry/opentelemetry-rust/issues/2742
 impl SpanBuilderState {
     pub fn new(span_builder: SpanBuilder, tracer: SdkTracer) -> Self {
-        Self { span_builder: Some(span_builder), tracer: Some(tracer),  parent_context_id: 0 }
+        Self {
+            span_builder: Some(span_builder),
+            tracer: Some(tracer),
+            parent_context_id: 0,
+        }
     }
     pub fn empty() -> Self {
-        Self{ span_builder: None, tracer: None,  parent_context_id: 0 }
+        Self {
+            span_builder: None,
+            tracer: None,
+            parent_context_id: 0,
+        }
     }
 }
 
@@ -67,9 +64,7 @@ pub fn make_span_builder_class(
 ) -> ClassEntity<SpanBuilderState> {
     let mut class = ClassEntity::<SpanBuilderState>::new_with_state_constructor(
         SPAN_BUILDER_CLASS_NAME,
-        || {
-            SpanBuilderState::empty()
-        },
+        SpanBuilderState::empty,
     );
 
     class.implements(span_builder_interface.clone());
@@ -80,8 +75,7 @@ pub fn make_span_builder_class(
 
     class
         .add_method("addLink", Visibility::Public, |this, arguments| {
-            let span_context =
-                span_context_from_object(arguments[0].expect_mut_z_obj()?)?;
+            let span_context = span_context_from_object(arguments[0].expect_mut_z_obj()?)?;
             // `with_links` drops invalid contexts itself, but reporting the no-op here is
             // more useful than silently discarding the call.
             if !span_context.is_valid() {
@@ -101,9 +95,11 @@ pub fn make_span_builder_class(
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(SPAN_CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                SPAN_CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .argument(
             Argument::new("attributes")
                 .with_type_hint(ArgumentTypeHint::Iterable)
@@ -135,21 +131,25 @@ pub fn make_span_builder_class(
         ))));
 
     class
-        .add_method("setStartTimestamp", Visibility::Public, |this, arguments| {
-            let nanos = arguments[0].expect_long()?;
-            // Upstream takes nanoseconds since the epoch; `SystemTime` cannot represent a
-            // negative one, and a caller passing one has a bug rather than a pre-1970 span.
-            let nanos: u64 = nanos.try_into().map_err(|_| {
-                phper::Error::boxed("setStartTimestamp() requires a non-negative timestamp")
-            })?;
-            let start_time = UNIX_EPOCH + Duration::from_nanos(nanos);
+        .add_method(
+            "setStartTimestamp",
+            Visibility::Public,
+            |this, arguments| {
+                let nanos = arguments[0].expect_long()?;
+                // Upstream takes nanoseconds since the epoch; `SystemTime` cannot represent a
+                // negative one, and a caller passing one has a bug rather than a pre-1970 span.
+                let nanos: u64 = nanos.try_into().map_err(|_| {
+                    phper::Error::boxed("setStartTimestamp() requires a non-negative timestamp")
+                })?;
+                let start_time = UNIX_EPOCH + Duration::from_nanos(nanos);
 
-            let state = this.as_mut_state();
-            let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
-            state.span_builder = Some(span_builder.clone().with_start_time(start_time));
+                let state = this.as_mut_state();
+                let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
+                state.span_builder = Some(span_builder.clone().with_start_time(start_time));
 
-            Ok::<_, phper::Error>(this.to_ref_owned())
-        })
+                Ok::<_, phper::Error>(this.to_ref_owned())
+            },
+        )
         .argument(Argument::new("timestampNanos").with_type_hint(ArgumentTypeHint::Int))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_BUILDER_INTERFACE_NAME,
@@ -157,21 +157,21 @@ pub fn make_span_builder_class(
 
     class
         .add_method("setAttribute", Visibility::Public, |this, arguments| {
-        let state = this.as_mut_state();
-        let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
-        let key = arguments[0].expect_z_str()?.to_str()?.to_string();
-        // `$value` is `mixed` upstream, and forcing it through `expect_z_str` rejected the
-        // ints, floats, bools and arrays that `Span::setAttribute` already accepts. Share
-        // that conversion rather than keeping a second, narrower one here.
-        if let Some(kv) = util::zval_to_key_value(&key, &arguments[1]) {
-            let mut attributes = span_builder.attributes.clone().unwrap_or_default();
-            attributes.push(kv);
-            let new_span_builder = span_builder.clone().with_attributes(attributes);
-            state.span_builder = Some(new_span_builder);
-        }
+            let state = this.as_mut_state();
+            let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
+            let key = arguments[0].expect_z_str()?.to_str()?.to_string();
+            // `$value` is `mixed` upstream, and forcing it through `expect_z_str` rejected the
+            // ints, floats, bools and arrays that `Span::setAttribute` already accepts. Share
+            // that conversion rather than keeping a second, narrower one here.
+            if let Some(kv) = util::zval_to_key_value(&key, &arguments[1]) {
+                let mut attributes = span_builder.attributes.clone().unwrap_or_default();
+                attributes.push(kv);
+                let new_span_builder = span_builder.clone().with_attributes(attributes);
+                state.span_builder = Some(new_span_builder);
+            }
 
-        Ok::<_, phper::Error>(this.to_ref_owned())
-    })
+            Ok::<_, phper::Error>(this.to_ref_owned())
+        })
         .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::String))
         // Required, as upstream has it. An `.optional()` here would let `setAttribute('k')`
         // past Zend's arity check and into a slot the handler indexes, panicking across the
@@ -228,7 +228,7 @@ pub fn make_span_builder_class(
                         span_kind_int
                     );
                     SpanKind::Internal
-                },
+                }
             };
             let new_span_builder = span_builder.clone().with_kind(span_kind);
             state.span_builder = Some(new_span_builder);

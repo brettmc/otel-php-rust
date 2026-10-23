@@ -1,3 +1,20 @@
+use crate::{
+    logs::{
+        logger::LoggerClass, logger_interface::LOGGER_INTERFACE_NAME,
+        memory_exporter::MEMORY_EXPORTER,
+    },
+    provider::{self, ProviderKey},
+    request,
+    runtime::init_tokio_runtime,
+    util,
+};
+use opentelemetry::{InstrumentationScope, logs::LoggerProvider};
+use opentelemetry_otlp::{LogExporter as OtlpLogExporter, Protocol, WithExportConfig};
+use opentelemetry_sdk::{
+    Resource,
+    logs::{BatchConfigBuilder, BatchLogProcessor, SdkLoggerProvider, SimpleLogProcessor},
+};
+use opentelemetry_stdout::LogExporter as StdoutLogExporter;
 use phper::{
     classes::{ClassEntity, StateClass, Visibility},
     functions::{Argument, ReturnType},
@@ -9,46 +26,19 @@ use std::{
     env,
     sync::{Arc, LazyLock, Mutex},
 };
-use opentelemetry::{
-    logs::LoggerProvider,
-    InstrumentationScope,
-};
-use opentelemetry_stdout::LogExporter as StdoutLogExporter;
-use opentelemetry_sdk::{
-    logs::{
-        SimpleLogProcessor,
-        BatchConfigBuilder,
-        BatchLogProcessor,
-        SdkLoggerProvider,
-    },
-    Resource,
-};
-use crate::{
-    logs::{
-        logger::LoggerClass,
-        logger_interface::LOGGER_INTERFACE_NAME,
-        memory_exporter::MEMORY_EXPORTER,
-    },
-    provider::{self, ProviderKey},
-    request,
-    util,
-    runtime::init_tokio_runtime,
-};
-use opentelemetry_otlp::{
-    Protocol,
-    LogExporter as OtlpLogExporter,
-    WithExportConfig,
-};
 
 pub const LOGGER_PROVIDER_CLASS_NAME: &str = r"OpenTelemetry\API\Logs\LoggerProvider";
 
 pub type LoggerProviderClass = StateClass<()>;
 
-static LOGGER_PROVIDERS: LazyLock<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static LOGGER_PROVIDERS: LazyLock<Mutex<HashMap<ProviderKey, Arc<SdkLoggerProvider>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 static NOOP_LOGGER_PROVIDER: LazyLock<Arc<SdkLoggerProvider>> = LazyLock::new(|| {
-    Arc::new(SdkLoggerProvider::builder()
-        .with_resource(Resource::builder_empty().build())
-        .build())
+    Arc::new(
+        SdkLoggerProvider::builder()
+            .with_resource(Resource::builder_empty().build())
+            .build(),
+    )
 });
 
 pub fn init_once() {
@@ -98,7 +88,8 @@ pub fn init_once() {
         }
     } else {
         // Default to OTLP exporter
-        let exporter = if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf") {
+        let exporter = if env::var("OTEL_EXPORTER_OTLP_PROTOCOL").as_deref() == Ok("http/protobuf")
+        {
             tracing::debug!("Using http/protobuf log exporter");
             OtlpLogExporter::builder()
                 .with_http()
@@ -107,11 +98,9 @@ pub fn init_once() {
         } else {
             tracing::debug!("Using gRPC log exporter with tokio runtime");
             match init_tokio_runtime() {
-                Some(runtime) => runtime.block_on(async {
-                    OtlpLogExporter::builder()
-                        .with_tonic()
-                        .build()
-                }),
+                Some(runtime) => {
+                    runtime.block_on(async { OtlpLogExporter::builder().with_tonic().build() })
+                }
                 None => Err(opentelemetry_otlp::ExporterBuildError::InternalFailure(
                     "no tokio runtime available for gRPC export".to_string(),
                 )),
@@ -132,7 +121,10 @@ pub fn init_once() {
             // a misconfigured exporter must not take down the PHP process; fall
             // back to not exporting, and leave the config error in the log
             Err(err) => {
-                tracing::error!("Failed to create OTLP log exporter, logging is disabled: {}", err);
+                tracing::error!(
+                    "Failed to create OTLP log exporter, logging is disabled: {}",
+                    err
+                );
                 providers.insert(key, NOOP_LOGGER_PROVIDER.clone());
                 return;
             }
@@ -145,7 +137,9 @@ pub fn init_once() {
 
 pub fn get_logger_provider() -> Arc<SdkLoggerProvider> {
     if request::is_disabled() {
-        tracing::debug!("OpenTelemetry is disabled for this request, returning no-op logger provider");
+        tracing::debug!(
+            "OpenTelemetry is disabled for this request, returning no-op logger provider"
+        );
         return NOOP_LOGGER_PROVIDER.clone();
     }
     provider::get_provider(&LOGGER_PROVIDERS, "Logger", &NOOP_LOGGER_PROVIDER)
@@ -177,15 +171,18 @@ pub fn make_logger_provider_class(
             let provider = get_logger_provider();
             let name = arguments[0].expect_z_str()?.to_str()?.to_string();
 
-            let version = arguments.get(1)
+            let version = arguments
+                .get(1)
                 .and_then(|arg| arg.as_z_str())
                 .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
-            let schema_url = arguments.get(2)
+            let schema_url = arguments
+                .get(2)
                 .and_then(|arg| arg.as_z_str())
                 .and_then(|s| s.to_str().ok().map(|s| s.to_string()));
 
-            let attributes = arguments.get(3)
+            let attributes = arguments
+                .get(3)
                 .and_then(|arg| arg.as_z_arr())
                 .map(|zarr| zarr.to_owned());
 
@@ -197,7 +194,8 @@ pub fn make_logger_provider_class(
                 scope_builder = scope_builder.with_schema_url(schema_url);
             }
             if let Some(attributes) = attributes {
-                scope_builder = scope_builder.with_attributes(util::zval_arr_to_key_value_vec(attributes));
+                scope_builder =
+                    scope_builder.with_attributes(util::zval_arr_to_key_value_vec(attributes));
             }
             let scope = scope_builder.build();
 
@@ -208,23 +206,43 @@ pub fn make_logger_provider_class(
             Ok::<_, phper::Error>(object)
         })
         .argument(Argument::new("name").with_type_hint(ArgumentTypeHint::String))
-        .argument(Argument::new("version").with_type_hint(ArgumentTypeHint::String).allow_null().with_default_value("null"))
-        .argument(Argument::new("schemaUrl").with_type_hint(ArgumentTypeHint::String).allow_null().with_default_value("null"))
-        .argument(Argument::new("attributes").with_type_hint(ArgumentTypeHint::Iterable).with_default_value("[]"))
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(LOGGER_INTERFACE_NAME))));
+        .argument(
+            Argument::new("version")
+                .with_type_hint(ArgumentTypeHint::String)
+                .allow_null()
+                .with_default_value("null"),
+        )
+        .argument(
+            Argument::new("schemaUrl")
+                .with_type_hint(ArgumentTypeHint::String)
+                .allow_null()
+                .with_default_value("null"),
+        )
+        .argument(
+            Argument::new("attributes")
+                .with_type_hint(ArgumentTypeHint::Iterable)
+                .with_default_value("[]"),
+        )
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            LOGGER_INTERFACE_NAME,
+        ))));
 
     // Declared on the class rather than on `API\Logs\LoggerProviderInterface`, for the reason
     // given in `tracer_provider::make_tracer_provider_class`.
     class
-        .add_method("forceFlush", Visibility::Public, |_, _| -> phper::Result<bool> {
-            Ok(force_flush())
-        })
+        .add_method(
+            "forceFlush",
+            Visibility::Public,
+            |_, _| -> phper::Result<bool> { Ok(force_flush()) },
+        )
         .return_type(ReturnType::new(ReturnTypeHint::Bool));
 
     class
-        .add_method("shutdown", Visibility::Public, |_, _| -> phper::Result<bool> {
-            Ok(shutdown())
-        })
+        .add_method(
+            "shutdown",
+            Visibility::Public,
+            |_, _| -> phper::Result<bool> { Ok(shutdown()) },
+        )
         .return_type(ReturnType::new(ReturnTypeHint::Bool));
 
     class

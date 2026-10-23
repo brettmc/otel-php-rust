@@ -24,44 +24,37 @@
 //! All request state lives in thread-locals rather than process statics, because a request
 //! belongs to a thread: under a threaded SAPI, sharing them would let one request's root
 //! span or env backup clobber another's.
+use crate::{
+    auto, config,
+    context::storage,
+    error::php_error_to_attributes,
+    logging,
+    logs::logger_provider,
+    module,
+    trace::{local_root_span, tracer_provider},
+    util::get_sapi_module_name,
+};
 use anyhow::Context as _;
+use opentelemetry::{
+    Context, InstrumentationScope, KeyValue, global,
+    trace::{SpanKind, TraceContextExt, Tracer, TracerProvider},
+};
+use opentelemetry_sdk::propagation::TraceContextPropagator;
+use opentelemetry_semantic_conventions as SemConv;
 use phper::{
+    arrays::{IterKey, ZArr},
     eg,
     ini::ini_get,
-    pg,
-    sg,
-    sys,
-    arrays::{IterKey, ZArr},
+    pg, sg, sys,
     values::ZVal,
 };
 use regex::Regex;
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     sync::Arc,
-};
-use opentelemetry::{
-    global,
-    Context,
-    InstrumentationScope,
-    KeyValue,
-    trace::{SpanKind, Tracer, TraceContextExt, TracerProvider},
-};
-use opentelemetry_sdk::propagation::TraceContextPropagator;
-use opentelemetry_semantic_conventions as SemConv;
-use crate::{
-    auto,
-    config,
-    context::storage,
-    logging,
-    logs::logger_provider,
-    module,
-    error::php_error_to_attributes,
-    trace::{local_root_span, tracer_provider},
-    util::{get_sapi_module_name},
 };
 
 thread_local! {
@@ -150,7 +143,8 @@ fn compute_is_disabled() -> bool {
 
     // Check for excluded URL before creating root span
     if let Some(ref uri) = request_details.uri
-        && is_excluded_url(uri) {
+        && is_excluded_url(uri)
+    {
         tracing::debug!("RINIT::excluded URL matched '{}'", uri);
         return true;
     }
@@ -300,9 +294,13 @@ fn find_dotenv() -> Option<PathBuf> {
             let docroot = match Path::new(&document_root).canonicalize() {
                 Ok(path) => path,
                 Err(err) => {
-                    tracing::warn!("Failed to canonicalize DOCUMENT_ROOT '{}': {}", document_root, err);
+                    tracing::warn!(
+                        "Failed to canonicalize DOCUMENT_ROOT '{}': {}",
+                        document_root,
+                        err
+                    );
                     return env_in_dir(script_dir);
-                },
+                }
             };
             let mut current = match script_dir.canonicalize() {
                 Ok(path) => path,
@@ -356,7 +354,11 @@ fn compile_excluded_urls(list: &str) -> Option<Regex> {
         Err(err) => {
             // Escaping should make this unreachable; if it ever happens, excluding nothing
             // is the safer failure than excluding everything.
-            tracing::error!("Failed to compile excluded URL patterns '{}': {}", list, err);
+            tracing::error!(
+                "Failed to compile excluded URL patterns '{}': {}",
+                list,
+                err
+            );
             None
         }
     }
@@ -413,14 +415,23 @@ fn init() {
         };
     }
 
-    tracing::debug!("RINIT::otel request is being traced, name={}", span_name.clone().unwrap_or("unknown".to_string()));
+    tracing::debug!(
+        "RINIT::otel request is being traced, name={}",
+        span_name.clone().unwrap_or("unknown".to_string())
+    );
     let tracer_provider = tracer_provider::get_tracer_provider();
     let scope = InstrumentationScope::builder("php:rinit").build();
     let tracer = tracer_provider.tracer_with_scope(scope);
     let span_builder = tracer.span_builder(span_name.unwrap_or("unknown".to_string()));
     let mut attributes = span_builder.attributes.clone().unwrap_or_default();
-    attributes.push(KeyValue::new(SemConv::trace::URL_FULL, request_details.uri.unwrap_or_default()));
-    attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_METHOD, request_details.method.unwrap_or_default()));
+    attributes.push(KeyValue::new(
+        SemConv::trace::URL_FULL,
+        request_details.uri.unwrap_or_default(),
+    ));
+    attributes.push(KeyValue::new(
+        SemConv::trace::HTTP_REQUEST_METHOD,
+        request_details.method.unwrap_or_default(),
+    ));
     //attributes.push(KeyValue::new(SemConv::trace::HTTP_REQUEST_BODY_SIZE, request_details.body_length.unwrap_or_default())); //experimental
     // TODO other HTTP attributes are experimental
 
@@ -491,13 +502,17 @@ fn close_root_span() {
     }
     if get_sapi_module_name() != "cli" {
         let response_code = get_response_status_code();
-        span.set_attribute(KeyValue::new(SemConv::trace::HTTP_RESPONSE_STATUS_CODE, response_code as i64));
+        span.set_attribute(KeyValue::new(
+            SemConv::trace::HTTP_RESPONSE_STATUS_CODE,
+            response_code as i64,
+        ));
         if response_code >= 500 {
             let mut func = ZVal::from("error_get_last");
             let mut args: Vec<ZVal> = Vec::new();
             let error = ZVal::call(&mut func, &mut args).ok();
             if let Some(error) = error
-                && error.get_type_info().is_array() {
+                && error.get_type_info().is_array()
+            {
                 tracing::debug!("RSHUTDOWN::HTTP error detected: {:?}", error);
                 let attributes = php_error_to_attributes(&error);
                 span.add_event("exception", attributes);
@@ -552,7 +567,8 @@ fn get_server_vars_with_prefix(prefix: &str) -> HashMap<String, String> {
                     if let IterKey::ZStr(zstr) = key
                         && let Ok(key_str) = zstr.to_str()
                         && key_str.starts_with(prefix)
-                        && let Some(value_str) = z_val_to_string(value) {
+                        && let Some(value_str) = z_val_to_string(value)
+                    {
                         return Some((key_str.to_string(), value_str));
                     }
                     None
@@ -576,7 +592,8 @@ fn extract_request_headers(server: &ZArr) -> HashMap<String, String> {
         if let IterKey::ZStr(zstr) = key
             && let Ok(key_str) = zstr.to_str()
             && key_str.starts_with("HTTP_")
-            && let Some(value_str) = value.as_z_str().and_then(|z| z.to_str().ok()) {
+            && let Some(value_str) = value.as_z_str().and_then(|z| z.to_str().ok())
+        {
             // Convert HTTP_ header names to standard format (e.g., HTTP_USER_AGENT -> User-Agent)
             let header_name = key_str
                 .trim_start_matches("HTTP_")
@@ -606,7 +623,9 @@ fn parse_resource_attributes(s: &str) -> HashMap<String, String> {
         .filter_map(|pair| {
             let mut parts = pair.splitn(2, '=');
             match (parts.next(), parts.next()) {
-                (Some(key), Some(value)) if !key.is_empty() && !value.is_empty() => Some((key.trim().to_string(), value.trim().to_string())),
+                (Some(key), Some(value)) if !key.is_empty() && !value.is_empty() => {
+                    Some((key.trim().to_string(), value.trim().to_string()))
+                }
                 _ => None,
             }
         })

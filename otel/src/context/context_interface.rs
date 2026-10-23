@@ -1,12 +1,12 @@
-use phper::{
-    classes::InterfaceEntity,
-    functions::{Argument, ReturnType},
-    types::{ArgumentTypeHint, ReturnTypeHint},
-};
 use crate::context::{
     context_key_interface::CONTEXT_KEY_INTERFACE_NAME,
     implicit_context_keyed_interface::IMPLICIT_CONTEXT_KEYED_INTERFACE_NAME,
     scope_interface::SCOPE_INTERFACE_NAME,
+};
+use phper::{
+    classes::InterfaceEntity,
+    functions::{Argument, ReturnType},
+    types::{ArgumentTypeHint, ReturnTypeHint},
 };
 
 pub const CONTEXT_INTERFACE_NAME: &str = r"OpenTelemetry\Context\ContextInterface";
@@ -29,17 +29,23 @@ pub fn make_context_interface() -> InterfaceEntity {
 
     interface
         .add_static_method("getCurrent")
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            CONTEXT_INTERFACE_NAME,
+        ))));
 
     interface
         .add_method("activate")
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SCOPE_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SCOPE_INTERFACE_NAME,
+        ))));
 
     interface
         .add_method("with")
-        .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_KEY_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_KEY_INTERFACE_NAME,
+            ))),
+        )
         // Untyped upstream, declared `mixed` here. PHP treats the two as the same type for
         // inheritance, so an implementer is unaffected either way, and `mixed` is what the
         // value genuinely is.
@@ -50,9 +56,11 @@ pub fn make_context_interface() -> InterfaceEntity {
 
     interface
         .add_method("withContextValue")
-        .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(IMPLICIT_CONTEXT_KEYED_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("value").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                IMPLICIT_CONTEXT_KEYED_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             CONTEXT_INTERFACE_NAME,
         ))));
@@ -64,9 +72,11 @@ pub fn make_context_interface() -> InterfaceEntity {
     // concrete `Context` class still declares `mixed`, which narrowing permits.
     interface
         .add_method("get")
-        .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_KEY_INTERFACE_NAME),
-        )));
+        .argument(
+            Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_KEY_INTERFACE_NAME,
+            ))),
+        );
 
     interface
 }

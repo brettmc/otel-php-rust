@@ -1,9 +1,6 @@
 use crate::{
     context::{
-        context::{
-            get_instance_id,
-            ContextClassEntity,
-        },
+        context::{ContextClassEntity, get_instance_id},
         context_interface::CONTEXT_INTERFACE_NAME,
         storage,
     },
@@ -11,20 +8,13 @@ use crate::{
 };
 use phper::{
     arrays::ZArray,
-    classes::{
-        ClassEntity,
-        Interface,
-        StateClass,
-        Visibility,
-    },
+    classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
     objects::ZObj,
     types::{ArgumentTypeHint, ReturnTypeHint},
     values::ZVal,
 };
-use std::{
-    convert::Infallible,
-};
+use std::convert::Infallible;
 
 const SCOPE_CLASS_NAME: &str = r"OpenTelemetry\Context\Scope";
 pub type ScopeClass = StateClass<()>;
@@ -85,22 +75,26 @@ pub fn build_scope_class(
         // hand userland NULL where the spec promises zero-or-a-bitmask. `detach_context`
         // reports which condition fired so the bitmask can distinguish "not top-most" from
         // "stack empty" rather than collapsing both into a bool.
-        .add_method("detach", Visibility::Public, |this, _| -> phper::Result<i64> {
-            let instance_id = get_instance_id(this);
-            let result = storage::detach_context(instance_id);
-            // Only tear down the local root span if the scope really was detached. An
-            // out-of-order detach is refused (see `storage::detach_context`), and clearing
-            // the local root for a scope that is still active would drop its context while
-            // userland can still reach it through the still-active inner scope.
-            if result.is_detached() {
-                local_root_span::maybe_remove_local_root_span(instance_id);
-            }
-            Ok(result.to_php_flags())
-        })
+        .add_method(
+            "detach",
+            Visibility::Public,
+            |this, _| -> phper::Result<i64> {
+                let instance_id = get_instance_id(this);
+                let result = storage::detach_context(instance_id);
+                // Only tear down the local root span if the scope really was detached. An
+                // out-of-order detach is refused (see `storage::detach_context`), and clearing
+                // the local root for a scope that is still active would drop its context while
+                // userland can still reach it through the still-active inner scope.
+                if result.is_detached() {
+                    local_root_span::maybe_remove_local_root_span(instance_id);
+                }
+                Ok(result.to_php_flags())
+            },
+        )
         .return_type(ReturnType::new(ReturnTypeHint::Int));
 
     class
-        .add_method("context", Visibility::Public, move |this,_| {
+        .add_method("context", Visibility::Public, move |this, _| {
             let instance_id = get_instance_id(this);
             let ctx = storage::get_context_instance(instance_id);
             let mut object = context_ce.init_object()?;
@@ -108,7 +102,9 @@ pub fn build_scope_class(
             object.set_property("context_id", instance_id.unwrap_or(0) as i64);
             Ok::<_, phper::Error>(object)
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            CONTEXT_INTERFACE_NAME,
+        ))));
 
     // The `ArrayAccess` half of `ContextStorageScopeInterface`. The offsets are a scope's own
     // scratch space: nothing in this extension reads them, they exist so instrumentation can

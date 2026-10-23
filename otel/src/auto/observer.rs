@@ -14,25 +14,14 @@
 //! Every entry point is `extern "C"` and called by the engine, so all three wrap their work
 //! in [`crate::auto::guard`]: unwinding across an FFI boundary is undefined behaviour, and
 //! there is no PHP frame here to throw into.
+use crate::auto::{
+    execute_data::{get_fqn, get_global_exception},
+    guard,
+    plugin_manager::{get_cached_observer, get_global as get_plugin_manager},
+};
 use phper::{
     sys,
-    values::{
-        ExecuteData,
-        ZVal,
-    }
-};
-use crate::{
-    auto::{
-        guard,
-        execute_data::{
-            get_fqn,
-            get_global_exception,
-        },
-        plugin_manager::{
-            get_cached_observer,
-            get_global as get_plugin_manager,
-        },
-    },
+    values::{ExecuteData, ZVal},
 };
 
 pub fn init() {
@@ -47,7 +36,9 @@ pub fn init() {
 ///
 /// Called by the Zend engine as an observer registration handler. `execute_data`
 /// must be a valid pointer to the frame being compiled, or null.
-pub unsafe extern "C" fn observer_instrument(execute_data: *mut sys::zend_execute_data) -> sys::zend_observer_fcall_handlers {
+pub unsafe extern "C" fn observer_instrument(
+    execute_data: *mut sys::zend_execute_data,
+) -> sys::zend_observer_fcall_handlers {
     const UNOBSERVED: sys::zend_observer_fcall_handlers = sys::zend_observer_fcall_handlers {
         begin: None,
         end: None,
@@ -117,7 +108,10 @@ pub unsafe extern "C" fn pre_observe_c_function(execute_data: *mut sys::zend_exe
 /// pointer to the frame being left, or null; `retval` must point to the return
 /// value, or be null if the function returned nothing.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn post_observe_c_function(execute_data: *mut sys::zend_execute_data, retval: *mut sys::zval) {
+pub unsafe extern "C" fn post_observe_c_function(
+    execute_data: *mut sys::zend_execute_data,
+    retval: *mut sys::zval,
+) {
     guard("post_observe", || {
         let Some(exec_data) = (unsafe { ExecuteData::try_from_mut_ptr(execute_data) }) else {
             return;

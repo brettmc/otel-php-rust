@@ -25,7 +25,10 @@ pub fn init_tokio_runtime() -> Option<&'static Runtime> {
             TOKIO_RUNTIME.get()
         }
         Err(err) => {
-            tracing::error!("Failed to create Tokio runtime required for gRPC export: {}", err);
+            tracing::error!(
+                "Failed to create Tokio runtime required for gRPC export: {}",
+                err
+            );
             None
         }
     }

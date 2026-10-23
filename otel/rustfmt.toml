@@ -1,0 +1,4 @@
+# cargo fmt passes the edition from Cargo.toml, but rustfmt run on its own (an editor
+# formatting one file, say) defaults to 2015 and formats differently. Keep this in step
+# with Cargo.toml.
+edition = "2024"

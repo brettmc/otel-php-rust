@@ -20,29 +20,21 @@
 //! VM, so unwinding is undefined behaviour and swallowing the call would stop the program
 //! executing. Instrumentation work is therefore wrapped in [`crate::auto::guard`] and a
 //! failure degrades to a plain, uninstrumented call.
+use crate::auto::{
+    execute_data::get_global_exception, guard, plugin::FunctionObserver,
+    plugin_manager::get_global as get_plugin_manager,
+};
 use phper::{
     sys,
-    values::{ExecuteData,ZVal},
+    values::{ExecuteData, ZVal},
 };
-use crate::{
-    auto::{
-        execute_data::{
-            get_global_exception,
-        },
-        guard,
-        plugin::FunctionObserver,
-        plugin_manager::get_global as get_plugin_manager,
-    }
-};
-use std::{
-    ptr::null_mut,
-};
+use std::ptr::null_mut;
 
 static mut UPSTREAM_EXECUTE_EX: Option<
     unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data),
 > = None;
 static mut UPSTREAM_EXECUTE_INTERNAL: Option<
-    unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data, return_value: *mut sys::zval)
+    unsafe extern "C" fn(execute_data: *mut sys::zend_execute_data, return_value: *mut sys::zval),
 > = None;
 
 pub fn init() {
@@ -54,7 +46,9 @@ pub fn init() {
         UPSTREAM_EXECUTE_INTERNAL = sys::zend_execute_internal;
         sys::zend_execute_internal = Some(execute_internal);
     }
-    tracing::debug!("swapped zend_execute_ex and zend_execute_internal with custom implementations");
+    tracing::debug!(
+        "swapped zend_execute_ex and zend_execute_internal with custom implementations"
+    );
 }
 
 /// Handle execution data and return value, invoking upstream functions and post hooks. This function
@@ -65,8 +59,7 @@ fn handle_execution<F, G>(
     return_value: Option<&mut ZVal>,
     upstream: F,
     run_post_hooks: G,
-)
-where
+) where
     F: Fn(Option<&mut ExecuteData>, Option<&mut ZVal>),
     G: Fn(&FunctionObserver, &mut ExecuteData, &mut ZVal),
 {
@@ -124,7 +117,7 @@ where
 }
 
 unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
-    let exec_data = unsafe{ExecuteData::try_from_mut_ptr(execute_data)};
+    let exec_data = unsafe { ExecuteData::try_from_mut_ptr(execute_data) };
     handle_execution(
         exec_data,
         None,
@@ -132,7 +125,8 @@ unsafe extern "C" fn execute_ex(execute_data: *mut sys::zend_execute_data) {
         |observer, exec_data, fallback_retval| {
             //get return value via a pointer to avoid double-borrowing exec_data
             let retval = unsafe {
-                exec_data.get_return_value_mut_ptr()
+                exec_data
+                    .get_return_value_mut_ptr()
                     .as_mut()
                     .unwrap_or(fallback_retval)
             };
@@ -148,8 +142,8 @@ unsafe extern "C" fn execute_internal(
     execute_data: *mut sys::zend_execute_data,
     return_value: *mut sys::zval,
 ) {
-    let exec_data = unsafe{ExecuteData::try_from_mut_ptr(execute_data)};
-    let ret_val = unsafe{ZVal::try_from_mut_ptr(return_value)};
+    let exec_data = unsafe { ExecuteData::try_from_mut_ptr(execute_data) };
+    let ret_val = unsafe { ZVal::try_from_mut_ptr(return_value) };
 
     handle_execution(
         exec_data,
@@ -175,7 +169,10 @@ fn upstream_execute_ex(execute_data: Option<&mut ExecuteData>) {
 }
 
 #[inline]
-fn upstream_execute_internal(execute_data: Option<&mut ExecuteData>, return_value: Option<&mut ZVal>) {
+fn upstream_execute_internal(
+    execute_data: Option<&mut ExecuteData>,
+    return_value: Option<&mut ZVal>,
+) {
     let execute_data = execute_data
         .map(ExecuteData::as_mut_ptr)
         .unwrap_or(null_mut());
