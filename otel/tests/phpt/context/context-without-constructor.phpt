@@ -10,10 +10,11 @@ OTEL_TRACES_EXPORTER=none
 <?php
 use OpenTelemetry\Context\Context;
 
-// Context has a private constructor, but reflection reaches it anyway and leaves the
+// Context has a private constructor, but unserialize() skips it anyway and leaves the
 // internal state unpopulated. Every method has to report that rather than panicking,
-// which would abort the whole PHP process.
-$context = (new ReflectionClass(Context::class))->newInstanceWithoutConstructor();
+// which would abort the whole PHP process. Context is final, and
+// newInstanceWithoutConstructor() refuses an internal final class.
+$context = unserialize(sprintf('O:%d:"%s":0:{}', strlen(Context::class), Context::class));
 
 foreach (['get', 'with', 'activate'] as $method) {
     try {

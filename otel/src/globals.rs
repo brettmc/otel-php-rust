@@ -24,6 +24,7 @@ pub fn make_globals_class(
     logger_provider_class: LoggerProviderClass,
 ) -> ClassEntity<()> {
     let mut class = ClassEntity::new(GLOBALS_CLASS_NAME);
+    class.set_final();
 
     class
         .add_static_method("tracerProvider", Visibility::Public, move |_| {

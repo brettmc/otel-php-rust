@@ -18,6 +18,7 @@ pub type ContextKeyClassEntity = ClassEntity<()>;
 pub fn make_context_key_class(context_key_interface: &Interface) -> ContextKeyClassEntity {
     let mut class = ClassEntity::<()>::new_with_default_state_constructor(CONTEXT_KEY_CLASS_NAME);
 
+    class.set_final();
     class.implements(context_key_interface.clone());
 
     // Upstream holds the name in a promoted `private readonly ?string $name`. phper can
@@ -26,9 +27,6 @@ pub fn make_context_key_class(context_key_interface: &Interface) -> ContextKeyCl
     class.add_property("name", Visibility::Private, ());
 
     class
-        // Upstream's class is `final`, which phper cannot express -- it has no ce_flags
-        // plumbing for ZEND_ACC_FINAL at all. Subclassing it is therefore possible here but
-        // pointless: identity comparison means a subclass instance is simply a different key.
         .add_method("__construct", Visibility::Public, |this, arguments| {
             // Declared with a default, so `new ContextKey()` is legal and yields an anonymous
             // key -- which is a perfectly good key, since lookup is by identity.
