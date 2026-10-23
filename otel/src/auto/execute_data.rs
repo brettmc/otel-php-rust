@@ -1,14 +1,7 @@
-use phper::{
-    eg,
-    objects::ZObj,
-    strings::ZStr,
-    values::ExecuteData,
-};
-use opentelemetry::{
-    KeyValue,
-};
-use std::collections::HashMap;
+use opentelemetry::KeyValue;
+use phper::{eg, objects::ZObj, strings::ZStr, values::ExecuteData};
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 // Storage for communication between pre and post hooks, using exec_data as key
 thread_local! {
@@ -26,9 +19,7 @@ pub fn set_exec_data_flag(exec_data: *mut ExecuteData, value: bool) {
 // Get a flag
 pub fn get_exec_data_flag(exec_data: *mut ExecuteData) -> Option<bool> {
     let key = exec_data as usize;
-    EXEC_DATA_FLAGS.with(|map| {
-        map.borrow().get(&key).copied()
-    })
+    EXEC_DATA_FLAGS.with(|map| map.borrow().get(&key).copied())
 }
 
 // Remove a flag (cleanup)
@@ -59,7 +50,8 @@ pub fn get_function_and_class_name(
 }
 
 pub fn get_fqn(execute_data: &ExecuteData) -> Option<String> {
-    let (function_name, class_name) = get_function_and_class_name(execute_data).unwrap_or((None, None));
+    let (function_name, class_name) =
+        get_function_and_class_name(execute_data).unwrap_or((None, None));
 
     match (class_name, function_name) {
         (Some(cls), Some(func)) => Some(format!("{}::{}", cls, func)),

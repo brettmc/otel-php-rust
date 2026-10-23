@@ -33,7 +33,7 @@ fn main() {
             .find(|p| p.name.as_str() == pkg)
             .map(|p| p.version.to_string())
             .unwrap_or_else(|| "unknown".to_string());
-        
+
         versions.push(format!(
             "pub const {}_VERSION: &str = \"{}\";",
             pkg.to_uppercase(),
@@ -43,6 +43,5 @@ fn main() {
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
     let dest_path = Path::new(&out_dir).join("package_versions.rs");
-    fs::write(&dest_path, versions.join("\n"))
-        .expect("Failed to write version file");
- }
+    fs::write(&dest_path, versions.join("\n")).expect("Failed to write version file");
+}

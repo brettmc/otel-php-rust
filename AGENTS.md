@@ -184,6 +184,7 @@ match `Span`'s exactly — differing arity or types make the same call legal aga
 make build-test     # debug build + phpize (for run-tests.php) -> modules/otel.so
 make test           # cargo test --features test, then every phpt suite
 make clippy         # cargo clippy --all-targets --features test
+make fmt            # cargo fmt; CI fails on anything `make fmt-check` reports
 make test-phpt      # unit tests only
 make test-auto      # auto-instrumentation (needs composer fixtures)
 make test-export    # otlp, needs the collector; not run in CI
@@ -248,7 +249,7 @@ sees it, and it keeps the 11-version matrix and every contributor on one depende
   and especially why an obvious-looking simplification is wrong. That is load-bearing here:
   most of the traps above are invisible at the call site. If you work one out, write it down
   next to the code.
-- `rustfmt` is not yet applied or enforced (it is on the todo list), so do not reformat
-  unrelated code — it buries the real diff.
+- Run `make fmt` before committing. CI runs `cargo fmt --check` in its own job, outside the
+  `continue-on-error` matrix, so unformatted code fails the workflow.
 - Known blind spot: nothing compares the **whole** API surface to upstream.
   `interface-surface.phpt` pins 13 interfaces by hand, which is a net, not a snapshot.

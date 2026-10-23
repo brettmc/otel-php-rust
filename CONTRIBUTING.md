@@ -66,6 +66,8 @@ version-specific assertion over skipping the whole file, as `interface-surface.p
 * `make clippy` - runs `cargo clippy` over the lib and tests. Some clippy lints are
   deny-by-default and reported as errors that `make check` does not catch, so it is
   worth running before opening a PR.
+* `make fmt` - formats the source with `rustfmt`. CI fails on unformatted code, which
+  `make fmt-check` reports without changing anything.
 * `make build` - builds the extension for release (smaller, but not stripped)
 * `make build-test` - builds the extension for testing (larger, but with debug symbols)
 * `make install` - build a release, copy it to the PHP extensions directory

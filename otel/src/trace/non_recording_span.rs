@@ -1,3 +1,18 @@
+use crate::{
+    context::{
+        context::{ContextClass, get_instance_id},
+        context_interface::CONTEXT_INTERFACE_NAME,
+        scope::ScopeClass,
+        scope_interface::SCOPE_INTERFACE_NAME,
+        storage,
+    },
+    trace::{
+        span_context::SpanContextClass, span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
+        span_interface::SPAN_INTERFACE_NAME,
+    },
+};
+use opentelemetry::trace::{SpanContext, TraceContextExt};
+use opentelemetry_sdk::trace::Span as SdkSpan;
 use phper::{
     alloc::ToRefOwned,
     classes::{ClassEntity, Interface, StateClass, Visibility},
@@ -5,31 +20,7 @@ use phper::{
     objects::ZObj,
     types::{ArgumentTypeHint, ReturnTypeHint},
 };
-use std::{
-    convert::Infallible,
-    sync::Arc,
-};
-use opentelemetry::{
-    trace::{
-        SpanContext,
-        TraceContextExt,
-    }
-};
-use opentelemetry_sdk::trace::Span as SdkSpan;
-use crate::{
-    context::{
-        context::{get_instance_id, ContextClass},
-        context_interface::CONTEXT_INTERFACE_NAME,
-        scope::ScopeClass,
-        scope_interface::SCOPE_INTERFACE_NAME,
-        storage,
-    },
-    trace::{
-        span_context::SpanContextClass,
-        span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
-        span_interface::SPAN_INTERFACE_NAME,
-    },
-};
+use std::{convert::Infallible, sync::Arc};
 
 const NON_RECORDING_SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\NonRecordingSpan";
 
@@ -41,8 +32,9 @@ pub fn make_non_recording_span_class(
     context_class: ContextClass,
     span_interface: &Interface,
 ) -> ClassEntity<Option<SdkSpan>> {
-    let mut class =
-        ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(NON_RECORDING_SPAN_CLASS_NAME);
+    let mut class = ClassEntity::<Option<SdkSpan>>::new_with_default_state_constructor(
+        NON_RECORDING_SPAN_CLASS_NAME,
+    );
     let span_class = class.bound_class();
 
     class.implements(span_interface.clone());
@@ -125,9 +117,10 @@ pub fn make_non_recording_span_class(
         .add_method("recordException", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("exception").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from("Throwable"),
-        )))
+        .argument(
+            Argument::new("exception")
+                .with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Throwable"))),
+        )
         .argument(
             Argument::new("attributes")
                 .with_type_hint(ArgumentTypeHint::Iterable)
@@ -141,9 +134,11 @@ pub fn make_non_recording_span_class(
         .add_method("addLink", Visibility::Public, |this, _| {
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(SPAN_CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                SPAN_CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .argument(
             Argument::new("attributes")
                 .with_type_hint(ArgumentTypeHint::Iterable)
@@ -211,9 +206,8 @@ pub fn make_non_recording_span_class(
         .add_method("activate", Visibility::Public, {
             let scope_class = scope_class.clone();
             move |_this, _| {
-                let ctx = storage::current_context().with_span(
-                    opentelemetry::trace::noop::NoopSpan::DEFAULT,
-                );
+                let ctx = storage::current_context()
+                    .with_span(opentelemetry::trace::noop::NoopSpan::DEFAULT);
                 let instance_id = storage::store_context_instance(Arc::new(ctx));
                 storage::attach_context(instance_id).map_err(phper::Error::boxed)?;
 
@@ -233,9 +227,8 @@ pub fn make_non_recording_span_class(
                 let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
                 let parent_id = get_instance_id(context_obj);
                 let parent = storage::resolve_context(parent_id);
-                let arc_ctx = Arc::new(
-                    parent.with_span(opentelemetry::trace::noop::NoopSpan::DEFAULT),
-                );
+                let arc_ctx =
+                    Arc::new(parent.with_span(opentelemetry::trace::noop::NoopSpan::DEFAULT));
                 let instance_id = storage::store_context_instance(arc_ctx.clone());
                 storage::inherit_context_values(parent_id, instance_id);
 
@@ -245,9 +238,11 @@ pub fn make_non_recording_span_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             CONTEXT_INTERFACE_NAME,
         ))));
@@ -263,9 +258,11 @@ pub fn make_non_recording_span_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_INTERFACE_NAME,
         ))));

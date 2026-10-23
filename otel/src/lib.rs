@@ -1,23 +1,20 @@
-use phper::{
-    modules::Module,
-    php_get_module,
-};
+use phper::{modules::Module, php_get_module};
 use std::env;
 
-pub mod context;
-pub mod trace;
+pub mod auto;
 pub mod class_registry;
 pub mod config;
+pub mod context;
 pub mod error;
 pub mod globals;
-pub mod request;
 pub mod logging;
 pub mod logs;
-pub mod provider;
-pub mod runtime;
-pub mod util;
 pub mod module;
-pub mod auto;
+pub mod provider;
+pub mod request;
+pub mod runtime;
+pub mod trace;
+pub mod util;
 
 include!(concat!(env!("OUT_DIR"), "/package_versions.rs"));
 

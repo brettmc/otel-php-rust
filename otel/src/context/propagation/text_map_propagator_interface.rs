@@ -1,8 +1,3 @@
-use phper::{
-    classes::InterfaceEntity,
-    functions::{Argument, ReturnType},
-    types::{ArgumentTypeHint, ReturnTypeHint},
-};
 use crate::context::{
     context_interface::CONTEXT_INTERFACE_NAME,
     propagation::{
@@ -10,8 +5,14 @@ use crate::context::{
         propagation_setter_interface::PROPAGATION_SETTER_INTERFACE_NAME,
     },
 };
+use phper::{
+    classes::InterfaceEntity,
+    functions::{Argument, ReturnType},
+    types::{ArgumentTypeHint, ReturnTypeHint},
+};
 
-pub const TEXT_MAP_PROPAGATOR_INTERFACE_NAME: &str = r"OpenTelemetry\Context\Propagation\TextMapPropagatorInterface";
+pub const TEXT_MAP_PROPAGATOR_INTERFACE_NAME: &str =
+    r"OpenTelemetry\Context\Propagation\TextMapPropagatorInterface";
 
 /// The arguments of `inject()`, shared with the concrete propagator.
 ///

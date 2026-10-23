@@ -4,7 +4,7 @@
 use crate::{
     auto::{
         execute_data::get_fqn,
-        plugin::{Handler, HandlerList, HandlerSlice, HandlerCallbacks, Plugin, Target},
+        plugin::{Handler, HandlerCallbacks, HandlerList, HandlerSlice, Plugin, Target},
         utils,
     },
     context::storage::take_guard,
@@ -12,16 +12,13 @@ use crate::{
 };
 use opentelemetry::{
     KeyValue,
-    trace::{
-        TraceContextExt,
-        TracerProvider,
-    },
+    trace::{TraceContextExt, TracerProvider},
+};
+use phper::{
+    objects::ZObj,
+    values::{ExecuteData, ZVal},
 };
 use std::sync::Arc;
-use phper::{
-    values::{ExecuteData, ZVal},
-    objects::ZObj,
-};
 
 pub struct TestPlugin {
     handlers: HandlerList,
@@ -89,13 +86,21 @@ impl DemoHandler {
         let exec_data_ref = unsafe { &*exec_data };
         let span_name = get_fqn(exec_data_ref).unwrap_or_default();
 
-        unsafe { utils::start_and_activate_span(tracer, &span_name, vec![], exec_data, opentelemetry::trace::SpanKind::Internal); }
+        unsafe {
+            utils::start_and_activate_span(
+                tracer,
+                &span_name,
+                vec![],
+                exec_data,
+                opentelemetry::trace::SpanKind::Internal,
+            );
+        }
     }
 
     unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
-        _exception: Option<&mut ZObj>
+        _exception: Option<&mut ZObj>,
     ) {
         take_guard(exec_data);
     }
@@ -105,9 +110,7 @@ pub struct DemoHelloHandler;
 
 impl Handler for DemoHelloHandler {
     fn get_targets(&self) -> &'static [Target] {
-        const TARGETS: &[Target] = &[
-            Target::method("DemoClass", "hello"),
-        ];
+        const TARGETS: &[Target] = &[Target::method("DemoClass", "hello")];
         TARGETS
     }
     fn get_callbacks(&self) -> HandlerCallbacks {
@@ -124,7 +127,7 @@ impl DemoHelloHandler {
     unsafe fn post_callback(
         _exec_data: *mut ExecuteData,
         retval: &mut ZVal,
-        _exception: Option<&mut ZObj>
+        _exception: Option<&mut ZObj>,
     ) {
         tracing::debug!("DemoFunctionHandler: post_callback called");
         // Print info about the return value
@@ -140,9 +143,7 @@ pub struct DemoFunctionHandler;
 
 impl Handler for DemoFunctionHandler {
     fn get_targets(&self) -> &'static [Target] {
-        const TARGETS: &[Target] = &[
-            Target::function("demoFunction"),
-        ];
+        const TARGETS: &[Target] = &[Target::function("demoFunction")];
         TARGETS
     }
 
@@ -164,13 +165,21 @@ impl DemoFunctionHandler {
         let attributes = vec![KeyValue::new("my-attribute", "my-value".to_string())];
         let span_name = "demo-function";
 
-        unsafe { utils::start_and_activate_span(tracer, span_name, attributes, exec_data, opentelemetry::trace::SpanKind::Internal); }
+        unsafe {
+            utils::start_and_activate_span(
+                tracer,
+                span_name,
+                attributes,
+                exec_data,
+                opentelemetry::trace::SpanKind::Internal,
+            );
+        }
     }
 
     unsafe fn post_callback(
         exec_data: *mut ExecuteData,
         _retval: &mut ZVal,
-        exception: Option<&mut ZObj>
+        exception: Option<&mut ZObj>,
     ) {
         tracing::debug!("DemoFunctionHandler: post_callback called");
         let _guard = take_guard(exec_data);
@@ -180,7 +189,10 @@ impl DemoFunctionHandler {
         if let Some(exception) = exception {
             utils::record_exception(&opentelemetry::Context::current(), exception);
         }
-        span_ref.set_attribute(KeyValue::new("post.attribute".to_string(), "post.value".to_string()));
+        span_ref.set_attribute(KeyValue::new(
+            "post.attribute".to_string(),
+            "post.value".to_string(),
+        ));
     }
 }
 
@@ -213,7 +225,7 @@ impl TestClassHandler {
     unsafe fn post_callback(
         _exec_data: *mut ExecuteData,
         retval: &mut ZVal,
-        exception: Option<&mut ZObj>
+        exception: Option<&mut ZObj>,
     ) {
         tracing::debug!("TestClassHandler: post_callback called");
         tracing::debug!("retval type: {:?}", retval.get_type_info());

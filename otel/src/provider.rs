@@ -5,15 +5,14 @@
 //! Keeping that here means the two cannot drift apart — notably the resource, where a
 //! divergence would attribute a process's logs and spans to different entities.
 
+use crate::util;
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::Resource;
 use std::{
     collections::HashMap,
-    env,
-    process,
+    env, process,
     sync::{Arc, Mutex, MutexGuard},
 };
-use crate::util;
 
 /// (pid, "service_name:resource_attributes")
 ///
@@ -37,11 +36,26 @@ pub fn build_resource() -> Resource {
     Resource::builder()
         .with_attribute(KeyValue::new("telemetry.sdk.language", "php"))
         .with_attribute(KeyValue::new("telemetry.sdk.name", "ext-otel"))
-        .with_attribute(KeyValue::new("telemetry.sdk.version", env!("CARGO_PKG_VERSION")))
-        .with_attribute(KeyValue::new("process.runtime.name", util::get_sapi_module_name()))
-        .with_attribute(KeyValue::new("process.runtime.version", util::get_php_version()))
+        .with_attribute(KeyValue::new(
+            "telemetry.sdk.version",
+            env!("CARGO_PKG_VERSION"),
+        ))
+        .with_attribute(KeyValue::new(
+            "process.runtime.name",
+            util::get_sapi_module_name(),
+        ))
+        .with_attribute(KeyValue::new(
+            "process.runtime.version",
+            util::get_php_version(),
+        ))
         .with_attribute(KeyValue::new("process.pid", process::id().to_string()))
-        .with_attribute(KeyValue::new("host.name", hostname::get().unwrap_or_default().to_string_lossy().to_string()))
+        .with_attribute(KeyValue::new(
+            "host.name",
+            hostname::get()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        ))
         .build()
 }
 
@@ -96,8 +110,14 @@ pub fn shutdown_registry<P>(
         // Carry on through a failure rather than returning early: the remaining providers
         // still need shutting down, and this also runs from MSHUTDOWN.
         if let Some(provider) = providers.remove(&key)
-            && let Err(err) = shutdown(&provider) {
-            tracing::warn!("Failed to shut down {}Provider for key {:?}: {}", signal, key, err);
+            && let Err(err) = shutdown(&provider)
+        {
+            tracing::warn!(
+                "Failed to shut down {}Provider for key {:?}: {}",
+                signal,
+                key,
+                err
+            );
             all_succeeded = false;
         }
     }
@@ -146,7 +166,11 @@ pub fn get_provider<P>(
     match providers.get(&key) {
         Some(provider) => provider.clone(),
         None => {
-            tracing::warn!("no {}Provider initialized for key {:?}, using no-op", signal, key);
+            tracing::warn!(
+                "no {}Provider initialized for key {:?}, using no-op",
+                signal,
+                key
+            );
             fallback.clone()
         }
     }

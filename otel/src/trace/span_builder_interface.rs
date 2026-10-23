@@ -1,14 +1,13 @@
+use crate::{
+    context::context_interface::CONTEXT_INTERFACE_NAME,
+    trace::{
+        span_context_interface::SPAN_CONTEXT_INTERFACE_NAME, span_interface::SPAN_INTERFACE_NAME,
+    },
+};
 use phper::{
     classes::InterfaceEntity,
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
-};
-use crate::{
-    context::context_interface::CONTEXT_INTERFACE_NAME,
-    trace::{
-        span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
-        span_interface::SPAN_INTERFACE_NAME,
-    },
 };
 
 pub const SPAN_BUILDER_INTERFACE_NAME: &str = r"OpenTelemetry\API\Trace\SpanBuilderInterface";
@@ -36,9 +35,11 @@ pub fn make_span_builder_interface() -> InterfaceEntity {
 
     interface
         .add_method("addLink")
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(SPAN_CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                SPAN_CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .argument(
             Argument::new("attributes")
                 .with_type_hint(ArgumentTypeHint::Iterable)

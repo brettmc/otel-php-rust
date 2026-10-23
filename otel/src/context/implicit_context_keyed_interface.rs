@@ -1,11 +1,10 @@
+use crate::context::{
+    context_interface::CONTEXT_INTERFACE_NAME, scope_interface::SCOPE_INTERFACE_NAME,
+};
 use phper::{
     classes::InterfaceEntity,
     functions::{Argument, ReturnType},
     types::{ArgumentTypeHint, ReturnTypeHint},
-};
-use crate::context::{
-    context_interface::CONTEXT_INTERFACE_NAME,
-    scope_interface::SCOPE_INTERFACE_NAME,
 };
 
 pub const IMPLICIT_CONTEXT_KEYED_INTERFACE_NAME: &str =
@@ -28,9 +27,11 @@ pub fn make_implicit_context_keyed_interface() -> InterfaceEntity {
 
     interface
         .add_method("storeInContext")
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             CONTEXT_INTERFACE_NAME,
         ))));

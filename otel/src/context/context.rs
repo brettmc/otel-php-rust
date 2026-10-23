@@ -8,6 +8,7 @@ use crate::context::{
     scope_interface::SCOPE_INTERFACE_NAME,
     storage::{self, StorageClassEntity},
 };
+use opentelemetry::Context;
 use phper::{
     alloc::ToRefOwned,
     classes::{ClassEntity, Interface, StateClass, Visibility},
@@ -15,13 +16,7 @@ use phper::{
     types::{ArgumentTypeHint, ReturnTypeHint},
     values::ZVal,
 };
-use std::{
-    convert::Infallible,
-    sync::Arc,
-};
-use opentelemetry::{
-    Context,
-};
+use std::{convert::Infallible, sync::Arc};
 use tracing::debug;
 
 pub const CONTEXT_CLASS_NAME: &str = r"OpenTelemetry\Context\Context";
@@ -54,18 +49,16 @@ pub fn build_context_class(
     class.implements(context_interface);
     class.add_property("context_id", Visibility::Private, 0i64);
 
-    class
-        .add_method("__construct", Visibility::Private, |_, _| {
-            Ok::<_, Infallible>(())
-        });
+    class.add_method("__construct", Visibility::Private, |_, _| {
+        Ok::<_, Infallible>(())
+    });
 
-    class
-        .add_method("__destruct", Visibility::Public, |this, _| {
-            let context_id = get_instance_id(this);
-            debug!("Context::__destruct for context_id = {:?}", context_id);
-            storage::maybe_remove_context_instance(context_id);
-            Ok::<_, Infallible>(())
-        });
+    class.add_method("__destruct", Visibility::Public, |this, _| {
+        let context_id = get_instance_id(this);
+        debug!("Context::__destruct for context_id = {:?}", context_id);
+        storage::maybe_remove_context_instance(context_id);
+        Ok::<_, Infallible>(())
+    });
 
     class
         .add_static_method("getCurrent", Visibility::Public, {
@@ -85,8 +78,9 @@ pub fn build_context_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME))));
-
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            CONTEXT_INTERFACE_NAME,
+        ))));
 
     // `with()` must return a *new* Context and leave the receiver unchanged, per the spec's
     // immutability contract -- which is also what makes a parent context safe to keep using
@@ -121,9 +115,11 @@ pub fn build_context_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_KEY_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_KEY_INTERFACE_NAME,
+            ))),
+        )
         .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             CONTEXT_INTERFACE_NAME,
@@ -140,9 +136,11 @@ pub fn build_context_class(
             let result = value.call("storeInContext", [context])?;
             Ok::<_, phper::Error>(result)
         })
-        .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(IMPLICIT_CONTEXT_KEYED_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("value").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                IMPLICIT_CONTEXT_KEYED_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             CONTEXT_INTERFACE_NAME,
         ))));
@@ -150,17 +148,25 @@ pub fn build_context_class(
     class
         // Returns null for an absent key, as upstream does, rather than the last value
         // written under any key.
-        .add_method("get", Visibility::Public, |this, arguments| -> phper::Result<ZVal> {
-            // Confirm the state exists so an object built by `newInstanceWithoutConstructor()`
-            // is still reported, even though the value lookup does not need it.
-            let _ = this.as_state().as_ref().ok_or_else(uninitialized)?;
-            let key_handle = arguments[0].expect_mut_z_obj()?.handle();
-            Ok(storage::get_context_value(get_instance_id(this), key_handle)
-                .unwrap_or_default())
-        })
-        .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_KEY_INTERFACE_NAME),
-        )))
+        .add_method(
+            "get",
+            Visibility::Public,
+            |this, arguments| -> phper::Result<ZVal> {
+                // Confirm the state exists so an object built by `newInstanceWithoutConstructor()`
+                // is still reported, even though the value lookup does not need it.
+                let _ = this.as_state().as_ref().ok_or_else(uninitialized)?;
+                let key_handle = arguments[0].expect_mut_z_obj()?.handle();
+                Ok(
+                    storage::get_context_value(get_instance_id(this), key_handle)
+                        .unwrap_or_default(),
+                )
+            },
+        )
+        .argument(
+            Argument::new("key").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_KEY_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::Mixed));
 
     class
@@ -208,7 +214,9 @@ pub fn build_context_class(
                 Ok::<_, phper::Error>(object)
             }
         })
-        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(SCOPE_INTERFACE_NAME))));
+        .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
+            SCOPE_INTERFACE_NAME,
+        ))));
 
     class
         .add_static_method("storage", Visibility::Public, move |_| {

@@ -1,45 +1,34 @@
-use phper::{
-    arrays::IterKey,
-    alloc::ToRefOwned,
-    classes::{ClassEntity, Interface, StateClass, Visibility},
-    errors::ThrowObject,
-    functions::{Argument, ReturnType},
-    objects::{ZObj, ZObject},
-    types::{ArgumentTypeHint, ReturnTypeHint},
-};
-use std::{
-    borrow::Cow,
-    convert::Infallible,
-    sync::Arc,
-};
-use opentelemetry::{
-    Context,
-    trace::{
-        Span,
-        Status,
-        TraceContextExt,
-    }
-};
-use opentelemetry_sdk::trace::Span as SdkSpan;
 use crate::{
     context::{
-        context::{
-            get_instance_id,
-            ContextClass,
-        },
+        context::{ContextClass, get_instance_id},
         context_interface::CONTEXT_INTERFACE_NAME,
         scope::ScopeClass,
         scope_interface::SCOPE_INTERFACE_NAME,
         storage,
     },
     trace::{
-        span_context::{span_context_from_object, SpanContextClass},
+        local_root_span::store_local_root_span,
+        span_context::{SpanContextClass, span_context_from_object},
         span_context_interface::SPAN_CONTEXT_INTERFACE_NAME,
         span_interface::SPAN_INTERFACE_NAME,
-        local_root_span::store_local_root_span,
     },
     util,
 };
+use opentelemetry::{
+    Context,
+    trace::{Span, Status, TraceContextExt},
+};
+use opentelemetry_sdk::trace::Span as SdkSpan;
+use phper::{
+    alloc::ToRefOwned,
+    arrays::IterKey,
+    classes::{ClassEntity, Interface, StateClass, Visibility},
+    errors::ThrowObject,
+    functions::{Argument, ReturnType},
+    objects::{ZObj, ZObject},
+    types::{ArgumentTypeHint, ReturnTypeHint},
+};
+use std::{borrow::Cow, convert::Infallible, sync::Arc};
 
 const SPAN_CLASS_NAME: &str = r"OpenTelemetry\API\Trace\Span";
 
@@ -113,7 +102,7 @@ pub fn make_span_class(
             let status_code = match status.as_str() {
                 "Ok" => Status::Ok,
                 "Unset" => Status::Unset,
-                "Error" => Status::Error {description},
+                "Error" => Status::Error { description },
                 _ => Status::Unset,
             };
 
@@ -148,7 +137,7 @@ pub fn make_span_class(
                 } else if let Some(ctx) = storage::get_context_instance(instance_id) {
                     ctx.span().set_attribute(kv.clone());
                 }
-             }
+            }
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
@@ -163,9 +152,7 @@ pub fn make_span_class(
 
     class
         .add_method("setAttributes", Visibility::Public, |this, arguments| {
-            let attrs = arguments[0]
-                .expect_z_arr()?
-                .to_owned();
+            let attrs = arguments[0].expect_z_arr()?.to_owned();
 
             let attributes = util::zval_arr_to_key_value_vec(attrs);
             let instance_id = get_instance_id(this);
@@ -215,9 +202,10 @@ pub fn make_span_class(
             }
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        .argument(Argument::new("exception").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from("Throwable"),
-        )))
+        .argument(
+            Argument::new("exception")
+                .with_type_hint(ArgumentTypeHint::ClassEntry(String::from("Throwable"))),
+        )
         // Declared to match upstream's arity, but not yet applied: the Rust SDK's
         // `record_error` takes no attributes.
         .argument(
@@ -247,9 +235,11 @@ pub fn make_span_class(
         // The interface, as upstream declares it, not the concrete class -- so a userland
         // `SpanContextInterface` is accepted. That is what makes the guarded cast in
         // `span_context_from_object` necessary.
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(SPAN_CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                SPAN_CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         // Declared to match upstream's arity; link attributes are not applied yet.
         .argument(
             Argument::new("attributes")
@@ -267,13 +257,14 @@ pub fn make_span_class(
             if let Some(array) = arguments.get(1).and_then(|attrs| attrs.as_z_arr()) {
                 for (key, value) in array.iter() {
                     match key {
-                        IterKey::Index(_) => {}, // Skip integer keys
+                        IterKey::Index(_) => {} // Skip integer keys
                         IterKey::ZStr(zstr) => {
                             if let Some(key_str) = zstr.to_str().ok().map(|s| s.to_string())
-                                && let Some(kv) = util::zval_to_key_value(&key_str, value) {
+                                && let Some(kv) = util::zval_to_key_value(&key_str, value)
+                            {
                                 attributes.push(kv);
                             }
-                        },
+                        }
                     };
                 }
             }
@@ -366,7 +357,8 @@ pub fn make_span_class(
                 // re-attach that context rather than panicking on the empty state.
                 let instance_id = match this.as_mut_state().take() {
                     Some(span) => {
-                        let is_local_root = !storage::current_context().span().span_context().is_valid();
+                        let is_local_root =
+                            !storage::current_context().span().span_context().is_valid();
 
                         let ctx = Context::current_with_span(span);
                         let instance_id = storage::store_context_instance(Arc::new(ctx.clone()));
@@ -377,9 +369,11 @@ pub fn make_span_class(
                         }
                         instance_id
                     }
-                    None => get_instance_id(this).ok_or_else(|| {
-                        phper::Error::boxed("Cannot activate a Span that holds no span")
-                    }).map(Some)?,
+                    None => get_instance_id(this)
+                        .ok_or_else(|| {
+                            phper::Error::boxed("Cannot activate a Span that holds no span")
+                        })
+                        .map(Some)?,
                 };
 
                 storage::attach_context(instance_id).map_err(phper::Error::boxed)?;
@@ -394,32 +388,38 @@ pub fn make_span_class(
         ))));
 
     class
-        .add_method("storeInContext", Visibility::Public, move |this, arguments| {
-            // Unlike `activate()`, there is nothing sensible to store when this object does
-            // not own a span, so report it to userland instead of panicking.
-            let span = this.as_mut_state().take().ok_or_else(|| {
-                phper::Error::boxed("Cannot store a Span that holds no span in a Context")
-            })?;
+        .add_method(
+            "storeInContext",
+            Visibility::Public,
+            move |this, arguments| {
+                // Unlike `activate()`, there is nothing sensible to store when this object does
+                // not own a span, so report it to userland instead of panicking.
+                let span = this.as_mut_state().take().ok_or_else(|| {
+                    phper::Error::boxed("Cannot store a Span that holds no span in a Context")
+                })?;
 
-            let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let context_id = get_instance_id(context_obj);
-            // Always go through storage — handles context_id = None as Context::current()
-            let context = storage::resolve_context(context_id);
-            let arc_ctx = Arc::new(context.with_span(span));
-            let instance_id = storage::store_context_instance(arc_ctx.clone());
-            // The returned Context is derived from `$context`, so it carries that context's
-            // PHP-side keys as well as the span.
-            storage::inherit_context_values(context_id, instance_id);
+                let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
+                let context_id = get_instance_id(context_obj);
+                // Always go through storage — handles context_id = None as Context::current()
+                let context = storage::resolve_context(context_id);
+                let arc_ctx = Arc::new(context.with_span(span));
+                let instance_id = storage::store_context_instance(arc_ctx.clone());
+                // The returned Context is derived from `$context`, so it carries that context's
+                // PHP-side keys as well as the span.
+                storage::inherit_context_values(context_id, instance_id);
 
-            let mut object = context_class.init_object()?;
-            *object.as_mut_state() = Some(arc_ctx);
-            object.set_property("context_id", instance_id.unwrap_or(0) as i64);
+                let mut object = context_class.init_object()?;
+                *object.as_mut_state() = Some(arc_ctx);
+                object.set_property("context_id", instance_id.unwrap_or(0) as i64);
 
-            Ok::<_, phper::Error>(object)
-        })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_INTERFACE_NAME),
-        )))
+                Ok::<_, phper::Error>(object)
+            },
+        )
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             CONTEXT_INTERFACE_NAME,
         ))));
@@ -428,15 +428,20 @@ pub fn make_span_class(
     class
         .add_static_method("fromContext", Visibility::Public, move |arguments| {
             let context_obj: &mut ZObj = arguments[0].expect_mut_z_obj()?;
-            let instance_id = context_obj.get_property("context_id").as_long().unwrap_or(0);
+            let instance_id = context_obj
+                .get_property("context_id")
+                .as_long()
+                .unwrap_or(0);
             let mut object = span_class_clone.init_object()?;
             *object.as_mut_state() = None;
             object.set_property("context_id", instance_id);
             Ok::<_, phper::Error>(object)
         })
-        .argument(Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(
-            String::from(CONTEXT_INTERFACE_NAME),
-        )))
+        .argument(
+            Argument::new("context").with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
+                CONTEXT_INTERFACE_NAME,
+            ))),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_INTERFACE_NAME,
         ))));

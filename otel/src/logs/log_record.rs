@@ -1,11 +1,10 @@
-use phper::classes::ClassEntity;
 use opentelemetry::{
-    KeyValue,
-    logs::{Severity, AnyValue},
-    trace::{TraceId, SpanId, TraceFlags},
-    Context,
+    Context, KeyValue,
+    logs::{AnyValue, Severity},
     trace::TraceContextExt,
+    trace::{SpanId, TraceFlags, TraceId},
 };
+use phper::classes::ClassEntity;
 use phper::{
     alloc::ToRefOwned,
     classes::{StateClass, Visibility},
@@ -88,31 +87,38 @@ fn zval_to_value(zval: &phper::values::ZVal) -> Option<opentelemetry::Value> {
 
         for (_, v) in arr.iter() {
             if let Ok(b) = v.expect_bool()
-                && (value_type.is_none() || value_type == Some("bool")) {
+                && (value_type.is_none() || value_type == Some("bool"))
+            {
                 bools.push(b);
                 value_type = Some("bool");
                 continue;
             }
             if let Ok(i) = v.expect_long()
-                && (value_type.is_none() || value_type == Some("i64")) {
+                && (value_type.is_none() || value_type == Some("i64"))
+            {
                 i64s.push(i);
                 value_type = Some("i64");
                 continue;
             }
             if let Ok(f) = v.expect_double()
-                && (value_type.is_none() || value_type == Some("f64")) {
+                && (value_type.is_none() || value_type == Some("f64"))
+            {
                 f64s.push(f);
                 value_type = Some("f64");
                 continue;
             }
             if let Ok(s) = v.expect_z_str()
-                && (value_type.is_none() || value_type == Some("string")) {
+                && (value_type.is_none() || value_type == Some("string"))
+            {
                 strings.push(s.to_str().unwrap_or("").to_owned().into());
                 value_type = Some("string");
                 continue;
             }
             // If we get here, it's a mixed or unsupported type
-            tracing::warn!("Unsupported or mixed array element type in attribute array, skipping attribute: {:?}", v);
+            tracing::warn!(
+                "Unsupported or mixed array element type in attribute array, skipping attribute: {:?}",
+                v
+            );
             return None;
         }
 
@@ -132,11 +138,19 @@ fn zval_to_value(zval: &phper::values::ZVal) -> Option<opentelemetry::Value> {
     }
 }
 
-fn insert_attribute(state: &mut LogRecordState, key: String, value_zval: &phper::values::ZVal) -> Result<(), phper::Error> {
+fn insert_attribute(
+    state: &mut LogRecordState,
+    key: String,
+    value_zval: &phper::values::ZVal,
+) -> Result<(), phper::Error> {
     let value = match zval_to_value(value_zval) {
         Some(val) => val,
         None => {
-            tracing::warn!("Unsupported attribute value type for key '{}', skipping: {:?}", key, value_zval);
+            tracing::warn!(
+                "Unsupported attribute value type for key '{}', skipping: {:?}",
+                key,
+                value_zval
+            );
             return Ok(());
         }
     };
@@ -216,11 +230,15 @@ pub fn make_log_record_class() -> ClassEntity<LogRecordState> {
         .argument(Argument::new("timestamp").with_type_hint(ArgumentTypeHint::Int));
 
     class
-        .add_method("setSeverityNumber", Visibility::Public, |this, arguments| {
-            let severity = arguments[0].expect_long()? as u8;
-            this.as_mut_state().severity = Some(map_severity_number(severity));
-            Ok::<_, phper::Error>(this.to_ref_owned())
-        })
+        .add_method(
+            "setSeverityNumber",
+            Visibility::Public,
+            |this, arguments| {
+                let severity = arguments[0].expect_long()? as u8;
+                this.as_mut_state().severity = Some(map_severity_number(severity));
+                Ok::<_, phper::Error>(this.to_ref_owned())
+            },
+        )
         .argument(Argument::new("severityNumber").with_type_hint(ArgumentTypeHint::Int));
 
     class

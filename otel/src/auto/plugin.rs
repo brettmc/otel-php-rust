@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use phper::{
-    values::{ExecuteData, ZVal},
     objects::ZObj,
+    values::{ExecuteData, ZVal},
 };
+use std::sync::Arc;
 
 // Submodules
 pub mod db;
@@ -38,12 +38,18 @@ pub struct Target {
 impl Target {
     /// A free function, e.g. `phpversion`.
     pub const fn function(function: &'static str) -> Self {
-        Self { class: None, function }
+        Self {
+            class: None,
+            function,
+        }
     }
 
     /// A method on `class`, matched on `class` itself or on any of its implementors.
     pub const fn method(class: &'static str, function: &'static str) -> Self {
-        Self { class: Some(class), function }
+        Self {
+            class: Some(class),
+            function,
+        }
     }
 }
 
@@ -70,7 +76,8 @@ pub struct HandlerCallbacks {
 }
 
 pub type ObserverPreHook = Box<dyn Fn(&mut ExecuteData) + Send + Sync>;
-pub type ObserverPostHook = Box<dyn Fn(&mut ExecuteData, &mut ZVal, Option<&mut ZObj>) + Send + Sync>;
+pub type ObserverPostHook =
+    Box<dyn Fn(&mut ExecuteData, &mut ZVal, Option<&mut ZObj>) + Send + Sync>;
 pub type HandlerList = Vec<Arc<dyn Handler + Send + Sync>>;
 pub type HandlerSlice = [Arc<dyn Handler + Send + Sync>];
 

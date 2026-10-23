@@ -27,6 +27,25 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: otel
 
+  # Formatting is independent of the PHP version, and rustfmt only parses, so this needs
+  # no PHP and runs once. It is outside the test matrix, so it is not continue-on-error
+  # and an unformatted change fails the workflow.
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+          cache: false
+
+      - name: Check formatting
+        working-directory: otel
+        run: cargo fmt --check
+
   # Cargo.lock is committed, which pins us to one dependency graph and hides upstream
   # breakage until someone runs `cargo update`. This job is the counterweight recommended
   # by https://doc.rust-lang.org/cargo/guide/continuous-integration.html#verifying-latest-dependencies

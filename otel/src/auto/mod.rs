@@ -1,11 +1,11 @@
-#[cfg(otel_observer_supported)]
-pub mod observer;
 #[cfg(otel_observer_not_supported)]
 pub mod execute;
 pub mod execute_data;
+#[cfg(otel_observer_supported)]
+pub mod observer;
+pub mod plugin;
 pub mod plugin_manager;
 pub mod utils;
-pub mod plugin;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
@@ -24,7 +24,11 @@ pub fn guard<T>(what: &str, body: impl FnOnce() -> T) -> Option<T> {
                 .map(|s| s.to_string())
                 .or_else(|| panic.downcast_ref::<String>().cloned())
                 .unwrap_or_else(|| "non-string panic payload".to_string());
-            tracing::error!("Auto::panic in {}, skipping instrumentation: {}", what, message);
+            tracing::error!(
+                "Auto::panic in {}, skipping instrumentation: {}",
+                what,
+                message
+            );
             None
         }
     }

@@ -1,15 +1,11 @@
 use crate::{
-    config,
-    logging,
-    logs::logger_provider,
+    auto, config, logging, logs::logger_provider, trace::tracer_provider,
     util::get_sapi_module_name,
-    auto,
-    trace::tracer_provider,
 };
 use phper::ini::ini_get;
-use tracing;
 use phper::modules::Module;
 use std::sync::OnceLock;
+use tracing;
 
 static DISABLED: OnceLock<bool> = OnceLock::new();
 
@@ -75,12 +71,44 @@ pub fn add_module_info(module: &mut Module) {
 }
 
 pub fn add_module_ini(module: &mut Module) {
-    module.add_ini(config::ini::OTEL_LOG_LEVEL, "error".to_string(), phper::ini::Policy::All);
-    module.add_ini(config::ini::OTEL_LOG_FILE, "/dev/stderr".to_string(), phper::ini::Policy::All);
-    module.add_ini(config::ini::OTEL_CLI_CREATE_ROOT_SPAN, false, phper::ini::Policy::All);
-    module.add_ini(config::ini::OTEL_CLI_ENABLED, false, phper::ini::Policy::All);
-    module.add_ini(config::ini::OTEL_ENV_DOTENV_ENABLED, false, phper::ini::Policy::All);
-    module.add_ini(config::ini::OTEL_ENV_SET_FROM_SERVER, false, phper::ini::Policy::All);
-    module.add_ini(config::ini::OTEL_AUTO_ENABLED, true, phper::ini::Policy::All);
-    module.add_ini(config::ini::OTEL_AUTO_DISABLED_PLUGINS, "".to_string(), phper::ini::Policy::All);
+    module.add_ini(
+        config::ini::OTEL_LOG_LEVEL,
+        "error".to_string(),
+        phper::ini::Policy::All,
+    );
+    module.add_ini(
+        config::ini::OTEL_LOG_FILE,
+        "/dev/stderr".to_string(),
+        phper::ini::Policy::All,
+    );
+    module.add_ini(
+        config::ini::OTEL_CLI_CREATE_ROOT_SPAN,
+        false,
+        phper::ini::Policy::All,
+    );
+    module.add_ini(
+        config::ini::OTEL_CLI_ENABLED,
+        false,
+        phper::ini::Policy::All,
+    );
+    module.add_ini(
+        config::ini::OTEL_ENV_DOTENV_ENABLED,
+        false,
+        phper::ini::Policy::All,
+    );
+    module.add_ini(
+        config::ini::OTEL_ENV_SET_FROM_SERVER,
+        false,
+        phper::ini::Policy::All,
+    );
+    module.add_ini(
+        config::ini::OTEL_AUTO_ENABLED,
+        true,
+        phper::ini::Policy::All,
+    );
+    module.add_ini(
+        config::ini::OTEL_AUTO_DISABLED_PLUGINS,
+        "".to_string(),
+        phper::ini::Policy::All,
+    );
 }

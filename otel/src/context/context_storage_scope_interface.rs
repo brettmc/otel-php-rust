@@ -1,9 +1,9 @@
+use crate::context::context_interface::CONTEXT_INTERFACE_NAME;
 use phper::{
     classes::{Interface, InterfaceEntity},
     functions::ReturnType,
     types::ReturnTypeHint,
 };
-use crate::context::context_interface::CONTEXT_INTERFACE_NAME;
 
 pub const CONTEXT_STORAGE_SCOPE_INTERFACE_NAME: &str =
     r"OpenTelemetry\Context\ContextStorageScopeInterface";

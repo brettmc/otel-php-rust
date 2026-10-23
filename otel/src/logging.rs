@@ -1,18 +1,21 @@
 use crate::config;
+use chrono::Utc;
 use phper::ini::ini_get;
-use tracing::{Event, Subscriber, field::{Visit, Field}};
-use tracing_subscriber::{layer::Context, Layer, filter::LevelFilter, Registry, prelude::*};
 use std::{
     collections::HashSet,
     ffi::CStr,
     fmt::{self, Write},
     fs::{File, OpenOptions},
-    io::{Write as _},
+    io::Write as _,
     process,
     sync::{LazyLock, Mutex, OnceLock},
     thread,
 };
-use chrono::Utc;
+use tracing::{
+    Event, Subscriber,
+    field::{Field, Visit},
+};
+use tracing_subscriber::{Layer, Registry, filter::LevelFilter, layer::Context, prelude::*};
 
 /// Where log lines go. Resolved once from `otel.log_file`, so the configured file is opened
 /// once for the life of the process instead of once per line.
@@ -54,7 +57,9 @@ pub fn init_once() {
         _ => LevelFilter::OFF,
     };
 
-    let subscriber = Registry::default().with(PhpErrorLogLayer).with(level_filter);
+    let subscriber = Registry::default()
+        .with(PhpErrorLogLayer)
+        .with(level_filter);
     // Emitted outside the LOGGER_PIDS lock: the layer writes to the log sink, and holding an
     // unrelated lock across that is a deadlock waiting to be introduced.
     match tracing::subscriber::set_global_default(subscriber) {
@@ -139,7 +144,9 @@ where
         );
 
         // Capture structured log fields
-        let mut visitor = LogVisitor { message: String::new() };
+        let mut visitor = LogVisitor {
+            message: String::new(),
+        };
         event.record(&mut visitor);
         message.push_str(&visitor.message);
 
