@@ -8,7 +8,7 @@
 use phper::{
     classes::{ClassEntity, Interface, StateClass, Visibility},
     functions::{Argument, ReturnType},
-    types::{ArgumentTypeHint, ReturnTypeHint},
+    types::{ArgumentTypeHint, PropertyTypeHint, ReturnTypeHint},
 };
 
 pub const CONTEXT_KEY_CLASS_NAME: &str = r"OpenTelemetry\Context\ContextKey";
@@ -21,10 +21,12 @@ pub fn make_context_key_class(context_key_interface: &Interface) -> ContextKeyCl
     class.set_final();
     class.implements(context_key_interface.clone());
 
-    // Upstream holds the name in a promoted `private readonly ?string $name`. phper can
-    // declare neither `readonly` nor a promoted constructor property, so this is a private
-    // property written once by the constructor; nothing else ever assigns it.
-    class.add_property("name", Visibility::Private, ());
+    // Upstream holds the name in a promoted `private readonly ?string $name`. phper cannot
+    // declare a promoted constructor property, so the constructor writes it instead.
+    // Readonly from 8.1, typed from 8.0, a plain property on 7.x.
+    class
+        .add_readonly_property("name", Visibility::Private, PropertyTypeHint::String)
+        .allow_null();
 
     class
         .add_method("__construct", Visibility::Public, |this, arguments| {
