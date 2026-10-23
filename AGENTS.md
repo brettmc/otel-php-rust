@@ -45,13 +45,16 @@ in `otel/`; `make` targets live in [otel/Makefile](otel/Makefile).
 
 ### Optional arguments must be trailing
 
-phper computes `required_num_args` as a **plain count** of non-optional arguments, not the
-length of the required prefix. Both `.optional()` and `.with_default_value()` clear `required`.
-So a required argument declared *after* an optional one still increments the count, Zend then
-accepts a call that leaves a required slot empty, and the handler indexes a slot that does not
-exist — SIGABRT, uncatchable.
+Both `.optional()` and `.with_default_value()` clear `required`. phper sets
+`required_num_args` to the length of the required prefix, as `zend_compile_params` does, so an
+optional argument declared before a required one is quietly made required again. That shape
+no longer aborts, but the declaration then says something the engine does not do.
 
-PHP itself rejects this at compile time; phper cannot, because declarations are built at
+Older phper releases used a plain count of required arguments instead. A required argument
+after an optional one let Zend accept a call that left a required slot empty, and the handler
+indexed a slot that did not exist: SIGABRT, uncatchable.
+
+PHP itself rejects the shape at compile time; phper cannot, because declarations are built at
 runtime. **Keeping optional arguments trailing is a convention held by hand.**
 `otel/tests/phpt/no-call-shape-aborts.phpt` guards the consequence by calling every exposed
 method with no arguments and requiring the process to survive.
@@ -62,16 +65,31 @@ Use `arguments.get(n)` with an explicit `None` branch. An ordinary call shape of
 fewer arguments than the signature declares, and indexing a missing slot panics across the FFI
 boundary. See `otel/src/trace/propagation/trace_context_propagator.rs:42`.
 
+The same holds in auto-instrumentation hooks, which see the call as made: `$this->prepare()`
+passes nothing to `prepare($sql = null)`. phper's `ExecuteData::get_mut_parameter` panics past
+`num_args()`, so hooks use `auto::execute_data::get_mut_parameter`, which returns an `Option`.
+
 ### `.optional()` is not free
 
 Making an argument optional to be accommodating can open a crash path: it lets
 `setAttribute('k')` past Zend's arity check and into a slot the handler indexes. Where upstream
-has an argument required, keep it required. See `otel/src/trace/span_builder.rs:176` and
+has an argument required, keep it required. See `otel/src/trace/span_builder.rs:187` and
 `otel/src/logs/log_record.rs:259`.
 
-Prefer `.optional()` over `.with_default_value()` for **class-typed** arguments: phper routes
-those through `ZEND_ARG_OBJ_INFO`, which has no default-value field, so the default is silently
-dropped. `.optional()` states what Zend actually records.
+For an optional argument with a natural default, prefer `.with_default_value(...)` over
+`.optional()`, class-typed arguments included. From 8.0 the default is recorded in the arg
+info, and that is what lets a caller skip the argument by name: `inject($carrier, context: $c)`
+raises ArgumentCountError if `$setter` has no default PHP can see. Before 8.0 phper-sys
+compiles defaults out, so on 7.x the two behave the same.
+
+### Internal argument types are only checked on 7.x
+
+From 8.0 the engine does not check the declared types of an internal function's arguments.
+`setParent(new stdClass)` reaches the handler. So every handler must check what it was given,
+and treat a declared type as documentation plus reflection, not a guarantee.
+
+PHP 7.x does check them. That is why some calls that work on 8.x are a TypeError on 7.x, such
+as passing an `ArrayIterator` where `iterable` is declared on 7.0.
 
 ### Return types are declared but never enforced
 
@@ -164,10 +182,25 @@ Other version facts:
 
 ## What phper cannot express
 
-As of phper 0.17.3 / `phper-sys` 0.15.6: no union types (`ContextInterface|false|null` is
-declared `?ContextInterface`, so passing `false` is a `TypeError`; `setAttribute`'s union is
-widened to `mixed`, which is safe because wider), no `final`, no `readonly`, no promoted
-constructor properties. `abstract` *is* available via `add_abstract_method`.
+As of phper 0.17.5 / `phper-sys` 0.15.6 at git rev `1d7fbf2`, pinned in `otel/Cargo.toml`:
+
+- No intersection types. `context.rs` and `tracer_provider.rs` declare the half that is true.
+- No `Callable` property type.
+- No promoted constructor properties. `ContextKey` declares a readonly property and writes it
+  from the constructor instead.
+
+Available, with the PHP version each needs:
+
+- Argument unions (`ArgumentTypeHint::Union`) and `false`, 8.0+. Before 8.0 a union is
+  declared untyped.
+- Defaults on class-typed arguments, 8.0+.
+- `ClassEntity::set_final()`, every version.
+- `add_readonly_property`, readonly on 8.1+, typed on 8.0, untyped on 7.x.
+- `abstract`, via `add_abstract_method`.
+
+A final internal class cannot be built with `ReflectionClass::newInstanceWithoutConstructor()`.
+Tests that need a constructor-less instance use `unserialize('O:<len>:"<class>":0:{}')`, as
+`no-call-shape-aborts.phpt` does.
 
 Where a workaround changed a signature, the reason is commented at the signature itself. Keep
 that up, and prefer widening a type over narrowing one.
