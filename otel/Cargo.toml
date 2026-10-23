@@ -38,3 +38,8 @@ phper-sys = "0.15.3"
 
 [dev-dependencies]
 phper-test = "0.16.0"
+
+[patch.crates-io]
+phper = { git = "https://github.com/phper-framework/phper", rev = "1d7fbf21bdd119122a3a52d688f97828391f1f4a" }
+phper-sys = { git = "https://github.com/phper-framework/phper", rev = "1d7fbf21bdd119122a3a52d688f97828391f1f4a" }
+phper-test = { git = "https://github.com/phper-framework/phper", rev = "1d7fbf21bdd119122a3a52d688f97828391f1f4a" }

@@ -1,5 +1,6 @@
 use crate::{
     auto::{
+        execute_data,
         plugin::{Handler, HandlerCallbacks, HandlerList, HandlerSlice, Plugin, Target},
         utils::{record_exception, start_and_activate_span},
     },
@@ -73,10 +74,12 @@ impl Psr18SendRequestHandler {
 
         let exec_data_ref = unsafe { &mut *exec_data };
         let mut attributes = vec![];
-        let request_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
+        // Start the span even without a request: post_callback still runs, and would otherwise
+        // record the ArgumentCountError against whatever span encloses the call.
+        let mut request_zval = execute_data::get_mut_parameter(exec_data_ref, 0);
 
         //TODO add more SemConv attributes...
-        if let Some(request_obj) = request_zval.as_mut_z_obj() {
+        if let Some(request_obj) = request_zval.as_mut().and_then(|zval| zval.as_mut_z_obj()) {
             if let Ok(mut uri_zval) = request_obj.call("getUri", [])
                 && let Some(uri_obj) = uri_zval.as_mut_z_obj()
             {
@@ -126,6 +129,10 @@ impl Psr18SendRequestHandler {
         unsafe {
             start_and_activate_span(tracer, &name, attributes, exec_data, SpanKind::Client);
         }
+
+        let Some(request_zval) = request_zval else {
+            return;
+        };
 
         //now inject the trace context into the request headers, using the span we just started
         let mut carrier = HashMap::new();

@@ -1,5 +1,10 @@
 use opentelemetry::KeyValue;
-use phper::{eg, objects::ZObj, strings::ZStr, values::ExecuteData};
+use phper::{
+    eg,
+    objects::ZObj,
+    strings::ZStr,
+    values::{ExecuteData, ZVal},
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -66,6 +71,17 @@ fn get_file_and_line(execute_data: &ExecuteData) -> Option<(String, u32)> {
     if let (Some(filename), Some(line)) = (filename, lineno) {
         let file = filename.to_str().unwrap_or("").to_string();
         Some((file, line))
+    } else {
+        None
+    }
+}
+
+// A hook sees the call as made, not as declared: `$this->prepare()` passes no argument even
+// though `prepare($sql = null)` declares one. phper's `get_mut_parameter` panics on a slot
+// past `num_args`, so reach for it through here instead.
+pub fn get_mut_parameter(execute_data: &mut ExecuteData, index: usize) -> Option<&mut ZVal> {
+    if index < execute_data.num_args() {
+        Some(execute_data.get_mut_parameter(index))
     } else {
         None
     }

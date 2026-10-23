@@ -113,22 +113,21 @@ checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "bindgen"
-version = "0.71.1"
+version = "0.73.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f58bf3d7db68cfbac37cfc485a8d711e87e064c3d0fe0435b92f7a407f9d6b3"
+checksum = "787ef8ef523575546b106a58213d6e6b06198a05c2f757258c68a74273670cfa"
 dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
  "quote",
  "regex",
  "rustc-hash",
- "shlex 1.3.0",
- "syn 2.0.119",
+ "shlex",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -235,7 +234,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6651c9ed80effdc7db0ff72512157f901af5e3549e341e24b1dd4887d836d838"
 dependencies = [
  "find-msvc-tools",
- "shlex 2.0.1",
+ "shlex",
 ]
 
 [[package]]
@@ -446,7 +445,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -578,19 +577,8 @@ checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
 dependencies = [
  "cfg-if",
  "libc",
- "r-efi 5.3.0",
+ "r-efi",
  "wasip2",
-]
-
-[[package]]
-name = "getrandom"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099"
-dependencies = [
- "cfg-if",
- "libc",
- "r-efi 6.0.0",
 ]
 
 [[package]]
@@ -893,15 +881,6 @@ name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
@@ -1246,9 +1225,8 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "phper"
-version = "0.17.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f1a07e8df098947d7c0eab4b1e57a0f1689253402b4edd4e3feea509a070858"
+version = "0.17.5"
+source = "git+https://github.com/phper-framework/phper?rev=1d7fbf21bdd119122a3a52d688f97828391f1f4a#1d7fbf21bdd119122a3a52d688f97828391f1f4a"
 dependencies = [
  "cfg-if",
  "derive_more",
@@ -1264,8 +1242,7 @@ dependencies = [
 [[package]]
 name = "phper-alloc"
 version = "0.16.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "717915904f6ee06640b3232d8d409d7cf3d55b8fc878c83fbd78f73a10466edb"
+source = "git+https://github.com/phper-framework/phper?rev=1d7fbf21bdd119122a3a52d688f97828391f1f4a#1d7fbf21bdd119122a3a52d688f97828391f1f4a"
 dependencies = [
  "phper-build",
  "phper-sys",
@@ -1274,8 +1251,7 @@ dependencies = [
 [[package]]
 name = "phper-build"
 version = "0.15.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6996befb91ef0538a35dd59f712c9667ad52905750bff74059886e1061a899e2"
+source = "git+https://github.com/phper-framework/phper?rev=1d7fbf21bdd119122a3a52d688f97828391f1f4a#1d7fbf21bdd119122a3a52d688f97828391f1f4a"
 dependencies = [
  "phper-sys",
 ]
@@ -1283,8 +1259,7 @@ dependencies = [
 [[package]]
 name = "phper-macros"
 version = "0.15.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82de7b26c685b446a2f0e2e718aa36b198cf806b094b7316d04b55b950c0a56a"
+source = "git+https://github.com/phper-framework/phper?rev=1d7fbf21bdd119122a3a52d688f97828391f1f4a#1d7fbf21bdd119122a3a52d688f97828391f1f4a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1294,8 +1269,7 @@ dependencies = [
 [[package]]
 name = "phper-sys"
 version = "0.15.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd0c78f99806ddfa651f0e1fc7aa86ab616a1819fb8335067f4cc2fb52f7c881"
+source = "git+https://github.com/phper-framework/phper?rev=1d7fbf21bdd119122a3a52d688f97828391f1f4a#1d7fbf21bdd119122a3a52d688f97828391f1f4a"
 dependencies = [
  "bindgen",
  "cc",
@@ -1305,8 +1279,7 @@ dependencies = [
 [[package]]
 name = "phper-test"
 version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f10c52695d64e194257214a8141ec60f5a4d5801f7976fe30ed55610c65d5246"
+source = "git+https://github.com/phper-framework/phper?rev=1d7fbf21bdd119122a3a52d688f97828391f1f4a#1d7fbf21bdd119122a3a52d688f97828391f1f4a"
 dependencies = [
  "cargo_metadata 0.20.0",
  "env_logger",
@@ -1380,12 +1353,12 @@ dependencies = [
 
 [[package]]
 name = "prettyplease"
-version = "0.2.37"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
+checksum = "2bfe0f4c752e450fc2faf62654f1c134747922825d5b04ca717b8874f41a40c0"
 dependencies = [
  "proc-macro2",
- "syn 2.0.119",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -1414,7 +1387,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1443,12 +1416,6 @@ name = "r-efi"
 version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
-
-[[package]]
-name = "r-efi"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "rand"
@@ -1597,7 +1564,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1753,12 +1720,6 @@ dependencies = [
 
 [[package]]
 name = "shlex"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
-
-[[package]]
-name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
@@ -1856,10 +1817,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
