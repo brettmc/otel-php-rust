@@ -51,13 +51,22 @@ pub fn make_span_interface(implicit_context_keyed_interface: &Interface) -> Inte
         .add_method("isRecording")
         .return_type(ReturnType::new(ReturnTypeHint::Bool));
 
-    // Upstream types the value `bool|int|float|string|array|null`. phper has no union type
-    // hint, so this is `mixed` -- wider than upstream rather than narrower, which keeps every
-    // call upstream accepts working.
+    // Exactly upstream's union, not `mixed`. Parameters are contravariant, so a wider type here
+    // would reject a userland implementation copied from upstream. `Span` and
+    // `NonRecordingSpan` declare `mixed`, a legal widening.
     interface
         .add_method("setAttribute")
         .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::String))
-        .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed))
+        .argument(
+            Argument::new("value").with_type_hint(ArgumentTypeHint::Union(vec![
+                ArgumentTypeHint::Bool,
+                ArgumentTypeHint::Int,
+                ArgumentTypeHint::Float,
+                ArgumentTypeHint::String,
+                ArgumentTypeHint::Array,
+                ArgumentTypeHint::Null,
+            ])),
+        )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_INTERFACE_NAME,
         ))));

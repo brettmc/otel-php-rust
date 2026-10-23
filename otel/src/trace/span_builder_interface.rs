@@ -15,19 +15,16 @@ pub const SPAN_BUILDER_INTERFACE_NAME: &str = r"OpenTelemetry\API\Trace\SpanBuil
 pub fn make_span_builder_interface() -> InterfaceEntity {
     let mut interface = InterfaceEntity::new(SPAN_BUILDER_INTERFACE_NAME);
 
-    // Upstream's type is `ContextInterface|false|null`, where null means "use the current
-    // context" and false means "no parent, start a new trace". phper has no union type hint,
-    // so `false` is unreachable through this signature -- the one place in the extension
-    // where a compromise genuinely loses a capability rather than just widening a type:
-    // `setParent(false)` is a TypeError, with no spelling that reaches the same behaviour.
+    // Null means "use the current context" and false means "no parent, start a new trace".
+    // Before 8.0 phper declares a union untyped, which is what lets `false` through there.
     interface
         .add_method("setParent")
         .argument(
-            Argument::new("context")
-                .with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
-                    CONTEXT_INTERFACE_NAME,
-                )))
-                .allow_null(),
+            Argument::new("context").with_type_hint(ArgumentTypeHint::Union(vec![
+                ArgumentTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME)),
+                ArgumentTypeHint::False,
+                ArgumentTypeHint::Null,
+            ])),
         )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_BUILDER_INTERFACE_NAME,

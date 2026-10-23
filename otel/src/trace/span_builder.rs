@@ -24,10 +24,21 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+/// What `setParent()` was given, resolved to a context only in `startSpan()`, since the
+/// current context can change in between.
+enum Parent {
+    /// Unset, or `setParent(null)`.
+    Current,
+    /// `setParent(false)`: no parent, so the span starts a new trace.
+    Root,
+    /// A context stored under this id.
+    Stored(u64),
+}
+
 pub struct SpanBuilderState {
     span_builder: Option<SpanBuilder>,
     tracer: Option<SdkTracer>,
-    parent_context_id: u64,
+    parent: Parent,
 }
 // @see https://github.com/open-telemetry/opentelemetry-rust/issues/2742
 impl SpanBuilderState {
@@ -35,14 +46,14 @@ impl SpanBuilderState {
         Self {
             span_builder: Some(span_builder),
             tracer: Some(tracer),
-            parent_context_id: 0,
+            parent: Parent::Current,
         }
     }
     pub fn empty() -> Self {
         Self {
             span_builder: None,
             tracer: None,
-            parent_context_id: 0,
+            parent: Parent::Current,
         }
     }
 }
@@ -183,26 +194,30 @@ pub fn make_span_builder_class(
 
     class
         .add_method("setParent", Visibility::Public, |this, arguments| {
+            // Matched on the value rather than trusting the declared type: from 8.0 the engine
+            // does not check an internal function's argument types, so anything can arrive.
             // `get_instance_id` rather than the `context_id` property directly: it maps 0 to
             // None, and 0 is what `Context::getCurrent()` reports. Taken literally that 0 is
             // a parent id resolving to no stored context.
-            let context_id = arguments[0]
-                .as_z_obj()
-                .and_then(get_instance_id)
-                .unwrap_or(0);
-            this.as_mut_state().parent_context_id = context_id;
+            let parent = match arguments.get(0) {
+                Some(zval) if zval.as_bool() == Some(false) => Parent::Root,
+                Some(zval) => match zval.as_z_obj().and_then(get_instance_id) {
+                    Some(context_id) => Parent::Stored(context_id),
+                    None => Parent::Current,
+                },
+                None => Parent::Current,
+            };
+            this.as_mut_state().parent = parent;
 
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
-        // Upstream is `ContextInterface|false|null`. phper has no union type hint, so this
-        // accepts null but rejects `false`. It stays required because phper cannot give a
-        // class-typed argument a default value either.
+        // Required, as upstream has it: there is no default.
         .argument(
-            Argument::new("context")
-                .with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
-                    CONTEXT_INTERFACE_NAME,
-                )))
-                .allow_null(),
+            Argument::new("context").with_type_hint(ArgumentTypeHint::Union(vec![
+                ArgumentTypeHint::ClassEntry(String::from(CONTEXT_INTERFACE_NAME)),
+                ArgumentTypeHint::False,
+                ArgumentTypeHint::Null,
+            ])),
         )
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_BUILDER_INTERFACE_NAME,
@@ -245,12 +260,12 @@ pub fn make_span_builder_class(
             let state = this.as_state();
             let span_builder = state.span_builder.as_ref().ok_or_else(uninitialized)?;
             let tracer = state.tracer.as_ref().ok_or_else(uninitialized)?;
-            let parent_context = if state.parent_context_id > 0 {
-                storage::get_context_instance(Some(state.parent_context_id))
+            let parent_context = match state.parent {
+                Parent::Stored(context_id) => storage::get_context_instance(Some(context_id))
                     .map(|ctx| {
                         tracing::debug!(
                             "SpanBuilder::Using parent context {} (ref count = {})",
-                            state.parent_context_id,
+                            context_id,
                             Arc::strong_count(&ctx)
                         );
                         (*ctx).clone()
@@ -258,13 +273,18 @@ pub fn make_span_builder_class(
                     .unwrap_or_else(|| {
                         tracing::warn!(
                             "SpanBuilder::Parent context {} not found, falling back to current()",
-                            state.parent_context_id
+                            context_id
                         );
                         Context::current()
-                    })
-            } else {
-                tracing::debug!("SpanBuilder::No parent context, using Context::current()");
-                Context::current()
+                    }),
+                Parent::Root => {
+                    tracing::debug!("SpanBuilder::Parent is false, starting a new trace");
+                    Context::new()
+                }
+                Parent::Current => {
+                    tracing::debug!("SpanBuilder::No parent context, using Context::current()");
+                    Context::current()
+                }
             };
 
             let span = tracer.build_with_context(span_builder.clone(), &parent_context);

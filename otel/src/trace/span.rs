@@ -142,9 +142,8 @@ pub fn make_span_class(
             Ok::<_, phper::Error>(this.to_ref_owned())
         })
         .argument(Argument::new("key").with_type_hint(ArgumentTypeHint::String))
-        // Upstream is `bool|int|float|string|array|null`. phper has no union type hint, so
-        // `mixed` stands in: it is wider than the union, and a parameter may be widened
-        // without breaking an implementer.
+        // `mixed`, wider than the interface's union, as upstream's untyped `Span` is. The
+        // handler converts what it can and drops the rest.
         .argument(Argument::new("value").with_type_hint(ArgumentTypeHint::Mixed))
         .return_type(ReturnType::new(ReturnTypeHint::ClassEntry(String::from(
             SPAN_INTERFACE_NAME,
