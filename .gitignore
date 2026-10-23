@@ -10,6 +10,7 @@ vendor/
 otel/demo/
 composer.lock
 /.env
+/.devcontainer/compose.local.yml
 otel/Makefile.global
 otel/acinclude.m4
 otel/aclocal.m4

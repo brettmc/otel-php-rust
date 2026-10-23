@@ -108,7 +108,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
 # directory it covers and otherwise creates it root-owned
 RUN mkdir -p /home/${USERNAME}/.cargo/registry \
              /home/${USERNAME}/.cargo/git \
-             /home/${USERNAME}/.config/dev-tools
+             /home/${USERNAME}/.config/dev-tools \
+             /home/${USERNAME}/.claude/projects/otel-php-rust/memory
 USER root
 
 # LANG is set here rather than left to the editor: vscode's integrated

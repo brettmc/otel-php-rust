@@ -2,7 +2,8 @@
   "name": "otel-php-rust (PHP 7.3)",
   "dockerComposeFile": [
     "../compose.base.yaml",
-    "compose.yaml"
+    "compose.yaml",
+    "../compose.local.yml"
   ],
   "service": "php",
   "runServices": [

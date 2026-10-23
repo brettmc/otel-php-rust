@@ -26,6 +26,10 @@ set -euo pipefail
 php_version="${1:?usage: build-image.sh <php-version>}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Every devcontainer.json lists compose.local.yml, which is personal and not
+# committed. Compose fails on a missing file, so a fresh clone gets an empty one.
+[ -f "${here}/compose.local.yml" ] || printf 'services: {}\n' > "${here}/compose.local.yml"
+
 echo "building otel-php-rust-dev:${php_version} (dev container image)..."
 
 # Layers are cached, so this is a no-op after the first run for a version.
