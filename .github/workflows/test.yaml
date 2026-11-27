@@ -84,7 +84,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        php-version: ['7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
+        php-version: ['7.1','7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
     steps:
       - uses: actions/checkout@v4
 
@@ -127,9 +127,8 @@ jobs:
       # --ignore-platform-req=php keeps mvc 3.8.0 instead. That is the version 8.4 already
       # tests against, it needs no advisory ignore, and the suite passes on it. The flag is
       # scoped to 8.5 on purpose: on 7.x/8.0 it would force 3.8.0 onto a PHP it cannot run.
-      - name: Install dependencies (7.1+)
+      - name: Install dependencies (laminas)
         working-directory: otel
-        if: matrix.php-version != '7.0'
         run: |
           cd tests/auto/laminas
           if [ "${{ matrix.php-version }}" = "8.5" ]; then
@@ -140,7 +139,7 @@ jobs:
 
       - name: Install dependencies (7.2+)
         working-directory: otel
-        if: matrix.php-version != '7.0' && matrix.php-version != '7.1'
+        if: matrix.php-version != '7.1'
         run: (cd tests/auto/psr18 && composer update --no-dev)
 
       # Clippy runs per PHP version on purpose. build.rs sets otel_observer_supported on

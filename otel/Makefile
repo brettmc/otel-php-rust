@@ -47,9 +47,9 @@ clean:
 	rm -rf tests/auto/zf1/vendor/* tests/auto/zf1/composer.lock
 	rm -rf tests/auto/psr18/vendor/* tests/auto/psr18/composer.lock
 # Which fixtures can resolve depends on the running PHP, so this mirrors the gates in
-# .github/workflows/test.yaml rather than duplicating the version matrix: zf1 always,
-# laminas on 7.1+, psr18 on 7.2+. Running all three unconditionally fails on 7.0/7.1,
-# where the skipped dirs have no resolvable release.
+# .github/workflows/test.yaml rather than duplicating the version matrix: zf1 and laminas
+# always, psr18 on 7.2+. Running psr18 unconditionally fails on 7.1, where it has no
+# resolvable release.
 #
 # 8.5 needs --ignore-platform-req=php for laminas: no laminas-mvc release supports it yet
 # (3.8.0 caps at ~8.4.0), and without the flag the resolver falls back to mvc 2.x, which
@@ -63,10 +63,8 @@ update:
 	(cd tests/auto/zf1 && composer update --no-dev)
 ifeq ($(shell test $(PHP_VERSION_ID) -ge 80500 && echo yes),yes)
 	(cd tests/auto/laminas && composer update --no-dev --ignore-platform-req=php)
-else ifeq ($(shell test $(PHP_VERSION_ID) -ge 70100 && echo yes),yes)
-	(cd tests/auto/laminas && composer update --no-dev)
 else
-	@echo "⏭  skipping laminas: needs PHP 7.1+"
+	(cd tests/auto/laminas && composer update --no-dev)
 endif
 ifeq ($(shell test $(PHP_VERSION_ID) -ge 70200 && echo yes),yes)
 	(cd tests/auto/psr18 && composer update --no-dev)

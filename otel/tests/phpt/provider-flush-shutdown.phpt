@@ -32,7 +32,7 @@ var_dump($loggerProvider->forceFlush());
 // Guarded rather than skipping the whole file: the return *values* checked above are the
 // point of this test and are worth asserting on every version. Only the declaration needs
 // 7.2, because phper-sys gates ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX at PHP_VERSION_ID
-// >= 70200 and falls back to ZEND_BEGIN_ARG_INFO_EX below it -- so on 7.0/7.1 even a
+// >= 70200 and falls back to ZEND_BEGIN_ARG_INFO_EX below it -- so on 7.1 even a
 // builtin return type is never registered and getReturnType() is NULL. (The class-valued
 // OBJ variant needs 8.0; see interface-surface.phpt.)
 //

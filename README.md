@@ -23,8 +23,8 @@ applications that pre-date modern frameworks.
 
 ## Supported PHP versions
 
-This works on all PHP versions supported by phper (7.0+). I've mostly tested against
-`8.4`, `7.4` and some light testing against `7.0`. Auto-instrumentation is implemented
+This works on PHP 7.1 and later, the versions phper supports. I've mostly tested against
+`8.4` and `7.4`. Auto-instrumentation is implemented
 via the `zend_observer` API for PHP 8.0+, and via `zend_execute_ex` + `zend_execute_internal`
 for PHP 7.x.
 
