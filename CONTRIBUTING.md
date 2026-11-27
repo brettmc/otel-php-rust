@@ -2,7 +2,7 @@
 
 ## Development
 
-Using docker + compose, `Dockerfile` provides PHP 7.0-8.4 + rust environment to build and
+Using docker + compose, `Dockerfile` provides PHP 7.0-8.5 + rust environment to build and
 test in. I've added `Makefile`s to make things easier, and written some tests using PHP's
 [phpt](https://qa.php.net/phpt_details.php).
 

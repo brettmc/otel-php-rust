@@ -563,10 +563,11 @@ entitlement check for *every* build in that environment.
 
 These are additive: the repository's top-level `Dockerfile`,
 `docker-compose.yaml` and `make bash` workflow still work. The dev containers
-use their own `Dockerfile` here, based on `debian:bookworm`, whose
+use their own `Dockerfile` here. Both are based on `debian:bookworm`, whose
 [sury](https://packages.sury.org/php/) repository carries every PHP version
-from 7.0 to 8.5 — the top-level image is `debian:bullseye` and is not changed
-by any of this.
+from 7.0 to 8.5. The top-level image is the slimmer of the two: it has the
+build toolchain, `gdb` and `valgrind`, but not `git`, an editor or `strace`
+(see [What's in the container](#whats-in-the-container)).
 
 The two now agree on paths: `make bash` also mounts the whole repository at
 `/workspace` and starts in `/workspace/otel`, so a path from one works in the
@@ -574,17 +575,3 @@ other. It used to mount only `otel/`, at `/usr/src/myapp`. If you have an
 existing `php-rust:<version>` image from before that change, rebuild it with
 `make build-image` — the `otel.so` symlink is baked into the image and the old
 one points at a path that no longer exists.
-
-## PHP 8.5
-
-The dev container builds and PHP 8.5 itself runs, but the extension does not
-currently compile against it: the pinned `phper` revision does not yet support
-PHP 8.5's internal API (`HASH_KEY_IS_STRING`/`HASH_KEY_IS_LONG` and some
-signature changes). The container is included so the build can be re-tried as
-`phper` adds support. CI currently covers 7.0 through 8.4.
-
-## PHP 7.0 - 7.3
-
-Not included, because bookworm's sury repository does not carry them. CI still
-tests these versions, and the top-level `Dockerfile` (`debian:bullseye`) can
-still build them via `make bash`.
