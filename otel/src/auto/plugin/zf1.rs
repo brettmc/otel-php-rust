@@ -126,13 +126,13 @@ impl Zf1RouteHandler {
         // in php7, retval is optimized away (not used in Zend_Controller_Front::dispatch), so we
         // instead use the first parameter of the execute_data (which is also the request object)
         let zf1_request_zval = if retval.get_type_info() != phper::types::TypeInfo::NULL {
-            retval
+            Some(retval)
         } else {
             let exec_data_ref = unsafe { &mut *exec_data };
-            exec_data_ref.get_mut_parameter(0)
+            execute_data::get_mut_parameter(exec_data_ref, 0)
         };
 
-        if let Some(zf1_request_obj) = zf1_request_zval.as_mut_z_obj() {
+        if let Some(zf1_request_obj) = zf1_request_zval.and_then(|zval| zval.as_mut_z_obj()) {
             tracing::debug!("Auto::Zf1::converted zf1_request_obj to ZObj");
             let method = zf1_request_obj.call("getMethod", []).ok().and_then(|zv| {
                 zv.as_z_str()
@@ -422,8 +422,9 @@ impl Zf1AdapterPrepareHandler {
         let exec_data_ref = unsafe { &mut *exec_data };
         let mut span_name = "prepare".to_string();
         let mut attributes = vec![];
-        let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
-        if let Some(sql_str) = sql_zval.as_z_str() {
+        if let Some(sql_str) = execute_data::get_mut_parameter(exec_data_ref, 0)
+            .and_then(|sql_zval| sql_zval.as_z_str())
+        {
             if let Ok(sql) = sql_str.to_str() {
                 // Add SQL query as an attribute
                 attributes.push(KeyValue::new(
@@ -478,8 +479,9 @@ impl Zf1AdapterPrepareHandler {
             }
 
             let exec_data_ref = unsafe { &mut *exec_data };
-            let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
-            if let Some(sql_str) = sql_zval.as_z_str() {
+            if let Some(sql_str) = execute_data::get_mut_parameter(exec_data_ref, 0)
+                .and_then(|sql_zval| sql_zval.as_z_str())
+            {
                 if let Ok(sql) = sql_str.to_str() {
                     let sql_name = utils::extract_span_name_from_sql(sql)
                         .unwrap_or_else(|| "OTHER".to_string());
