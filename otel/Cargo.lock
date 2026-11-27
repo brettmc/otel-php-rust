@@ -1188,7 +1188,7 @@ dependencies = [
 
 [[package]]
 name = "otel"
-version = "0.17.0"
+version = "0.18.1"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.23.1",
