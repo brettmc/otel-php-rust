@@ -57,6 +57,12 @@ jobs:
           php-version: '8.5'
           coverage: none
 
+      # ubuntu-26.04 has LLVM 20, 21 and 22. bindgen loads the newest libclang but uses
+      # the builtin headers of `clang` on PATH, and libclang 22 cannot parse clang 21's
+      # SSE headers. Load the libclang that matches them.
+      - name: Match libclang to clang
+        run: echo "LIBCLANG_PATH=$(dirname "$(dirname "$(clang -print-resource-dir)")")" >> "$GITHUB_ENV"
+
       # ignores the committed lockfile and takes the newest semver-compatible versions
       - name: Update to latest dependencies
         working-directory: otel
@@ -97,6 +103,10 @@ jobs:
 
       - name: Set TEST_PHP_EXECUTABLE environment variable
         run: echo "TEST_PHP_EXECUTABLE=$(which php)" >> $GITHUB_ENV
+
+      # see the same step in latest-deps
+      - name: Match libclang to clang
+        run: echo "LIBCLANG_PATH=$(dirname "$(dirname "$(clang -print-resource-dir)")")" >> "$GITHUB_ENV"
 
       - name: Build
         working-directory: otel

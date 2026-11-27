@@ -1,5 +1,6 @@
 use crate::{
     auto::{
+        execute_data,
         plugin::{Handler, HandlerCallbacks, HandlerList, HandlerSlice, Plugin, Target, db},
         utils,
     },
@@ -162,9 +163,10 @@ impl LaminasCompleteRequestHandler {
     unsafe fn pre_callback(exec_data: *mut ExecuteData) {
         //get the first argument from exec_data, which is an MvcEvent
         let exec_data_ref = unsafe { &mut *exec_data };
-        let mvc_event_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         // see https://opentelemetry.io/docs/specs/otel/trace/exceptions/#recording-an-exception
-        if let Some(mvc_event_obj) = mvc_event_zval.as_mut_z_obj() {
+        if let Some(mvc_event_obj) = execute_data::get_mut_parameter(exec_data_ref, 0)
+            .and_then(|mvc_event_zval| mvc_event_zval.as_mut_z_obj())
+        {
             let is_error = mvc_event_obj
                 .call("isError", [])
                 .ok()
@@ -234,10 +236,11 @@ impl LaminasRouteHandler {
             }
         };
         let exec_data_ref = unsafe { &mut *exec_data };
-        let route_match_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
         let request = get_request_details();
 
-        if let Some(route_match_obj) = route_match_zval.as_mut_z_obj() {
+        if let Some(route_match_obj) = execute_data::get_mut_parameter(exec_data_ref, 0)
+            .and_then(|route_match_zval| route_match_zval.as_mut_z_obj())
+        {
             let route_name = route_match_obj
                 .call("getMatchedRouteName", [])
                 .ok()
@@ -453,13 +456,13 @@ impl LaminasStatementPrepareHandler {
         // Get the first parameter as a string, if present
         let sql_from_param = {
             let exec_data_ref = unsafe { &mut *exec_data };
-            let sql_zval = exec_data_ref.get_mut_parameter(0);
-            if sql_zval.get_type_info() != phper::types::TypeInfo::NULL {
-                sql_zval
-                    .as_z_str()
-                    .and_then(|s| s.to_str().ok().map(|s| s.to_owned()))
-            } else {
-                None
+            match execute_data::get_mut_parameter(exec_data_ref, 0) {
+                Some(sql_zval) if sql_zval.get_type_info() != phper::types::TypeInfo::NULL => {
+                    sql_zval
+                        .as_z_str()
+                        .and_then(|s| s.to_str().ok().map(|s| s.to_owned()))
+                }
+                _ => None,
             }
         };
 
@@ -646,9 +649,8 @@ impl LaminasConnectionExecuteHandler {
         let exec_data_ref = unsafe { &mut *exec_data };
         let mut attributes = vec![];
         //sql param
-        let sql_zval: &mut ZVal = exec_data_ref.get_mut_parameter(0);
-        let sql_str = sql_zval
-            .as_z_str()
+        let sql_str = execute_data::get_mut_parameter(exec_data_ref, 0)
+            .and_then(|sql_zval| sql_zval.as_z_str())
             .and_then(|s| s.to_str().ok())
             .unwrap_or_default();
 

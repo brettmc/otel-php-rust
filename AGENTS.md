@@ -62,6 +62,10 @@ Use `arguments.get(n)` with an explicit `None` branch. An ordinary call shape of
 fewer arguments than the signature declares, and indexing a missing slot panics across the FFI
 boundary. See `otel/src/trace/propagation/trace_context_propagator.rs:42`.
 
+The same holds in auto-instrumentation hooks, which see the call as made: `$this->prepare()`
+passes nothing to `prepare($sql = null)`. phper's `ExecuteData::get_mut_parameter` panics past
+`num_args()`, so hooks use `auto::execute_data::get_mut_parameter`, which returns an `Option`.
+
 ### `.optional()` is not free
 
 Making an argument optional to be accommodating can open a crash path: it lets
