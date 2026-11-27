@@ -2,13 +2,13 @@
 
 ## Development
 
-Using docker + compose, `Dockerfile` provides PHP 7.0-8.4 + rust environment to build and
+Using docker + compose, `Dockerfile` provides PHP 7.1-8.4 + rust environment to build and
 test in. I've added `Makefile`s to make things easier, and written some tests using PHP's
 [phpt](https://qa.php.net/phpt_details.php).
 
 ### Dev containers
 
-Alternatively, there is a dev container per PHP version (7.0-8.5) in
+Alternatively, there is a dev container per PHP version (7.1-8.5) in
 [.devcontainer](.devcontainer), each with the rust toolchain, PHP debug symbols, a
 collector for the `otlp` tests. Each version gets its own
 cargo `target/`, so no `make clean` is needed when switching between them.
@@ -47,7 +47,7 @@ Tests are organised as:
 
 ### PHP 7.x
 
-(tested back to 7.0)
+(tested back to 7.1)
 
 Note that a handful of tests skip on 7.x, for three reasons:
 

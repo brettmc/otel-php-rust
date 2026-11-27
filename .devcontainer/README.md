@@ -5,7 +5,6 @@ PHP development headers.
 
 | Dev container            | PHP   |
 |--------------------------|-------|
-| `otel-php-rust (PHP 7.0)`| 7.0   |
 | `otel-php-rust (PHP 7.1)`| 7.1   |
 | `otel-php-rust (PHP 7.2)`| 7.2   |
 | `otel-php-rust (PHP 7.3)`| 7.3   |
@@ -242,11 +241,11 @@ The first open of a version therefore spends a minute or so on composer. After t
 volume is warm and reopening is immediate. `postCreate` rather than `postStart` because it
 only needs to happen once per container.
 
-`make update` installs only the fixtures the running PHP can resolve — `zf1` always,
-`laminas` on 7.1+, `psr18` on 7.2+ — mirroring the gates in `.github/workflows/test.yaml`
+`make update` installs only the fixtures the running PHP can resolve — `zf1` and
+`laminas` always, `psr18` on 7.2+ — mirroring the gates in `.github/workflows/test.yaml`
 rather than duplicating the version matrix. On 8.5 it adds `--ignore-platform-req=php` for
 laminas, for the reason given in that workflow. Running all three unconditionally is what
-used to fail on 7.0 and 7.1.
+used to fail on 7.1.
 
 To force a reinstall, remove the volume and rebuild, or just run `make update` again:
 
@@ -324,7 +323,7 @@ else.
 
 The committed configuration does not *require* any of it. The one exception is
 that it provides the volume and environment for Claude Code's state, since that
-is the awkward part of using it across eleven containers — see
+is the awkward part of using it across ten containers — see
 [Claude Code](#claude-code). It is inert if you do not install it.
 
 Dev container *features* install software into the image:
@@ -370,7 +369,7 @@ config file or an API token on the host needs one of two mechanisms here:
 * **A named volume**, for a tool that writes a credential or state file and
   would otherwise lose it on every rebuild. `compose.base.yaml` carries one
   general-purpose volume for this, mounted at
-  `/home/php-rust/.config/dev-tools`, shared across all eleven versions and
+  `/home/php-rust/.config/dev-tools`, shared across all ten versions and
   inert if nothing writes to it. Point your tool at it with whatever variable
   it uses for its config directory, set in `.env`.
 
@@ -391,7 +390,7 @@ works, and whether the message is only on stderr, before chasing it.
 
 Nothing here installs it, and the configuration below is inert if you do not use it. But
 because it keeps state in a known place, `compose.base.yaml` provides the volume and the two
-environment variables that make it behave the same in all eleven containers — which is
+environment variables that make it behave the same in all ten containers — which is
 otherwise the awkward part of running it across this many.
 
 To install it, in your own VS Code **user** settings:
@@ -426,7 +425,7 @@ environment:
 ```
 
 * **One volume, `otel-php-rust-claude-config`, shared by every version.** Without it the
-  container's home directory is discarded on rebuild and you sign in again each time — eleven
+  container's home directory is discarded on rebuild and you sign in again each time — ten
   containers, each rebuilt whenever a feature changes, is a lot of signing in.
 * **`CLAUDE_CONFIG_DIR`** is the part that is easy to miss. The auth token, settings and
   session history live under `~/.claude`, but the OAuth account and per-project trust live in
@@ -460,8 +459,8 @@ your home directory is on the container's own filesystem, so point it at the vol
 
 **Notes Claude keeps itself** — auto memory — live in
 `<config dir>/projects/<project>/memory/`, as a `MEMORY.md` index plus a file per fact. Since
-that is inside the volume, it persists across rebuilds and is the *same* memory in all eleven
-containers: something learned on 8.4 is there on 7.0.
+that is inside the volume, it persists across rebuilds and is the *same* memory in all ten
+containers: something learned on 8.4 is there on 7.1.
 
 `CLAUDE_CODE_PROJECT_DIR_NAME` is what makes that reliable. `<project>` is normally derived
 from the repository path, which here is `/workspace` in every container — so they would agree
@@ -506,7 +505,7 @@ One caveat about the shared volume: it is one directory, so several containers r
 Code *at the same time* are writing to it at the same time. Sequential use across versions,
 which is the normal way to work here, is fine. If you want per-version isolation instead, move
 the `claude-config` volume out of `compose.base.yaml` into each `php*/compose.yaml` with a
-per-version `name:`, as `target` is done — at the cost of signing in eleven times and eleven
+per-version `name:`, as `target` is done — at the cost of signing in ten times and ten
 separate memories.
 
 ## Troubleshooting
@@ -565,7 +564,7 @@ These are additive: the repository's top-level `Dockerfile`,
 `docker-compose.yaml` and `make bash` workflow still work. The dev containers
 use their own `Dockerfile` here, based on `debian:bookworm`, whose
 [sury](https://packages.sury.org/php/) repository carries every PHP version
-from 7.0 to 8.5 — the top-level image is `debian:bullseye` and is not changed
+from 7.1 to 8.5 — the top-level image is `debian:bullseye` and is not changed
 by any of this.
 
 The two now agree on paths: `make bash` also mounts the whole repository at
@@ -574,17 +573,3 @@ other. It used to mount only `otel/`, at `/usr/src/myapp`. If you have an
 existing `php-rust:<version>` image from before that change, rebuild it with
 `make build-image` — the `otel.so` symlink is baked into the image and the old
 one points at a path that no longer exists.
-
-## PHP 8.5
-
-The dev container builds and PHP 8.5 itself runs, but the extension does not
-currently compile against it: the pinned `phper` revision does not yet support
-PHP 8.5's internal API (`HASH_KEY_IS_STRING`/`HASH_KEY_IS_LONG` and some
-signature changes). The container is included so the build can be re-tried as
-`phper` adds support. CI currently covers 7.0 through 8.4.
-
-## PHP 7.0 - 7.3
-
-Not included, because bookworm's sury repository does not carry them. CI still
-tests these versions, and the top-level `Dockerfile` (`debian:bullseye`) can
-still build them via `make bash`.

@@ -49,7 +49,7 @@ services:
       CLAUDE_CONFIG_DIR: /home/php-rust/.claude
       # Auto memory lives in <config dir>/projects/<project>/memory, where <project>
       # is normally derived from the repository path. Naming it explicitly keeps all
-      # eleven versions on one memory directory: without this they would agree anyway
+      # ten versions on one memory directory: without this they would agree anyway
       # (every container bind-mounts the repo at the same /workspace), but then so
       # would any *other* project opened at /workspace, which is the real hazard.
       CLAUDE_CODE_PROJECT_DIR_NAME: otel-php-rust

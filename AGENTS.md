@@ -2,7 +2,7 @@
 
 A PHP extension written in Rust: an OpenTelemetry API/SDK implementation that aims to be a
 drop-in replacement for the userland `open-telemetry/opentelemetry-php` packages. Built with
-[phper](https://github.com/phper-framework/phper), it targets **PHP 7.0 through 8.5** from one
+[phper](https://github.com/phper-framework/phper), it targets **PHP 7.1 through 8.5** from one
 source tree.
 
 Read this before editing. Most of what follows is a failure mode you cannot see in a diff.
@@ -88,8 +88,7 @@ From 8.0 the engine does not check the declared types of an internal function's 
 `setParent(new stdClass)` reaches the handler. So every handler must check what it was given,
 and treat a declared type as documentation plus reflection, not a guarantee.
 
-PHP 7.x does check them. That is why some calls that work on 8.x are a TypeError on 7.x, such
-as passing an `ArrayIterator` where `iterable` is declared on 7.0.
+PHP 7.x does check them. That is why some calls that work on 8.x are a TypeError on 7.x.
 
 ### Return types are declared but never enforced
 
@@ -160,7 +159,7 @@ file from an 8.x container:
 RUSTFLAGS="--cfg otel_observer_not_supported" cargo check --features test
 ```
 
-This is why CI runs clippy on all 11 PHP versions rather than one — a single-version run is
+This is why CI runs clippy on all 10 PHP versions rather than one — a single-version run is
 blind to one of those files entirely.
 
 For Zend structs whose field types differ across versions, **infer the type rather than
@@ -274,7 +273,7 @@ fail the workflow**. Read the matrix itself rather than trusting the green check
 `latest-deps` job is `continue-on-error` on purpose too.
 
 `otel/Cargo.lock` is committed — a `cdylib` with `publish = false`, so no downstream consumer
-sees it, and it keeps the 11-version matrix and every contributor on one dependency graph.
+sees it, and it keeps the 10-version matrix and every contributor on one dependency graph.
 
 ## Conventions
 

@@ -1,7 +1,7 @@
 # Dev container image for otel-php-rust.
 #
 # Separate from the repository's top-level Dockerfile (which backs `make bash`):
-# this one is based on bookworm, whose sury repository carries php7.4 through
+# this one is based on bookworm, whose sury repository carries php7.1 through
 # php8.5, so a single base covers every version we ship a dev container for.
 FROM composer:lts AS composer
 FROM debian:bookworm
