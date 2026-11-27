@@ -37,6 +37,7 @@ pub fn make_non_recording_span_class(
     );
     let span_class = class.bound_class();
 
+    class.set_final();
     class.implements(span_interface.clone());
 
     class.add_method("__construct", Visibility::Private, |_, _| {

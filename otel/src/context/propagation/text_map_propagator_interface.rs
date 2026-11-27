@@ -25,25 +25,21 @@ pub fn inject_arguments() -> Vec<Argument> {
         Argument::new("carrier")
             .with_type_hint(ArgumentTypeHint::Mixed)
             .by_ref(),
-        // `.optional()` rather than `.with_default_value("null")`: both lower
-        // `required_num_args` identically, but phper routes a class-typed argument through
-        // `ZEND_ARG_OBJ_INFO`, which has no default-value field, so the default would be
-        // silently dropped. `.optional()` says exactly what Zend ends up recording.
-        //
-        // The visible consequence is that the argument cannot be passed by name:
-        // `inject($carrier, setter: $s)` raises ArgumentCountError for the skipped argument.
+        // A recorded default, not just `.optional()`, so a later argument can be passed by
+        // name: `inject($carrier, context: $c)` otherwise raises ArgumentCountError, because
+        // PHP will not skip a parameter whose default it cannot see.
         Argument::new("setter")
             .with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
                 PROPAGATION_SETTER_INTERFACE_NAME,
             )))
             .allow_null()
-            .optional(),
+            .with_default_value("null"),
         Argument::new("context")
             .with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
                 CONTEXT_INTERFACE_NAME,
             )))
             .allow_null()
-            .optional(),
+            .with_default_value("null"),
     ]
 }
 
@@ -58,13 +54,13 @@ pub fn extract_arguments() -> Vec<Argument> {
                 PROPAGATION_GETTER_INTERFACE_NAME,
             )))
             .allow_null()
-            .optional(),
+            .with_default_value("null"),
         Argument::new("context")
             .with_type_hint(ArgumentTypeHint::ClassEntry(String::from(
                 CONTEXT_INTERFACE_NAME,
             )))
             .allow_null()
-            .optional(),
+            .with_default_value("null"),
     ]
 }
 

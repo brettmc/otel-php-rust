@@ -28,11 +28,8 @@ use OpenTelemetry\API\Globals;
 //   ArgumentCountError: Argument #2 ($version) must be passed explicitly,
 //                       because the default value is not known
 // `.with_default_value("null")` records one, which is also what leaves the handler a slot to
-// read instead of an absent one.
-//
-// Not every argument can be fixed this way: phper routes a class-typed argument through
-// `ZEND_ARG_OBJ_INFO`, which has no default-value field, so the default is dropped and the
-// named call still fails. That is why the arguments asserted here are the builtin-typed ones.
+// read instead of an absent one. The class-typed arguments of the propagator are asserted in
+// `context/propagation/context-named-arguments.phpt`.
 
 $tracerProvider = Globals::tracerProvider();
 var_dump($tracerProvider->getTracer('n', version: 'v') !== null);

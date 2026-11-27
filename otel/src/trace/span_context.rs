@@ -21,6 +21,7 @@ pub fn make_span_context_class(
     );
     let span_context_class = class.bound_class();
 
+    class.set_final();
     class.implements(span_context_interface.clone());
 
     class.add_method("__construct", Visibility::Private, |_, _| {

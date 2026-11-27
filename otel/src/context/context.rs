@@ -46,6 +46,7 @@ pub fn build_context_class(
     let storage_ce = storage_class.bound_class();
     let context_key_class = context_key_class.bound_class();
 
+    class.set_final();
     class.implements(context_interface);
     class.add_property("context_id", Visibility::Private, 0i64);
 

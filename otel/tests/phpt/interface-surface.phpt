@@ -17,8 +17,8 @@ OTEL_METRICS_EXPORTER=none
 //
 // Each expectation below is upstream's own signature (open-telemetry/opentelemetry-php),
 // pinned as name => [requiredParams, totalParams]. Arity, not full types, because phper
-// cannot express some of upstream's types (unions especially) so those legitimately differ --
-// a missing *method* never does.
+// cannot express some of upstream's types (intersections, and any union before PHP 8.0) so
+// those legitimately differ -- a missing *method* never does.
 $expected = [
     'OpenTelemetry\Context\ContextInterface' => [
         'createKey' => [1, 1],
